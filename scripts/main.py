@@ -1,12 +1,24 @@
-from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit
-from PyQt6.QtCore import pyqtSlot, Qt
+
 import sys
 import os
 import pyXTF
 import numpy as np
 import math
 import time
+from PIL import Image
+import bisect
+from PyQt6 import QtGui
+
+#os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000"
+os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
+
+from PyQt6 import QtWidgets
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import pyqtSlot, Qt, QRect
+from PySide6 import QtGui
+
+#QtGui.QImageReader.setAllocationLimit(0)
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -20,6 +32,7 @@ class MyWindow(QMainWindow):
         self.filename = None
         self.port_data = None
         self.starboard_data = None
+        self.image = None
 
         self._decimation = 4
         self._clip = 1.0
@@ -47,47 +60,86 @@ class MyWindow(QMainWindow):
     def clip(self, val):
         self._clip = val
 
-    def initUI(self):
-        self.label_decimation = QLabel(self)
-        self.label_decimation.move(10, 5)
-        self.label_decimation.setText(f"Decimation: {self.decimation}")
-        self.label_decimation.adjustSize()
+    def init_toolbox(self):
+        self.decimation_label = QLabel(self)
+        self.decimation_label.setFixedSize(100, 15)
+        self.decimation_label.setText(f"Decimation: {self.decimation}")
+        self.decimation_label.adjustSize()
 
-        self.slider_decimation = QSlider(Qt.Orientation.Horizontal, self)
-        self.slider_decimation.setGeometry(10, 15, 100, 40)
-        self.slider_decimation.setMinimum(1)
-        self.slider_decimation.setMaximum(10)
-        self.slider_decimation.setValue(self.decimation)
-        self.slider_decimation.setTickInterval(1)
-        self.slider_decimation.valueChanged.connect(self.update_decimation)
+        self.decimation_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.decimation_slider.setGeometry(10, 15, 100, 40)
+        self.decimation_slider.setMinimum(1)
+        self.decimation_slider.setMaximum(10)
+        self.decimation_slider.setFixedSize(100, 15)
+        self.decimation_slider.setValue(self.decimation)
+        self.decimation_slider.setTickInterval(1)
+        self.decimation_slider.valueChanged.connect(self.update_decimation)
 
-        self.label_clip = QLabel(self)
-        self.label_clip.move(150, 5)
-        self.label_clip.setText(f"Clip: {self.clip}")
-        self.label_clip.adjustSize()
+        self.clip_label = QLabel(self)
+        self.clip_label.setFixedSize(100, 15)
+        self.clip_label.setText(f"Clip: {self.clip}")
+        self.clip_label.adjustSize()
 
-        self.slider_clip = QSlider(Qt.Orientation.Horizontal, self)
-        self.slider_clip.setGeometry(150, 15, 100, 40)
-        self.slider_clip.setMinimum(0)
-        self.slider_clip.setMaximum(100)
-        self.slider_clip.setValue(self.clip * 100)
-        self.slider_clip.setTickInterval(1)
-        self.slider_clip.valueChanged.connect(self.update_clip)
+        self.clip_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.clip_slider.setGeometry(100, 15, 100, 40)
+        self.clip_slider.setMinimum(0)
+        self.clip_slider.setMaximum(100)
+        self.clip_slider.setFixedSize(100, 15)
+        self.clip_slider.setValue(self.clip * 100)
+        self.clip_slider.setTickInterval(1)
+        self.clip_slider.valueChanged.connect(self.update_clip)
 
         self.open_file_btn = QPushButton(self)
         self.open_file_btn.setText("Open file dialog")
-        self.open_file_btn.move(450, 0)
         self.open_file_btn.clicked.connect(self.open_dialog)
 
-        self.b = QtWidgets.QPushButton(self)
-        self.b.setText("Clickme")
-        self.b.clicked.connect(self.read_xtf)
-        self.b.move(100, 100)
+        b = QtWidgets.QPushButton(self)
+        b.setText("Readt XTF")
+        b.clicked.connect(self.read_xtf)
+        b.move(300, 0)
 
-        self.b1 = QtWidgets.QPushButton(self)
-        self.b1.setText("Clickme")
-        self.b1.clicked.connect(self.clicked)
-        self.b1.move(400, 400)
+        b1 = QtWidgets.QPushButton(self)
+        b1.setText("Process")
+        b1.clicked.connect(self.clicked)
+
+        self.toolbox_layout = QVBoxLayout()
+        
+        self.toolbox_layout.addWidget(self.decimation_label)
+        self.toolbox_layout.addWidget(self.decimation_slider)
+        self.toolbox_layout.addWidget(self.clip_label)
+        self.toolbox_layout.addWidget(self.clip_slider)
+        self.toolbox_layout.addWidget(b1)
+        self.toolbox_layout.addStretch(1)
+
+
+    def initUI(self):
+        self.init_toolbox()
+
+        self.label_display = QLabel(self)
+        self.label_display.setGeometry(QRect(0, 20, 1024, 1024))
+        #self.label_display.move(0, 100)
+        pixmap = QPixmap('aaa.png')
+        pixmap.scaledToWidth(1601)
+        #pixmap.scaledToHeight(398)
+        self.label_display.setPixmap(pixmap)
+
+        scrollArea = QScrollArea()
+        scrollArea.setWidgetResizable(True) 
+        scrollArea.setWidget(self.label_display)
+
+        image_layout = QVBoxLayout()
+        image_layout.addWidget(scrollArea)
+
+        main_layout = QHBoxLayout()
+        main_layout.addLayout(self.toolbox_layout)
+        main_layout.addLayout(image_layout)
+
+
+        main_widget = QWidget()
+        main_widget.setLayout(main_layout)
+        
+        self.setCentralWidget(main_widget)
+
 
     def update_decimation(self):
         self.decimation = self.sender().value()
@@ -96,15 +148,28 @@ class MyWindow(QMainWindow):
     
     def update_clip(self):
         self.clip = self.sender().value() / 100
-        self.label_clip.setText(f"Clip: {str(self.sender().value() / 100)}")
-        self.label_clip.adjustSize()
+        self.clip_label.setText(f"Clip: {str(self.sender().value() / 100)}")
+        self.clip_label.adjustSize()
     
 
     def clicked(self):
         print(self.filename, self.filepath, self.decimation, self._decimation)
         print(np.array(self.port_data).shape, np.array(self.starboard_data).shape)
-        self.label.setText("you pressed the button")
-        self.update()
+
+        invert = True
+        clip = 0
+        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, clip)
+        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, clip)
+        
+        filename = "image"
+        mergedImage = mergeImages(portImage, stbdImage)
+        print ("Saving Image...")
+        self.image = mergedImage
+        mergedImage.save(os.path.splitext(filename)[0]+'.png')
+        pixmap = QPixmap('image.png')
+        self.label_display.setPixmap(pixmap)
+
+
 
     def update(self):
         self.label.adjustSize()
@@ -129,7 +194,7 @@ class MyWindow(QMainWindow):
         acrossTrackSampleInterval = (maxSlantRange / maxSamplesPort) * self.decimation # sample interval in metres
         
         # to make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
-        distance = 1#meanSpeed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
+        distance = meanSpeed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
         alongTrackSampleInterval = (distance / pingCount) 
 
         stretch = math.ceil(alongTrackSampleInterval / acrossTrackSampleInterval)
@@ -196,6 +261,94 @@ def getSampleRange(filepath, channelA, channelB, loadNavigation):
 
     print("Get Sample Range Duration %.3fs" % (time.time() - start_time)) # print the processing time.
     return maxSamplesPort, maxSamplesStbd, minAltitude, maxAltitude, maxRange, pingCount, meanSpeed, navigation
+
+
+def findMinMaxClipValues(channel, clip):
+    print ("Clipping data with an upper and lower percentage of:", clip)
+    # compute a histogram of teh data so we can auto clip the outliers
+    bins = np.arange(np.floor(channel.min()),np.ceil(channel.max()))
+    hist, base = np.histogram(channel, bins=bins, density=1)    
+
+    # instead of spreading across the entire data range, we can clip the outer n percent by using the cumsum.
+    # from the cumsum of histogram density, we can figure out what cut off sample amplitude removes n % of data
+    cumsum = np.cumsum(hist)   
+    
+    minimumBinIndex = bisect.bisect(cumsum,clip/100)
+    maximumBinIndex = bisect.bisect(cumsum,(1-clip/100))
+
+    return minimumBinIndex, maximumBinIndex
+
+def samplesToGrayImageLogarithmic(samples, invert, clip):
+    zg_LL = 0 # min and max grey scales
+    zg_UL = 255
+    zs_LL = 0 
+    zs_UL = 0
+    conv_01_99 = 1
+
+    #create numpy arrays so we can compute stats
+    channel = np.array(samples)   
+
+    # compute the clips
+    if clip > 0:
+        channelMin, channelMax = findMinMaxClipValues(channel, clip)
+    else:
+        channelMin = channel.min()
+        channelMax = channel.max()
+    
+    if channelMin > 0:
+        zs_LL = math.log(channelMin)
+    else:
+        zs_LL = 0
+    if channelMax > 0:
+        zs_UL = math.log(channelMax)
+    else:
+        zs_UL = 0
+
+    mii = np.log(np.mean(np.array(channel)) - np.std(np.array(channel)))
+
+    if np.isnan(mii) or mii < 0:
+        print("IS or not")
+        mii = 0
+    
+    zs_UL = math.log(np.mean(np.array(channel)) + np.std(np.array(channel)))
+    zs_LL = mii
+
+    # this scales from the range of image values to the range of output grey levels
+    if (zs_UL - zs_LL) is not 0:
+        conv_01_99 = ( zg_UL - zg_LL ) / ( zs_UL - zs_LL )
+   
+    conv_01_99 = conv_01_99 / 2
+    #we can expect some divide by zero errors, so suppress 
+    np.seterr(divide='ignore')
+    channel = np.log(samples)
+    channel = np.subtract(channel, zs_LL)
+    channel = np.multiply(channel, conv_01_99)
+    if invert:
+        channel = np.subtract(zg_UL, channel)
+    else:
+        channel = np.add(zg_LL, channel)
+    # ch = channel.astype('uint8')
+    image = Image.fromarray(channel).convert('L')
+    
+    return image
+
+def mergeImages(image1, image2):
+    """Merge two images into one, displayed side by side
+    :param file1: path to first image file
+    :param file2: path to second image file
+    :return: the merged Image object
+    """
+
+    (width1, height1) = image1.size
+    (width2, height2) = image2.size
+
+    result_width = width1 + width2
+    result_height = max(height1, height2)
+
+    result = Image.new('L', (result_width, result_height))
+    result.paste(im=image1, box=(0, 0))
+    result.paste(im=image2, box=(width1, 0))
+    return result
 
 def window():
     app = QApplication(sys.argv)
