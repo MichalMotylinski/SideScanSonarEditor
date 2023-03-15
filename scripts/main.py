@@ -102,11 +102,25 @@ class MyWindow(QMainWindow):
         self.greyscale_min_slider = QSlider(Qt.Orientation.Horizontal, self)
         self.greyscale_min_slider.setGeometry(100, 15, 100, 40)
         self.greyscale_min_slider.setMinimum(0)
-        self.greyscale_min_slider.setMaximum(1000)
+        self.greyscale_min_slider.setMaximum(100)
         self.greyscale_min_slider.setFixedSize(150, 15)
         self.greyscale_min_slider.setValue(self.greyscale_min)
         self.greyscale_min_slider.setTickInterval(1)
         self.greyscale_min_slider.valueChanged.connect(self.update_greyscale_min)
+
+        self.greyscale_max_label = QLabel(self)
+        self.greyscale_max_label.setFixedSize(150, 15)
+        self.greyscale_max_label.setText(f"Greyscale max: {self.greyscale_max}")
+        self.greyscale_max_label.adjustSize()
+
+        self.greyscale_max_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.greyscale_max_slider.setGeometry(100, 15, 100, 40)
+        self.greyscale_max_slider.setMinimum(0)
+        self.greyscale_max_slider.setMaximum(100)
+        self.greyscale_max_slider.setFixedSize(150, 15)
+        self.greyscale_max_slider.setValue(self.greyscale_max)
+        self.greyscale_max_slider.setTickInterval(1)
+        self.greyscale_max_slider.valueChanged.connect(self.update_greyscale_max)
 
         self.open_file_btn = QPushButton(self)
         self.open_file_btn.setText("Open file dialog")
@@ -126,7 +140,7 @@ class MyWindow(QMainWindow):
 
         self.toolbox_layout = QVBoxLayout()
         self.toolbox_layout.addWidget(self.open_file_btn)
-        
+
         self.toolbox_layout.addWidget(self.decimation_label)
         self.toolbox_layout.addWidget(self.decimation_slider)
         self.toolbox_layout.addWidget(self.reload_file_btn)
@@ -135,6 +149,8 @@ class MyWindow(QMainWindow):
         self.toolbox_layout.addWidget(self.clip_slider)
         self.toolbox_layout.addWidget(self.greyscale_min_label)
         self.toolbox_layout.addWidget(self.greyscale_min_slider)
+        self.toolbox_layout.addWidget(self.greyscale_max_label)
+        self.toolbox_layout.addWidget(self.greyscale_max_slider)
         self.toolbox_layout.addWidget(self.apply_color_scheme_btn)
         
         self.toolbox_layout.addWidget(self.save_btn)
@@ -177,19 +193,15 @@ class MyWindow(QMainWindow):
         self.greyscale_min_label.setText(f"Greyscale min: {str(self.sender().value())}")
         self.greyscale_min_label.adjustSize()
 
-        invert = True
-        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip)
-        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip)
-        
-        self.image = mergeImages(portImage, stbdImage)
-        pixmap = toqpixmap(self.image)
-        self.label_display.setPixmap(pixmap)
-
+    def update_greyscale_max(self):
+        self.greyscale_max = self.sender().value()
+        self.greyscale_max_label.setText(f"Greyscale max: {str(self.sender().value())}")
+        self.greyscale_max_label.adjustSize()
         
     def apply_color_scheme(self):
         invert = True
-        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip)
-        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip)
+        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip, self.greyscale_min, self.greyscale_max)
+        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip, self.greyscale_min, self.greyscale_max)
         
         self.image = mergeImages(portImage, stbdImage)
         pixmap = toqpixmap(self.image)
@@ -311,7 +323,7 @@ def findMinMaxClipValues(channel, clip):
 
     return minimumBinIndex, maximumBinIndex
 
-def samplesToGrayImageLogarithmic(samples, invert, clip):
+def samplesToGrayImageLogarithmic(samples, invert, clip, min, max):
     zg_LL = 0 # min and max grey scales
     zg_UL = 255
     zs_LL = 0 
@@ -327,6 +339,9 @@ def samplesToGrayImageLogarithmic(samples, invert, clip):
     else:
         channelMin = channel.min()
         channelMax = channel.max()
+
+    channelMin = min
+    channelMax = max
     
     if channelMin > 0:
         zs_LL = math.log(channelMin)
@@ -343,14 +358,17 @@ def samplesToGrayImageLogarithmic(samples, invert, clip):
         print("IS or not")
         mii = 0
     
-    zs_UL = math.log(np.mean(np.array(channel)) + np.std(np.array(channel)))
-    zs_LL = mii
+    #zs_UL = math.log(np.mean(np.array(channel)) + np.std(np.array(channel)))
+    #zs_LL = mii
+
+    zs_UL = channelMax
+    zs_LL = channelMin
 
     # this scales from the range of image values to the range of output grey levels
-    if (zs_UL - zs_LL) is not 0:
+    if (zs_UL - zs_LL) != 0:
         conv_01_99 = ( zg_UL - zg_LL ) / ( zs_UL - zs_LL )
    
-    conv_01_99 = conv_01_99 / 2
+    #conv_01_99 = conv_01_99 / 2
     #we can expect some divide by zero errors, so suppress 
     np.seterr(divide='ignore')
     channel = np.log(samples)
