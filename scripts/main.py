@@ -6,6 +6,7 @@ import numpy as np
 import math
 import time
 from PIL import Image
+from PIL.ImageQt import ImageQt, toqpixmap
 import bisect
 from PyQt6 import QtGui
 
@@ -24,7 +25,7 @@ class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
         
-        self.setGeometry(200, 200, 600, 600)
+        self.setGeometry(200, 200, 1024, 1024)
         self.setWindowTitle("SSS")
         
 
@@ -33,7 +34,11 @@ class MyWindow(QMainWindow):
         self.port_data = None
         self.starboard_data = None
         self.image = None
+        self.image_filename = None
 
+        self.greyscale_min = 0
+        self.greyscale_max = 1
+        
         self._decimation = 4
         self._clip = 1.0
         self._stretch = None
@@ -62,7 +67,7 @@ class MyWindow(QMainWindow):
 
     def init_toolbox(self):
         self.decimation_label = QLabel(self)
-        self.decimation_label.setFixedSize(100, 15)
+        self.decimation_label.setFixedSize(150, 15)
         self.decimation_label.setText(f"Decimation: {self.decimation}")
         self.decimation_label.adjustSize()
 
@@ -70,13 +75,13 @@ class MyWindow(QMainWindow):
         self.decimation_slider.setGeometry(10, 15, 100, 40)
         self.decimation_slider.setMinimum(1)
         self.decimation_slider.setMaximum(10)
-        self.decimation_slider.setFixedSize(100, 15)
+        self.decimation_slider.setFixedSize(150, 15)
         self.decimation_slider.setValue(self.decimation)
         self.decimation_slider.setTickInterval(1)
         self.decimation_slider.valueChanged.connect(self.update_decimation)
 
         self.clip_label = QLabel(self)
-        self.clip_label.setFixedSize(100, 15)
+        self.clip_label.setFixedSize(150, 15)
         self.clip_label.setText(f"Clip: {self.clip}")
         self.clip_label.adjustSize()
 
@@ -84,44 +89,62 @@ class MyWindow(QMainWindow):
         self.clip_slider.setGeometry(100, 15, 100, 40)
         self.clip_slider.setMinimum(0)
         self.clip_slider.setMaximum(100)
-        self.clip_slider.setFixedSize(100, 15)
+        self.clip_slider.setFixedSize(150, 15)
         self.clip_slider.setValue(self.clip * 100)
         self.clip_slider.setTickInterval(1)
         self.clip_slider.valueChanged.connect(self.update_clip)
+
+        self.greyscale_min_label = QLabel(self)
+        self.greyscale_min_label.setFixedSize(150, 15)
+        self.greyscale_min_label.setText(f"Greyscale min: {self.greyscale_min}")
+        self.greyscale_min_label.adjustSize()
+
+        self.greyscale_min_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.greyscale_min_slider.setGeometry(100, 15, 100, 40)
+        self.greyscale_min_slider.setMinimum(0)
+        self.greyscale_min_slider.setMaximum(1000)
+        self.greyscale_min_slider.setFixedSize(150, 15)
+        self.greyscale_min_slider.setValue(self.greyscale_min)
+        self.greyscale_min_slider.setTickInterval(1)
+        self.greyscale_min_slider.valueChanged.connect(self.update_greyscale_min)
 
         self.open_file_btn = QPushButton(self)
         self.open_file_btn.setText("Open file dialog")
         self.open_file_btn.clicked.connect(self.open_dialog)
 
-        b = QtWidgets.QPushButton(self)
-        b.setText("Readt XTF")
-        b.clicked.connect(self.read_xtf)
-        b.move(300, 0)
+        self.reload_file_btn = QtWidgets.QPushButton(self)
+        self.reload_file_btn.setText("Reload")
+        self.reload_file_btn.clicked.connect(self.read_xtf)
 
-        b1 = QtWidgets.QPushButton(self)
-        b1.setText("Process")
-        b1.clicked.connect(self.clicked)
+        self.apply_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.apply_color_scheme_btn.setText("Apply")
+        self.apply_color_scheme_btn.clicked.connect(self.apply_color_scheme)
+
+        self.save_btn = QtWidgets.QPushButton(self)
+        self.save_btn.setText("Save image")
+        self.save_btn.clicked.connect(self.save_image)
 
         self.toolbox_layout = QVBoxLayout()
+        self.toolbox_layout.addWidget(self.open_file_btn)
         
         self.toolbox_layout.addWidget(self.decimation_label)
         self.toolbox_layout.addWidget(self.decimation_slider)
+        self.toolbox_layout.addWidget(self.reload_file_btn)
+
         self.toolbox_layout.addWidget(self.clip_label)
         self.toolbox_layout.addWidget(self.clip_slider)
-        self.toolbox_layout.addWidget(b1)
+        self.toolbox_layout.addWidget(self.greyscale_min_label)
+        self.toolbox_layout.addWidget(self.greyscale_min_slider)
+        self.toolbox_layout.addWidget(self.apply_color_scheme_btn)
+        
+        self.toolbox_layout.addWidget(self.save_btn)
         self.toolbox_layout.addStretch(1)
-
 
     def initUI(self):
         self.init_toolbox()
 
         self.label_display = QLabel(self)
-        self.label_display.setGeometry(QRect(0, 20, 1024, 1024))
-        #self.label_display.move(0, 100)
-        pixmap = QPixmap('aaa.png')
-        pixmap.scaledToWidth(1601)
-        #pixmap.scaledToHeight(398)
-        self.label_display.setPixmap(pixmap)
+        self.label_display.setGeometry(QRect(0, 0, 1024, 1024))
 
         scrollArea = QScrollArea()
         scrollArea.setWidgetResizable(True) 
@@ -134,40 +157,48 @@ class MyWindow(QMainWindow):
         main_layout.addLayout(self.toolbox_layout)
         main_layout.addLayout(image_layout)
 
-
         main_widget = QWidget()
         main_widget.setLayout(main_layout)
         
         self.setCentralWidget(main_widget)
 
-
     def update_decimation(self):
         self.decimation = self.sender().value()
-        self.label_decimation.setText(f"Decimation: {str(self.sender().value())}")
-        self.label_decimation.adjustSize()
+        self.decimation_label.setText(f"Decimation: {str(self.sender().value())}")
+        self.decimation_label.adjustSize()
     
     def update_clip(self):
         self.clip = self.sender().value() / 100
         self.clip_label.setText(f"Clip: {str(self.sender().value() / 100)}")
         self.clip_label.adjustSize()
-    
 
-    def clicked(self):
-        print(self.filename, self.filepath, self.decimation, self._decimation)
-        print(np.array(self.port_data).shape, np.array(self.starboard_data).shape)
+    def update_greyscale_min(self):
+        self.greyscale_min = self.sender().value()
+        self.greyscale_min_label.setText(f"Greyscale min: {str(self.sender().value())}")
+        self.greyscale_min_label.adjustSize()
 
         invert = True
-        clip = 0
-        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, clip)
-        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, clip)
+        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip)
+        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip)
         
-        filename = "image"
-        mergedImage = mergeImages(portImage, stbdImage)
-        print ("Saving Image...")
-        self.image = mergedImage
-        mergedImage.save(os.path.splitext(filename)[0]+'.png')
-        pixmap = QPixmap('image.png')
+        self.image = mergeImages(portImage, stbdImage)
+        pixmap = toqpixmap(self.image)
         self.label_display.setPixmap(pixmap)
+
+        
+    def apply_color_scheme(self):
+        invert = True
+        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip)
+        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip)
+        
+        self.image = mergeImages(portImage, stbdImage)
+        pixmap = toqpixmap(self.image)
+        self.label_display.setPixmap(pixmap)
+
+        self.save_image()
+
+    def save_image(self):
+        self.image.save(f"{self.image_filename}.png")
 
 
 
@@ -185,6 +216,8 @@ class MyWindow(QMainWindow):
 
         if self.filepath:
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
+            self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}.png"
+            self.read_xtf()
 
     def read_xtf(self):
         channelA = 0
