@@ -1,4 +1,3 @@
-
 import sys
 import os
 import pyXTF
@@ -9,6 +8,7 @@ from PIL import Image
 from PIL.ImageQt import ImageQt, toqpixmap
 import bisect
 from PyQt6 import QtGui
+from process import *
 
 #os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000"
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
@@ -44,8 +44,8 @@ class MyWindow(QMainWindow):
         # Image display params
         self._clip = 1.0
         self._stretch = None
-        self._color_scheme = None
         self._invert = False
+        self._color_scheme = "greylog"
         self._greyscale_min = 0
         self._greyscale_max = 1
         self._greyscale_multi = 1
@@ -160,7 +160,7 @@ class MyWindow(QMainWindow):
         # Reload file button
         self.reload_file_btn = QtWidgets.QPushButton(self)
         self.reload_file_btn.setText("Reload")
-        self.reload_file_btn.clicked.connect(self.read_xtf)
+        self.reload_file_btn.clicked.connect(read_xtf)
 
         # Image display parameters
         self.clip_label = QLabel(self)
@@ -233,11 +233,13 @@ class MyWindow(QMainWindow):
         self.greyscale_multi_slider.setTickInterval(1)
         self.greyscale_multi_slider.valueChanged.connect(self.update_greyscale_multi)
 
-        self.inverse_checkbox = QCheckBox(self)
-        self.inverse_checkbox.setText(f"Inverse")
+        self.invert_checkbox = QCheckBox(self)
+        self.invert_checkbox.setText(f"invert")
+        self.invert_checkbox.stateChanged.connect(self.update_invert)
 
         self.color_scheme_combobox = QComboBox(self)
-        self.color_scheme_combobox.addItems(["graylog", "gray", "color"])
+        self.color_scheme_combobox.addItems(["greylog", "grey", "color"])
+        self.color_scheme_combobox.currentIndexChanged.connect(self.update_color_scheme)
 
         # Apply selected display parameter values
         self.apply_color_scheme_btn = QtWidgets.QPushButton(self)
@@ -264,7 +266,7 @@ class MyWindow(QMainWindow):
         self.toolbox_layout.addWidget(self.greyscale_max_slider)
         self.toolbox_layout.addWidget(self.greyscale_multi_label)
         self.toolbox_layout.addWidget(self.greyscale_multi_slider)
-        self.toolbox_layout.addWidget(self.inverse_checkbox, 0, Qt.AlignmentFlag.AlignCenter)
+        self.toolbox_layout.addWidget(self.invert_checkbox, 0, Qt.AlignmentFlag.AlignCenter)
         self.toolbox_layout.addWidget(self.color_scheme_combobox)
         self.toolbox_layout.addWidget(self.apply_color_scheme_btn)
         self.toolbox_layout.addWidget(self.save_btn)
@@ -320,22 +322,32 @@ class MyWindow(QMainWindow):
         self.greyscale_multi = self.sender().value()
         self.greyscale_multi_label.setText(f"Greyscale multi: {str(self.sender().value())}")
         self.greyscale_multi_label.adjustSize()
+
+    def update_invert(self):
+        self.invert = self.sender().isChecked()
+
+    def update_color_scheme(self):
+        self.color_scheme = self.sender().currentText()
         
     def apply_color_scheme(self):
         invert = True
-        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
-        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
-        
+        if self.color_scheme == "greylog":
+            portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
+            stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
+        """elif self.color_scheme == "grey":
+            portImage = samplesToGrayImage(pc, invert, clip)
+            stbdImage = samplesToGrayImage(sc, invert, clip)
+        else:
+            portImage = samplesToColorImage(pc, invert, clip, colorScale)
+            stbdImage = samplesToColorImage(sc, invert, clip, colorScale)"""
+
+        # Display merged image
         self.image = mergeImages(portImage, stbdImage)
         pixmap = toqpixmap(self.image)
         self.label_display.setPixmap(pixmap)
 
-        self.save_image()
-
     def save_image(self):
         self.image.save(f"{self.image_filename}.png")
-
-
 
     def update(self):
         self.label.adjustSize()
@@ -352,184 +364,12 @@ class MyWindow(QMainWindow):
         if self.filepath:
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}.png"
-            self.read_xtf()
-
-    def read_xtf(self):
-        channelA = 0
-        channelB = 1
-
-        maxSamplesPort, maxSamplesStbd, minAltitude, maxAltitude, maxSlantRange, pingCount, meanSpeed, navigation = getSampleRange(self.filepath, channelA, channelB, True)
-        acrossTrackSampleInterval = (maxSlantRange / maxSamplesPort) * self.decimation # sample interval in metres
-        
-        # to make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
-        distance = meanSpeed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
-        alongTrackSampleInterval = (distance / pingCount) 
-
-        stretch = math.ceil(alongTrackSampleInterval / acrossTrackSampleInterval)
-
-        #r = pyXTF.XTFReader(self.filepath)
-        pc = []
-        sc = []
-        r = pyXTF.XTFReader(self.filepath)
-        
-        while r.moreData():
-            ping = r.readPacket()
-            # this is not a ping so skip it
-            if ping == -999:
-                continue
-
-            channel = np.array(ping.pingChannel[0].data[::self.decimation])
-            channel = np.multiply(channel, math.pow(2, -ping.pingChannel[0].Weight))
-            
-            filteredPortData = channel.tolist()
-            
-            for i in range(stretch):
-                pc.insert(0, filteredPortData[::-1])
-           
-            channel = np.array(ping.pingChannel[1].data[::self.decimation])
-            channel = np.multiply(channel, math.pow(2, -ping.pingChannel[1].Weight))
-            rawStbdData = channel.tolist()
-            for i in range(stretch):
-                sc.insert(0, rawStbdData)
-        
-        self.port_data = np.array(pc)
-        self.starboard_data = np.array(sc)
-        print(np.array(pc).shape, np.array(sc).shape)
-
-
-def getSampleRange(filepath, channelA, channelB, loadNavigation):
-    """iterate through the file to find the extents for range, time and samples.  These are all needed in subsequent processing """
-    maxSamplesPort = 0
-    maxSamplesStbd = 0
-    minAltitude = 99999
-    maxRange = 0
-    maxAltitude = 0
-    pingCount = 0
-    pingTimes = []
-    navigation = 0
-    
-    print("Gathering data limits...")
-    #   open the XTF file for reading 
-    r = pyXTF.XTFReader(filepath)
-    
-    if loadNavigation:
-        navigation = r.loadNavigation()
-    # meanSpeed, navigation = r.computeSpeedFromPositions(navigation)
-    meanSpeed = 1
-    start_time = time.time() # time the process
-
-    while r.moreData():
-        ping = r.readPacket()
-        maxSamplesPort = max(ping.pingChannel[channelA].NumSamples, maxSamplesPort)
-        maxSamplesStbd = max(ping.pingChannel[channelB].NumSamples, maxSamplesStbd)
-        minAltitude = min(minAltitude, ping.SensorPrimaryAltitude)
-        maxAltitude = max(maxAltitude, ping.SensorPrimaryAltitude)
-        maxRange = max(maxRange, ping.pingChannel[channelA].SlantRange)
-        pingCount = pingCount + 1
-
-    print("Get Sample Range Duration %.3fs" % (time.time() - start_time)) # print the processing time.
-    return maxSamplesPort, maxSamplesStbd, minAltitude, maxAltitude, maxRange, pingCount, meanSpeed, navigation
-
-
-def findMinMaxClipValues(channel, clip):
-    print ("Clipping data with an upper and lower percentage of:", clip)
-    # compute a histogram of teh data so we can auto clip the outliers
-    bins = np.arange(np.floor(channel.min()),np.ceil(channel.max()))
-    hist, base = np.histogram(channel, bins=bins, density=1)    
-
-    # instead of spreading across the entire data range, we can clip the outer n percent by using the cumsum.
-    # from the cumsum of histogram density, we can figure out what cut off sample amplitude removes n % of data
-    cumsum = np.cumsum(hist)   
-    
-    minimumBinIndex = bisect.bisect(cumsum,clip/100)
-    maximumBinIndex = bisect.bisect(cumsum,(1-clip/100))
-
-    return minimumBinIndex, maximumBinIndex
-
-def samplesToGrayImageLogarithmic(samples, invert, clip, min, max, multi):
-    zg_LL = 0 # min and max grey scales
-    zg_UL = 255
-    zs_LL = 0 
-    zs_UL = 0
-    conv_01_99 = 1
-
-    #create numpy arrays so we can compute stats
-    channel = np.array(samples)   
-
-    # compute the clips
-    if clip > 0:
-        channelMin, channelMax = findMinMaxClipValues(channel, clip)
-    else:
-        channelMin = channel.min()
-        channelMax = channel.max()
-
-    channelMin = min
-    channelMax = max
-    
-    if channelMin > 0:
-        zs_LL = math.log(channelMin)
-    else:
-        zs_LL = 0
-    if channelMax > 0:
-        zs_UL = math.log(channelMax)
-    else:
-        zs_UL = 0
-
-    mii = np.log(np.mean(np.array(channel)) - np.std(np.array(channel)))
-
-    if np.isnan(mii) or mii < 0:
-        print("IS or not")
-        mii = 0
-    
-    #zs_UL = math.log(np.mean(np.array(channel)) + np.std(np.array(channel)))
-    #zs_LL = mii
-
-    zs_UL = channelMax
-    zs_LL = channelMin
-
-    # this scales from the range of image values to the range of output grey levels
-    if (zs_UL - zs_LL) != 0:
-        conv_01_99 = ( zg_UL - zg_LL ) / ( zs_UL - zs_LL )
-    
-    conv_01_99 = multi
-    #conv_01_99 = conv_01_99 / 2
-    #we can expect some divide by zero errors, so suppress 
-    np.seterr(divide='ignore')
-    channel = np.log(samples)
-    channel = np.subtract(channel, zs_LL)
-    channel = np.multiply(channel, conv_01_99)
-    if invert:
-        channel = np.subtract(zg_UL, channel)
-    else:
-        channel = np.add(zg_LL, channel)
-    # ch = channel.astype('uint8')
-    image = Image.fromarray(channel).convert('L')
-    
-    return image
-
-def mergeImages(image1, image2):
-    """Merge two images into one, displayed side by side
-    :param file1: path to first image file
-    :param file2: path to second image file
-    :return: the merged Image object
-    """
-
-    (width1, height1) = image1.size
-    (width2, height2) = image2.size
-
-    result_width = width1 + width2
-    result_height = max(height1, height2)
-
-    result = Image.new('L', (result_width, result_height))
-    result.paste(im=image1, box=(0, 0))
-    result.paste(im=image2, box=(width1, 0))
-    return result
+            self.port_data, self.starboard_data = read_xtf(self.filepath, 0, True)
 
 def window():
     app = QApplication(sys.argv)
     win = MyWindow()
     
-
     win.show()
 
     sys.exit(app.exec())
