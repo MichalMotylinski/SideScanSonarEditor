@@ -16,7 +16,7 @@ os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QApplication, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSize
+from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSize, QTimer
 from PySide6 import QtGui
 
 #QtGui.QImageReader.setAllocationLimit(0)
@@ -43,12 +43,14 @@ class MyWindow(QMainWindow):
         
         # Image display params
         self._clip = 1.0
-        self._stretch = None
+        self._stretch = 1.0
         self._invert = False
         self._color_scheme = "greylog"
         self._greyscale_min = 0
         self._greyscale_max = 1
         self._greyscale_multi = 1
+
+        self._auto_edit = True
         
         self.initUI()
 
@@ -128,7 +130,7 @@ class MyWindow(QMainWindow):
         # Create main toolbox widget
         self.toolbox_widget = QWidget(self)
         self.toolbox_widget.setContentsMargins(0, 0, 0, 0)
-        self.toolbox_widget.setFixedSize(150, 400)
+        self.toolbox_widget.setFixedSize(200, 500)
         self.toolbox_widget.move(10, 10)
         #self.toolbox_widget.setStyleSheet("background-color:salmon;")
 
@@ -144,7 +146,7 @@ class MyWindow(QMainWindow):
 
         # Loading data parameters
         self.decimation_label = QLabel(self)
-        self.decimation_label.setFixedSize(150, 15)
+        self.decimation_label.setFixedSize(200, 15)
         self.decimation_label.setText(f"Decimation: {self.decimation}")
         self.decimation_label.adjustSize()
 
@@ -152,7 +154,7 @@ class MyWindow(QMainWindow):
         self.decimation_slider.setGeometry(10, 15, 100, 40)
         self.decimation_slider.setMinimum(1)
         self.decimation_slider.setMaximum(10)
-        self.decimation_slider.setFixedSize(150, 15)
+        self.decimation_slider.setFixedSize(200, 15)
         self.decimation_slider.setValue(self.decimation)
         self.decimation_slider.setTickInterval(1)
         self.decimation_slider.valueChanged.connect(self.update_decimation)
@@ -164,7 +166,7 @@ class MyWindow(QMainWindow):
 
         # Image display parameters
         self.clip_label = QLabel(self)
-        self.clip_label.setFixedSize(150, 15)
+        self.clip_label.setFixedSize(200, 15)
         self.clip_label.setText(f"Clip: {self.clip}")
         self.clip_label.adjustSize()
 
@@ -172,27 +174,27 @@ class MyWindow(QMainWindow):
         self.clip_slider.setGeometry(100, 15, 100, 40)
         self.clip_slider.setMinimum(0)
         self.clip_slider.setMaximum(100)
-        self.clip_slider.setFixedSize(150, 15)
+        self.clip_slider.setFixedSize(200, 15)
         self.clip_slider.setValue(self.clip * 100)
         self.clip_slider.setTickInterval(1)
         self.clip_slider.valueChanged.connect(self.update_clip)
 
         self.stretch_label = QLabel(self)
-        self.stretch_label.setFixedSize(150, 15)
-        self.stretch_label.setText(f"Clip: {self.clip}")
+        self.stretch_label.setFixedSize(200, 15)
+        self.stretch_label.setText(f"Stretch: {self.stretch}")
         self.stretch_label.adjustSize()
 
         self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self)
         self.stretch_slider.setGeometry(100, 15, 100, 40)
         self.stretch_slider.setMinimum(0)
         self.stretch_slider.setMaximum(100)
-        self.stretch_slider.setFixedSize(150, 15)
-        self.stretch_slider.setValue(self.clip * 100)
+        self.stretch_slider.setFixedSize(200, 15)
+        self.stretch_slider.setValue(self.stretch * 100)
         self.stretch_slider.setTickInterval(1)
-        self.stretch_slider.valueChanged.connect(self.update_clip)
+        self.stretch_slider.valueChanged.connect(self.update_stretch)
 
         self.greyscale_min_label = QLabel(self)
-        self.greyscale_min_label.setFixedSize(150, 15)
+        self.greyscale_min_label.setFixedSize(200, 15)
         self.greyscale_min_label.setText(f"Greyscale min: {self.greyscale_min}")
         self.greyscale_min_label.adjustSize()
 
@@ -200,13 +202,35 @@ class MyWindow(QMainWindow):
         self.greyscale_min_slider.setGeometry(100, 15, 100, 40)
         self.greyscale_min_slider.setMinimum(0)
         self.greyscale_min_slider.setMaximum(100)
-        self.greyscale_min_slider.setFixedSize(150, 15)
+        self.greyscale_min_slider.setFixedSize(200, 15)
         self.greyscale_min_slider.setValue(self.greyscale_min)
         self.greyscale_min_slider.setTickInterval(1)
         self.greyscale_min_slider.valueChanged.connect(self.update_greyscale_min)
+        self.greyscale_min_slider.setEnabled(False)
+
+        self.greyscale_min_slider_bottom = QLineEdit(self)
+        self.greyscale_min_slider_bottom.setPlaceholderText("min")
+        self.greyscale_min_slider_bottom.setEnabled(False)
+        self.greyscale_min_slider_bottom.editingFinished.connect(self.update_greyscale_min_slider_bottom)
+        self.greyscale_min_slider_bottom.setText("0")
+        self.greyscale_min_slider_current = QLineEdit(self)
+        self.greyscale_min_slider_current.setPlaceholderText("current")
+        self.greyscale_min_slider_current.setEnabled(False)
+        self.greyscale_min_slider_top = QLineEdit(self)
+        self.greyscale_min_slider_top.setPlaceholderText("max")
+        self.greyscale_min_slider_top.setEnabled(False)
+        self.greyscale_min_slider_top.editingFinished.connect(self.update_greyscale_min_slider_top)
+        self.greyscale_min_slider_top.setText("0")
+
+        self.greyscale_min_slider_layout = QHBoxLayout()
+        self.greyscale_min_slider_layout.addWidget(self.greyscale_min_slider_bottom)
+        self.greyscale_min_slider_layout.addSpacing(20)
+        self.greyscale_min_slider_layout.addWidget(self.greyscale_min_slider_current)
+        self.greyscale_min_slider_layout.addSpacing(20)
+        self.greyscale_min_slider_layout.addWidget(self.greyscale_min_slider_top)
 
         self.greyscale_max_label = QLabel(self)
-        self.greyscale_max_label.setFixedSize(150, 15)
+        self.greyscale_max_label.setFixedSize(200, 15)
         self.greyscale_max_label.setText(f"Greyscale max: {self.greyscale_max}")
         self.greyscale_max_label.adjustSize()
 
@@ -214,13 +238,35 @@ class MyWindow(QMainWindow):
         self.greyscale_max_slider.setGeometry(100, 15, 100, 40)
         self.greyscale_max_slider.setMinimum(0)
         self.greyscale_max_slider.setMaximum(100)
-        self.greyscale_max_slider.setFixedSize(150, 15)
+        self.greyscale_max_slider.setFixedSize(200, 15)
         self.greyscale_max_slider.setValue(self.greyscale_max)
         self.greyscale_max_slider.setTickInterval(1)
         self.greyscale_max_slider.valueChanged.connect(self.update_greyscale_max)
+        self.greyscale_max_slider.setEnabled(False)
+
+        self.greyscale_max_slider_bottom = QLineEdit(self)
+        self.greyscale_max_slider_bottom.setPlaceholderText("min")
+        self.greyscale_max_slider_bottom.setEnabled(False)
+        self.greyscale_max_slider_bottom.editingFinished.connect(self.update_greyscale_max_slider_bottom)
+        self.greyscale_max_slider_bottom.setText("0")
+        self.greyscale_max_slider_current = QLineEdit(self)
+        self.greyscale_max_slider_current.setPlaceholderText("current")
+        self.greyscale_max_slider_current.setEnabled(False)
+        self.greyscale_max_slider_top = QLineEdit(self)
+        self.greyscale_max_slider_top.setPlaceholderText("max")
+        self.greyscale_max_slider_top.setEnabled(False)
+        self.greyscale_max_slider_top.editingFinished.connect(self.update_greyscale_max_slider_top)
+        self.greyscale_max_slider_top.setText("0")
+
+        self.greyscale_max_slider_layout = QHBoxLayout()
+        self.greyscale_max_slider_layout.addWidget(self.greyscale_max_slider_bottom)
+        self.greyscale_max_slider_layout.addSpacing(20)
+        self.greyscale_max_slider_layout.addWidget(self.greyscale_max_slider_current)
+        self.greyscale_max_slider_layout.addSpacing(20)
+        self.greyscale_max_slider_layout.addWidget(self.greyscale_max_slider_top)
 
         self.greyscale_multi_label = QLabel(self)
-        self.greyscale_multi_label.setFixedSize(150, 15)
+        self.greyscale_multi_label.setFixedSize(200, 15)
         self.greyscale_multi_label.setText(f"Greyscale multi: {self.greyscale_multi}")
         self.greyscale_multi_label.adjustSize()
 
@@ -228,14 +274,45 @@ class MyWindow(QMainWindow):
         self.greyscale_multi_slider.setGeometry(100, 15, 100, 40)
         self.greyscale_multi_slider.setMinimum(0)
         self.greyscale_multi_slider.setMaximum(100)
-        self.greyscale_multi_slider.setFixedSize(150, 15)
+        self.greyscale_multi_slider.setFixedSize(200, 15)
         self.greyscale_multi_slider.setValue(self.greyscale_multi)
         self.greyscale_multi_slider.setTickInterval(1)
         self.greyscale_multi_slider.valueChanged.connect(self.update_greyscale_multi)
+        self.greyscale_multi_slider.setEnabled(False)
+
+        self.greyscale_multi_slider_bottom = QLineEdit(self)
+        self.greyscale_multi_slider_bottom.setPlaceholderText("min")
+        self.greyscale_multi_slider_bottom.setEnabled(False)
+        self.greyscale_multi_slider_bottom.editingFinished.connect(self.update_greyscale_multi_slider_bottom)
+        self.greyscale_multi_slider_bottom.setText("0")
+        self.greyscale_multi_slider_current = QLineEdit(self)
+        self.greyscale_multi_slider_current.setPlaceholderText("current")
+        self.greyscale_multi_slider_current.setEnabled(False)
+        self.greyscale_multi_slider_top = QLineEdit(self)
+        self.greyscale_multi_slider_top.setPlaceholderText("max")
+        self.greyscale_multi_slider_top.setEnabled(False)
+        self.greyscale_multi_slider_top.editingFinished.connect(self.update_greyscale_multi_slider_top)
+        self.greyscale_multi_slider_top.setText("0")
+
+        self.greyscale_multi_slider_layout = QHBoxLayout()
+        self.greyscale_multi_slider_layout.addWidget(self.greyscale_multi_slider_bottom)
+        self.greyscale_multi_slider_layout.addSpacing(20)
+        self.greyscale_multi_slider_layout.addWidget(self.greyscale_multi_slider_current)
+        self.greyscale_multi_slider_layout.addSpacing(20)
+        self.greyscale_multi_slider_layout.addWidget(self.greyscale_multi_slider_top)
 
         self.invert_checkbox = QCheckBox(self)
         self.invert_checkbox.setText(f"invert")
         self.invert_checkbox.stateChanged.connect(self.update_invert)
+
+        self.auto_edit_checkbox = QCheckBox(self)
+        self.auto_edit_checkbox.setText(f"auto")
+        self.auto_edit_checkbox.stateChanged.connect(self.update_auto_edit)
+        self.auto_edit_checkbox.setChecked(True)
+
+        self.auto_edit_checkbox_layout = QHBoxLayout()
+        self.auto_edit_checkbox_layout.addWidget(self.invert_checkbox)
+        self.auto_edit_checkbox_layout.addWidget(self.auto_edit_checkbox)
 
         self.color_scheme_combobox = QComboBox(self)
         self.color_scheme_combobox.addItems(["greylog", "grey", "color"])
@@ -253,20 +330,33 @@ class MyWindow(QMainWindow):
 
         # Add widgets to the toolbox layout
         self.toolbox_layout.addWidget(self.open_file_btn)
+
         self.toolbox_layout.addWidget(self.decimation_label)
         self.toolbox_layout.addWidget(self.decimation_slider)
+
         self.toolbox_layout.addWidget(self.reload_file_btn)
+
         self.toolbox_layout.addWidget(self.clip_label)
         self.toolbox_layout.addWidget(self.clip_slider)
+
         self.toolbox_layout.addWidget(self.stretch_label)
         self.toolbox_layout.addWidget(self.stretch_slider)
+
         self.toolbox_layout.addWidget(self.greyscale_min_label)
         self.toolbox_layout.addWidget(self.greyscale_min_slider)
+        self.toolbox_layout.addLayout(self.greyscale_min_slider_layout)
+        
         self.toolbox_layout.addWidget(self.greyscale_max_label)
         self.toolbox_layout.addWidget(self.greyscale_max_slider)
+        self.toolbox_layout.addLayout(self.greyscale_max_slider_layout)
+        
         self.toolbox_layout.addWidget(self.greyscale_multi_label)
         self.toolbox_layout.addWidget(self.greyscale_multi_slider)
-        self.toolbox_layout.addWidget(self.invert_checkbox, 0, Qt.AlignmentFlag.AlignCenter)
+        self.toolbox_layout.addLayout(self.greyscale_multi_slider_layout)
+
+        #self.toolbox_layout.addWidget(self.invert_checkbox, 0, Qt.AlignmentFlag.AlignCenter)
+        self.toolbox_layout.addLayout(self.auto_edit_checkbox_layout)
+
         self.toolbox_layout.addWidget(self.color_scheme_combobox)
         self.toolbox_layout.addWidget(self.apply_color_scheme_btn)
         self.toolbox_layout.addWidget(self.save_btn)
@@ -305,11 +395,12 @@ class MyWindow(QMainWindow):
     
     def update_stretch(self):
         self.stretch = self.sender().value() / 100
-        self.stretch_label.setText(f"stretch: {str(self.sender().value() / 100)}")
+        self.stretch_label.setText(f"Stretch: {str(self.sender().value() / 100)}")
         self.stretch_label.adjustSize()
 
     def update_greyscale_min(self):
         self.greyscale_min = self.sender().value()
+        self.greyscale_min_slider_current.setText(f"{str(self.sender().value())}")
         self.greyscale_min_label.setText(f"Greyscale min: {str(self.sender().value())}")
         self.greyscale_min_label.adjustSize()
 
@@ -317,6 +408,24 @@ class MyWindow(QMainWindow):
         self.greyscale_max = self.sender().value()
         self.greyscale_max_label.setText(f"Greyscale max: {str(self.sender().value())}")
         self.greyscale_max_label.adjustSize()
+
+    def update_greyscale_min_slider_bottom(self):
+        self.greyscale_min_slider.setMinimum(int(self.sender().text()))
+
+    def update_greyscale_min_slider_top(self):
+        self.greyscale_min_slider.setMaximum(int(self.sender().text()))
+
+    def update_greyscale_max_slider_bottom(self):
+        self.greyscale_max_slider.setMinimum(int(self.sender().text()))
+
+    def update_greyscale_max_slider_top(self):
+        self.greyscale_max_slider.setMaximum(int(self.sender().text()))
+
+    def update_greyscale_multi_slider_bottom(self):
+        self.greyscale_multi_slider.setMinimum(int(self.sender().text()))
+
+    def update_greyscale_multi_slider_top(self):
+        self.greyscale_multi_slider.setMaximum(int(self.sender().text()))
 
     def update_greyscale_multi(self):
         self.greyscale_multi = self.sender().value()
@@ -326,14 +435,47 @@ class MyWindow(QMainWindow):
     def update_invert(self):
         self.invert = self.sender().isChecked()
 
+    def update_auto_edit(self):
+        self.auto_edit = self.sender().isChecked()
+
+        if self.auto_edit:
+            self.greyscale_min_slider.setEnabled(False)
+            self.greyscale_min_slider_bottom.setEnabled(False)
+            self.greyscale_min_slider_current.setEnabled(False)
+            self.greyscale_min_slider_top.setEnabled(False)
+
+            self.greyscale_multi_slider.setEnabled(False)
+            self.greyscale_multi_slider_bottom.setEnabled(False)
+            self.greyscale_multi_slider_current.setEnabled(False)
+            self.greyscale_multi_slider_top.setEnabled(False)
+
+            self.greyscale_max_slider.setEnabled(False)
+            self.greyscale_max_slider_bottom.setEnabled(False)
+            self.greyscale_max_slider_current.setEnabled(False)
+            self.greyscale_max_slider_top.setEnabled(False)
+        else:
+            self.greyscale_min_slider.setEnabled(True)
+            self.greyscale_min_slider_bottom.setEnabled(True)
+            self.greyscale_min_slider_current.setEnabled(True)
+            self.greyscale_min_slider_top.setEnabled(True)
+
+            self.greyscale_multi_slider.setEnabled(True)
+            self.greyscale_multi_slider_bottom.setEnabled(True)
+            self.greyscale_multi_slider_current.setEnabled(True)
+            self.greyscale_multi_slider_top.setEnabled(True)
+
+            self.greyscale_max_slider.setEnabled(True)
+            self.greyscale_max_slider_bottom.setEnabled(True)
+            self.greyscale_max_slider_current.setEnabled(True)
+            self.greyscale_max_slider_top.setEnabled(True)
+
     def update_color_scheme(self):
         self.color_scheme = self.sender().currentText()
         
     def apply_color_scheme(self):
-        invert = True
         if self.color_scheme == "greylog":
-            portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
-            stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
+            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
+            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
         """elif self.color_scheme == "grey":
             portImage = samplesToGrayImage(pc, invert, clip)
             stbdImage = samplesToGrayImage(sc, invert, clip)
@@ -342,7 +484,7 @@ class MyWindow(QMainWindow):
             stbdImage = samplesToColorImage(sc, invert, clip, colorScale)"""
 
         # Display merged image
-        self.image = mergeImages(portImage, stbdImage)
+        self.image = merge_images(portImage, stbdImage)
         pixmap = toqpixmap(self.image)
         self.label_display.setPixmap(pixmap)
 
