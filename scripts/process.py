@@ -6,7 +6,7 @@ import time
 from PIL import Image
 import bisect
 
-def read_xtf(filepath, channel_num, decimation):
+def read_xtf(filepath, channel_num, decimation, stretch):
     max_samples_port, max_slant_range, ping_count, mean_speed, navigation = get_sample_range(filepath, channel_num, True)
     across_track_sample_interval = (max_slant_range / max_samples_port) * decimation # sample interval in metres
 
@@ -53,9 +53,9 @@ def get_sample_range(filepath, channel_num, load_navigation):
     print("Gathering data limits...")
     #   open the XTF file for reading 
     data = pyXTF.XTFReader(filepath)
-    
+    print(data)
     if load_navigation:
-        navigation = data.load_navigation()
+        navigation = data.loadNavigation()
     
     mean_speed = 1
     start_time = time.time() # time the process
@@ -85,68 +85,50 @@ def find_min_max_clip_values(channel, clip):
 
     return minimum_bin_index, maximum_bin_index
 
-def samplesToGrayImageLogarithmic(samples, invert, clip, min, max, multi):
-    zg_LL = 0 # min and max grey scales
-    zg_UL = 255
-    zs_LL = 0 
-    zs_UL = 0
-    conv_01_99 = 1
-
+def samples_to_grey_image_logarithmic(samples, invert, clip, channel_min=None, channel_max=None, scale=None):
+    gs_min = 0
+    gs_max = 255
+    
     #create numpy arrays so we can compute stats
-    channel = np.array(samples)   
+    channel = np.array(samples)
 
-    # compute the clips
-    if clip > 0:
-        channelMin, channelMax = find_min_max_clip_values(channel, clip)
-    else:
-        channelMin = channel.min()
-        channelMax = channel.max()
+    if channel_min == None:
+        # compute the clips
+        if clip > 0:
+            channel_min, channel_max = find_min_max_clip_values(channel, clip)
+        else:
+            channel_min = channel.min()
+            channel_max = channel.max()
 
-    channelMin = min
-    channelMax = max
+        if channel_min > 0:
+            channel_min = math.log(channel_min)
+        else:
+            channel_min = 0
+        
+        if channel_max > 0:
+            channel_max = math.log(channel_max)
+        else:
+            channel_max = 0
+
+        # this scales from the range of image values to the range of output grey levels
+        if (channel_max - channel_min) != 0:
+            scale = (gs_max - gs_min) / (channel_max - channel_min)
     
-    if channelMin > 0:
-        zs_LL = math.log(channelMin)
-    else:
-        zs_LL = 0
-    if channelMax > 0:
-        zs_UL = math.log(channelMax)
-    else:
-        zs_UL = 0
-
-    mii = np.log(np.mean(np.array(channel)) - np.std(np.array(channel)))
-
-    if np.isnan(mii) or mii < 0:
-        print("IS or not")
-        mii = 0
-    
-    #zs_UL = math.log(np.mean(np.array(channel)) + np.std(np.array(channel)))
-    #zs_LL = mii
-
-    zs_UL = channelMax
-    zs_LL = channelMin
-
-    # this scales from the range of image values to the range of output grey levels
-    if (zs_UL - zs_LL) != 0:
-        conv_01_99 = ( zg_UL - zg_LL ) / ( zs_UL - zs_LL )
-    
-    conv_01_99 = multi
-    #conv_01_99 = conv_01_99 / 2
-    #we can expect some divide by zero errors, so suppress 
     np.seterr(divide='ignore')
     channel = np.log(samples)
-    channel = np.subtract(channel, zs_LL)
-    channel = np.multiply(channel, conv_01_99)
+    channel = np.subtract(channel, channel_min)
+    channel = np.multiply(channel, scale)
+
     if invert:
-        channel = np.subtract(zg_UL, channel)
+        channel = np.subtract(gs_max, channel)
     else:
-        channel = np.add(zg_LL, channel)
-    # ch = channel.astype('uint8')
+        channel = np.add(gs_min, channel)
+
     image = Image.fromarray(channel).convert('L')
     
     return image
 
-def mergeImages(image1, image2):
+def merge_images(image1, image2):
     """Merge two images into one, displayed side by side
     :param file1: path to first image file
     :param file2: path to second image file
