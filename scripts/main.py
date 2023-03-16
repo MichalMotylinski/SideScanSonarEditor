@@ -14,9 +14,9 @@ from PyQt6 import QtGui
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QApplication, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import pyqtSlot, Qt, QRect
+from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSize
 from PySide6 import QtGui
 
 #QtGui.QImageReader.setAllocationLimit(0)
@@ -28,22 +28,27 @@ class MyWindow(QMainWindow):
         self.setGeometry(200, 200, 1024, 1024)
         self.setWindowTitle("SSS")
         
-
+        # File info
         self.filepath = None
         self.filename = None
+
+        # Image data
         self.port_data = None
         self.starboard_data = None
         self.image = None
         self.image_filename = None
 
-        self.greyscale_min = 0
-        self.greyscale_max = 1
-        
+        # Image load params
         self._decimation = 4
+        
+        # Image display params
         self._clip = 1.0
         self._stretch = None
         self._color_scheme = None
         self._invert = False
+        self._greyscale_min = 0
+        self._greyscale_max = 1
+        self._greyscale_multi = 1
         
         self.initUI()
 
@@ -65,7 +70,79 @@ class MyWindow(QMainWindow):
     def clip(self, val):
         self._clip = val
 
+    @property
+    def stretch(self):
+        """The stretch property."""
+        return self._stretch
+    
+    @stretch.setter
+    def stretch(self, val):
+        self._stretch = val
+
+    @property
+    def color_scheme(self):
+        """The color_scheme property."""
+        return self._color_scheme
+    
+    @color_scheme.setter
+    def color_scheme(self, val):
+        self._color_scheme = val
+
+    @property
+    def invert(self):
+        """The invert property."""
+        return self._invert
+    
+    @invert.setter
+    def invert(self, val):
+        self._invert = val
+
+    @property
+    def greyscale_min(self):
+        """The greyscale_min property."""
+        return self._greyscale_min
+    
+    @greyscale_min.setter
+    def greyscale_min(self, val):
+        self._greyscale_min = val
+    
+    @property
+    def greyscale_max(self):
+        """The greyscale_max property."""
+        return self._greyscale_max
+    
+    @greyscale_max.setter
+    def greyscale_max(self, val):
+        self._greyscale_max = val
+    
+    @property
+    def greyscale_multi(self):
+        """The greyscale_multi property."""
+        return self._greyscale_multi
+    
+    @greyscale_multi.setter
+    def greyscale_multi(self, val):
+        self._greyscale_multi = val
+
     def init_toolbox(self):
+        # Create main toolbox widget
+        self.toolbox_widget = QWidget(self)
+        self.toolbox_widget.setContentsMargins(0, 0, 0, 0)
+        self.toolbox_widget.setFixedSize(150, 400)
+        self.toolbox_widget.move(10, 10)
+        #self.toolbox_widget.setStyleSheet("background-color:salmon;")
+
+        # Create toolbox inner layout
+        self.toolbox_layout = QVBoxLayout(self.toolbox_widget)
+        self.toolbox_layout.setContentsMargins(0, 0, 0, 0)
+        self.toolbox_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Open file button
+        self.open_file_btn = QPushButton(self)
+        self.open_file_btn.setText("Open file")
+        self.open_file_btn.clicked.connect(self.open_dialog)
+
+        # Loading data parameters
         self.decimation_label = QLabel(self)
         self.decimation_label.setFixedSize(150, 15)
         self.decimation_label.setText(f"Decimation: {self.decimation}")
@@ -80,6 +157,12 @@ class MyWindow(QMainWindow):
         self.decimation_slider.setTickInterval(1)
         self.decimation_slider.valueChanged.connect(self.update_decimation)
 
+        # Reload file button
+        self.reload_file_btn = QtWidgets.QPushButton(self)
+        self.reload_file_btn.setText("Reload")
+        self.reload_file_btn.clicked.connect(self.read_xtf)
+
+        # Image display parameters
         self.clip_label = QLabel(self)
         self.clip_label.setFixedSize(150, 15)
         self.clip_label.setText(f"Clip: {self.clip}")
@@ -93,6 +176,20 @@ class MyWindow(QMainWindow):
         self.clip_slider.setValue(self.clip * 100)
         self.clip_slider.setTickInterval(1)
         self.clip_slider.valueChanged.connect(self.update_clip)
+
+        self.stretch_label = QLabel(self)
+        self.stretch_label.setFixedSize(150, 15)
+        self.stretch_label.setText(f"Clip: {self.clip}")
+        self.stretch_label.adjustSize()
+
+        self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.stretch_slider.setGeometry(100, 15, 100, 40)
+        self.stretch_slider.setMinimum(0)
+        self.stretch_slider.setMaximum(100)
+        self.stretch_slider.setFixedSize(150, 15)
+        self.stretch_slider.setValue(self.clip * 100)
+        self.stretch_slider.setTickInterval(1)
+        self.stretch_slider.valueChanged.connect(self.update_clip)
 
         self.greyscale_min_label = QLabel(self)
         self.greyscale_min_label.setFixedSize(150, 15)
@@ -122,39 +219,55 @@ class MyWindow(QMainWindow):
         self.greyscale_max_slider.setTickInterval(1)
         self.greyscale_max_slider.valueChanged.connect(self.update_greyscale_max)
 
-        self.open_file_btn = QPushButton(self)
-        self.open_file_btn.setText("Open file dialog")
-        self.open_file_btn.clicked.connect(self.open_dialog)
+        self.greyscale_multi_label = QLabel(self)
+        self.greyscale_multi_label.setFixedSize(150, 15)
+        self.greyscale_multi_label.setText(f"Greyscale multi: {self.greyscale_multi}")
+        self.greyscale_multi_label.adjustSize()
 
-        self.reload_file_btn = QtWidgets.QPushButton(self)
-        self.reload_file_btn.setText("Reload")
-        self.reload_file_btn.clicked.connect(self.read_xtf)
+        self.greyscale_multi_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.greyscale_multi_slider.setGeometry(100, 15, 100, 40)
+        self.greyscale_multi_slider.setMinimum(0)
+        self.greyscale_multi_slider.setMaximum(100)
+        self.greyscale_multi_slider.setFixedSize(150, 15)
+        self.greyscale_multi_slider.setValue(self.greyscale_multi)
+        self.greyscale_multi_slider.setTickInterval(1)
+        self.greyscale_multi_slider.valueChanged.connect(self.update_greyscale_multi)
 
+        self.inverse_checkbox = QCheckBox(self)
+        self.inverse_checkbox.setText(f"Inverse")
+
+        self.color_scheme_combobox = QComboBox(self)
+        self.color_scheme_combobox.addItems(["graylog", "gray", "color"])
+
+        # Apply selected display parameter values
         self.apply_color_scheme_btn = QtWidgets.QPushButton(self)
         self.apply_color_scheme_btn.setText("Apply")
         self.apply_color_scheme_btn.clicked.connect(self.apply_color_scheme)
 
+        # Save image button
         self.save_btn = QtWidgets.QPushButton(self)
         self.save_btn.setText("Save image")
         self.save_btn.clicked.connect(self.save_image)
 
-        self.toolbox_layout = QVBoxLayout()
+        # Add widgets to the toolbox layout
         self.toolbox_layout.addWidget(self.open_file_btn)
-
         self.toolbox_layout.addWidget(self.decimation_label)
         self.toolbox_layout.addWidget(self.decimation_slider)
         self.toolbox_layout.addWidget(self.reload_file_btn)
-
         self.toolbox_layout.addWidget(self.clip_label)
         self.toolbox_layout.addWidget(self.clip_slider)
+        self.toolbox_layout.addWidget(self.stretch_label)
+        self.toolbox_layout.addWidget(self.stretch_slider)
         self.toolbox_layout.addWidget(self.greyscale_min_label)
         self.toolbox_layout.addWidget(self.greyscale_min_slider)
         self.toolbox_layout.addWidget(self.greyscale_max_label)
         self.toolbox_layout.addWidget(self.greyscale_max_slider)
+        self.toolbox_layout.addWidget(self.greyscale_multi_label)
+        self.toolbox_layout.addWidget(self.greyscale_multi_slider)
+        self.toolbox_layout.addWidget(self.inverse_checkbox, 0, Qt.AlignmentFlag.AlignCenter)
+        self.toolbox_layout.addWidget(self.color_scheme_combobox)
         self.toolbox_layout.addWidget(self.apply_color_scheme_btn)
-        
         self.toolbox_layout.addWidget(self.save_btn)
-        self.toolbox_layout.addStretch(1)
 
     def initUI(self):
         self.init_toolbox()
@@ -170,7 +283,7 @@ class MyWindow(QMainWindow):
         image_layout.addWidget(scrollArea)
 
         main_layout = QHBoxLayout()
-        main_layout.addLayout(self.toolbox_layout)
+        main_layout.addWidget(self.toolbox_widget, 0, Qt.AlignmentFlag.AlignTop)
         main_layout.addLayout(image_layout)
 
         main_widget = QWidget()
@@ -187,6 +300,11 @@ class MyWindow(QMainWindow):
         self.clip = self.sender().value() / 100
         self.clip_label.setText(f"Clip: {str(self.sender().value() / 100)}")
         self.clip_label.adjustSize()
+    
+    def update_stretch(self):
+        self.stretch = self.sender().value() / 100
+        self.stretch_label.setText(f"stretch: {str(self.sender().value() / 100)}")
+        self.stretch_label.adjustSize()
 
     def update_greyscale_min(self):
         self.greyscale_min = self.sender().value()
@@ -197,11 +315,16 @@ class MyWindow(QMainWindow):
         self.greyscale_max = self.sender().value()
         self.greyscale_max_label.setText(f"Greyscale max: {str(self.sender().value())}")
         self.greyscale_max_label.adjustSize()
+
+    def update_greyscale_multi(self):
+        self.greyscale_multi = self.sender().value()
+        self.greyscale_multi_label.setText(f"Greyscale multi: {str(self.sender().value())}")
+        self.greyscale_multi_label.adjustSize()
         
     def apply_color_scheme(self):
         invert = True
-        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip, self.greyscale_min, self.greyscale_max)
-        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip, self.greyscale_min, self.greyscale_max)
+        portImage = samplesToGrayImageLogarithmic(self.port_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
+        stbdImage = samplesToGrayImageLogarithmic(self.starboard_data, invert, self.clip, self.greyscale_min, self.greyscale_max, self.greyscale_multi)
         
         self.image = mergeImages(portImage, stbdImage)
         pixmap = toqpixmap(self.image)
@@ -323,7 +446,7 @@ def findMinMaxClipValues(channel, clip):
 
     return minimumBinIndex, maximumBinIndex
 
-def samplesToGrayImageLogarithmic(samples, invert, clip, min, max):
+def samplesToGrayImageLogarithmic(samples, invert, clip, min, max, multi):
     zg_LL = 0 # min and max grey scales
     zg_UL = 255
     zs_LL = 0 
@@ -367,7 +490,8 @@ def samplesToGrayImageLogarithmic(samples, invert, clip, min, max):
     # this scales from the range of image values to the range of output grey levels
     if (zs_UL - zs_LL) != 0:
         conv_01_99 = ( zg_UL - zg_LL ) / ( zs_UL - zs_LL )
-   
+    
+    conv_01_99 = multi
     #conv_01_99 = conv_01_99 / 2
     #we can expect some divide by zero errors, so suppress 
     np.seterr(divide='ignore')
