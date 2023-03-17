@@ -46,8 +46,10 @@ class MyWindow(QMainWindow):
         self._stretch = 1.0
         self._invert = False
         self._color_scheme = "greylog"
-        self._greyscale_min = 0
-        self._greyscale_max = 1
+        self._grey_min = 0
+        self._grey_min_step = 1
+        self._grey_max = 1
+        self._grey_max_step = 1
         self._grey_scale = 1
         self._grey_scale_step = 1
 
@@ -102,22 +104,40 @@ class MyWindow(QMainWindow):
         self._invert = val
 
     @property
-    def greyscale_min(self):
-        """The greyscale_min property."""
-        return self._greyscale_min
+    def grey_min(self):
+        """The grey_min property."""
+        return self._grey_min
     
-    @greyscale_min.setter
-    def greyscale_min(self, val):
-        self._greyscale_min = val
+    @grey_min.setter
+    def grey_min(self, val):
+        self._grey_min = val
     
     @property
-    def greyscale_max(self):
-        """The greyscale_max property."""
-        return self._greyscale_max
+    def grey_min_step(self):
+        """The grey_min_step property."""
+        return self._grey_min_step
     
-    @greyscale_max.setter
-    def greyscale_max(self, val):
-        self._greyscale_max = val
+    @grey_min_step.setter
+    def grey_min_step(self, val):
+        self._grey_min_step = val
+    
+    @property
+    def grey_max(self):
+        """The grey_max property."""
+        return self._grey_max
+    
+    @grey_max.setter
+    def grey_max(self, val):
+        self._grey_max = val
+
+    @property
+    def grey_max_step(self):
+        """The grey_max_step property."""
+        return self._grey_max_step
+    
+    @grey_max_step.setter
+    def grey_max_step(self, val):
+        self._grey_max_step = val
     
     @property
     def grey_scale(self):
@@ -204,75 +224,107 @@ class MyWindow(QMainWindow):
         self.stretch_slider.setTickInterval(1)
         self.stretch_slider.valueChanged.connect(self.update_stretch)
 
-        self.greyscale_min_label = QLabel(self)
-        self.greyscale_min_label.setFixedSize(200, 15)
-        self.greyscale_min_label.setText(f"Grey min")
-        self.greyscale_min_label.adjustSize()
+        self.grey_min_label = QLabel(self)
+        self.grey_min_label.setText(f"Grey min")
+        self.grey_min_label.adjustSize()
 
-        self.greyscale_min_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.greyscale_min_slider.setGeometry(100, 15, 100, 40)
-        self.greyscale_min_slider.setMinimum(0)
-        self.greyscale_min_slider.setMaximum(100)
-        self.greyscale_min_slider.setFixedSize(200, 15)
-        self.greyscale_min_slider.setValue(self.greyscale_min)
-        self.greyscale_min_slider.setTickInterval(1)
-        self.greyscale_min_slider.valueChanged.connect(self.update_greyscale_min)
-        self.greyscale_min_slider.setEnabled(False)
+        self.grey_min_step_label = QLabel(self)
+        self.grey_min_step_label.setText(f"step")
+        self.grey_min_step_label.adjustSize()
 
-        self.greyscale_min_slider_bottom = QLineEdit(self)
-        self.greyscale_min_slider_bottom.setPlaceholderText("min")
-        self.greyscale_min_slider_bottom.setEnabled(False)
-        self.greyscale_min_slider_bottom.editingFinished.connect(self.update_greyscale_min_slider_bottom)
-        self.greyscale_min_slider_current = QLineEdit(self)
-        self.greyscale_min_slider_current.setPlaceholderText("current")
-        self.greyscale_min_slider_current.setEnabled(False)
-        self.greyscale_min_slider_current.editingFinished.connect(self.update_greyscale_min_slider_current)
-        self.greyscale_min_slider_top = QLineEdit(self)
-        self.greyscale_min_slider_top.setPlaceholderText("max")
-        self.greyscale_min_slider_top.setEnabled(False)
-        self.greyscale_min_slider_top.editingFinished.connect(self.update_greyscale_min_slider_top)
+        self.grey_min_step_textbox = QLineEdit(self)
+        self.grey_min_step_textbox.setEnabled(False)
+        self.grey_min_step_textbox.editingFinished.connect(self.update_grey_min_step_textbox)
 
-        self.greyscale_min_slider_layout = QHBoxLayout()
-        self.greyscale_min_slider_layout.addWidget(self.greyscale_min_slider_bottom)
-        self.greyscale_min_slider_layout.addSpacing(20)
-        self.greyscale_min_slider_layout.addWidget(self.greyscale_min_slider_current)
-        self.greyscale_min_slider_layout.addSpacing(20)
-        self.greyscale_min_slider_layout.addWidget(self.greyscale_min_slider_top)
+        self.grey_min_step_layout_sub = QHBoxLayout()
+        self.grey_min_step_layout_sub.addWidget(self.grey_min_step_label)
+        self.grey_min_step_layout_sub.addWidget(self.grey_min_step_textbox)
+        
+        self.grey_min_step_layout = QHBoxLayout()
+        self.grey_min_step_layout.addWidget(self.grey_min_label, 5)
+        self.grey_min_step_layout.addLayout(self.grey_min_step_layout_sub, 3)
 
-        self.greyscale_max_label = QLabel(self)
-        self.greyscale_max_label.setFixedSize(200, 15)
-        self.greyscale_max_label.setText(f"Grey max")
-        self.greyscale_max_label.adjustSize()
+        self.grey_min_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.grey_min_slider.setMinimum(0)
+        self.grey_min_slider.setMaximum(100)
+        self.grey_min_slider.setFixedSize(200, 15)
+        self.grey_min_slider.setValue(self.grey_min)
+        self.grey_min_slider.setTickInterval(1)
+        self.grey_min_slider.valueChanged.connect(self.update_grey_min)
+        self.grey_min_slider.setEnabled(False)
 
-        self.greyscale_max_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.greyscale_max_slider.setGeometry(100, 15, 100, 40)
-        self.greyscale_max_slider.setMinimum(0)
-        self.greyscale_max_slider.setMaximum(100)
-        self.greyscale_max_slider.setFixedSize(200, 15)
-        self.greyscale_max_slider.setValue(self.greyscale_max)
-        self.greyscale_max_slider.setTickInterval(1)
-        self.greyscale_max_slider.valueChanged.connect(self.update_greyscale_max)
-        self.greyscale_max_slider.setEnabled(False)
+        self.grey_min_slider_bottom = QLineEdit(self)
+        self.grey_min_slider_bottom.setPlaceholderText("min")
+        self.grey_min_slider_bottom.setText("0")
+        self.grey_min_slider_bottom.setEnabled(False)
+        self.grey_min_slider_bottom.editingFinished.connect(self.update_grey_min_slider_bottom)
+        self.grey_min_slider_current = QLineEdit(self)
+        self.grey_min_slider_current.setPlaceholderText("current")
+        self.grey_min_slider_current.setEnabled(False)
+        self.grey_min_slider_current.editingFinished.connect(self.update_grey_min_slider_current)
+        self.grey_min_slider_top = QLineEdit(self)
+        self.grey_min_slider_top.setPlaceholderText("max")
+        self.grey_min_slider_top.setText("100")
+        self.grey_min_slider_top.setEnabled(False)
+        self.grey_min_slider_top.editingFinished.connect(self.update_grey_min_slider_top)
 
-        self.greyscale_max_slider_bottom = QLineEdit(self)
-        self.greyscale_max_slider_bottom.setPlaceholderText("min")
-        self.greyscale_max_slider_bottom.setEnabled(False)
-        self.greyscale_max_slider_bottom.editingFinished.connect(self.update_greyscale_max_slider_bottom)
-        self.greyscale_max_slider_current = QLineEdit(self)
-        self.greyscale_max_slider_current.setPlaceholderText("current")
-        self.greyscale_max_slider_current.setEnabled(False)
-        self.greyscale_max_slider_current.editingFinished.connect(self.update_greyscale_max_slider_current)
-        self.greyscale_max_slider_top = QLineEdit(self)
-        self.greyscale_max_slider_top.setPlaceholderText("max")
-        self.greyscale_max_slider_top.setEnabled(False)
-        self.greyscale_max_slider_top.editingFinished.connect(self.update_greyscale_max_slider_top)
+        self.grey_min_slider_layout = QHBoxLayout()
+        self.grey_min_slider_layout.addWidget(self.grey_min_slider_bottom)
+        self.grey_min_slider_layout.addSpacing(20)
+        self.grey_min_slider_layout.addWidget(self.grey_min_slider_current)
+        self.grey_min_slider_layout.addSpacing(20)
+        self.grey_min_slider_layout.addWidget(self.grey_min_slider_top)
 
-        self.greyscale_max_slider_layout = QHBoxLayout()
-        self.greyscale_max_slider_layout.addWidget(self.greyscale_max_slider_bottom)
-        self.greyscale_max_slider_layout.addSpacing(20)
-        self.greyscale_max_slider_layout.addWidget(self.greyscale_max_slider_current)
-        self.greyscale_max_slider_layout.addSpacing(20)
-        self.greyscale_max_slider_layout.addWidget(self.greyscale_max_slider_top)
+        self.grey_max_label = QLabel(self)
+        self.grey_max_label.setText(f"Grey max")
+        self.grey_max_label.adjustSize()
+
+        self.grey_max_step_label = QLabel(self)
+        self.grey_max_step_label.setText(f"step")
+        self.grey_max_step_label.adjustSize()
+
+        self.grey_max_step_textbox = QLineEdit(self)
+        self.grey_max_step_textbox.setEnabled(False)
+        self.grey_max_step_textbox.editingFinished.connect(self.update_grey_max_step_textbox)
+
+        self.grey_max_step_layout_sub = QHBoxLayout()
+        self.grey_max_step_layout_sub.addWidget(self.grey_max_step_label)
+        self.grey_max_step_layout_sub.addWidget(self.grey_max_step_textbox)
+        
+        self.grey_max_step_layout = QHBoxLayout()
+        self.grey_max_step_layout.addWidget(self.grey_max_label, 5)
+        self.grey_max_step_layout.addLayout(self.grey_max_step_layout_sub, 3)
+
+        self.grey_max_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.grey_max_slider.setMinimum(0)
+        self.grey_max_slider.setMaximum(100)
+        self.grey_max_slider.setFixedSize(200, 15)
+        self.grey_max_slider.setValue(self.grey_max)
+        self.grey_max_slider.setTickInterval(1)
+        self.grey_max_slider.valueChanged.connect(self.update_grey_max)
+        self.grey_max_slider.setEnabled(False)
+
+        self.grey_max_slider_bottom = QLineEdit(self)
+        self.grey_max_slider_bottom.setPlaceholderText("min")
+        self.grey_max_slider_bottom.setText("0")
+        self.grey_max_slider_bottom.setEnabled(False)
+        self.grey_max_slider_bottom.editingFinished.connect(self.update_grey_max_slider_bottom)
+        self.grey_max_slider_current = QLineEdit(self)
+        self.grey_max_slider_current.setPlaceholderText("current")
+        self.grey_max_slider_current.setEnabled(False)
+        self.grey_max_slider_current.editingFinished.connect(self.update_grey_max_slider_current)
+        self.grey_max_slider_top = QLineEdit(self)
+        self.grey_max_slider_top.setPlaceholderText("max")
+        self.grey_max_slider_top.setText("100")
+        self.grey_max_slider_top.setEnabled(False)
+        self.grey_max_slider_top.editingFinished.connect(self.update_grey_max_slider_top)
+
+        self.grey_max_slider_layout = QHBoxLayout()
+        self.grey_max_slider_layout.addWidget(self.grey_max_slider_bottom)
+        self.grey_max_slider_layout.addSpacing(20)
+        self.grey_max_slider_layout.addWidget(self.grey_max_slider_current)
+        self.grey_max_slider_layout.addSpacing(20)
+        self.grey_max_slider_layout.addWidget(self.grey_max_slider_top)
 
         self.grey_scale_label = QLabel(self)
         self.grey_scale_label.setText(f"Grey scale")
@@ -299,7 +351,7 @@ class MyWindow(QMainWindow):
         self.grey_scale_slider.setMaximum(100)
         self.grey_scale_slider.setFixedSize(200, 15)
         self.grey_scale_slider.setValue(self.grey_scale)
-        self.grey_scale_slider.setTickInterval(2)
+        self.grey_scale_slider.setTickInterval(1)
         self.grey_scale_slider.valueChanged.connect(self.update_grey_scale)
         self.grey_scale_slider.setEnabled(False)
 
@@ -371,13 +423,13 @@ class MyWindow(QMainWindow):
         self.toolbox_layout.addWidget(self.stretch_label)
         self.toolbox_layout.addWidget(self.stretch_slider)
 
-        self.toolbox_layout.addWidget(self.greyscale_min_label)
-        self.toolbox_layout.addWidget(self.greyscale_min_slider)
-        self.toolbox_layout.addLayout(self.greyscale_min_slider_layout)
+        self.toolbox_layout.addLayout(self.grey_min_step_layout)
+        self.toolbox_layout.addWidget(self.grey_min_slider)
+        self.toolbox_layout.addLayout(self.grey_min_slider_layout)
         
-        self.toolbox_layout.addWidget(self.greyscale_max_label)
-        self.toolbox_layout.addWidget(self.greyscale_max_slider)
-        self.toolbox_layout.addLayout(self.greyscale_max_slider_layout)
+        self.toolbox_layout.addLayout(self.grey_max_step_layout)
+        self.toolbox_layout.addWidget(self.grey_max_slider)
+        self.toolbox_layout.addLayout(self.grey_max_slider_layout)
         
         self.toolbox_layout.addLayout(self.grey_scale_step_layout)
         self.toolbox_layout.addWidget(self.grey_scale_slider)
@@ -426,52 +478,70 @@ class MyWindow(QMainWindow):
         self.stretch = self.sender().value() / 100
         self.stretch_label.setText(f"Stretch: {str(self.sender().value() / 100)}")
         self.stretch_label.adjustSize()
+    
+    def update_grey_min_step_textbox(self):
+        new = self.scale_range(self.grey_min, self.grey_min_slider.minimum(), self.grey_min_slider.maximum(), int(self.grey_min_slider_bottom.text()) / float(self.sender().text()), int(self.grey_min_slider_top.text()) / float(self.sender().text()))
 
-    def update_greyscale_min(self):
-        self.greyscale_min = self.sender().value()
-        self.greyscale_min_slider_current.setText(f"{str(self.sender().value())}")
-        self.greyscale_min_label.setText(f"Grey min")
-        self.greyscale_min_label.adjustSize()
+        self.grey_min_step = float(self.sender().text())
+        self.grey_min_slider.setMinimum(int(self.grey_min_slider_bottom.text()) / float(self.sender().text()))
+        self.grey_min_slider.setMaximum(int(self.grey_min_slider_top.text()) / float(self.sender().text()))
 
-    def update_greyscale_min_slider_bottom(self):
-        self.greyscale_min_slider.setMinimum(int(self.sender().text()))
+        self.grey_min_slider.setValue(new)
 
-    def update_greyscale_min_slider_current(self):
-        self.greyscale_min = int(self.sender().text())
+    def update_grey_min(self):
+        self.grey_min = self.sender().value()
+        self.grey_min_slider_current.setText(f"{str(round(self.sender().value() * self.grey_min_step, 2))}")
 
-        if int(self.sender().text()) < self.greyscale_min_slider.minimum():
-            self.greyscale_min = self.greyscale_min_slider.minimum()
+    def update_grey_min_slider_bottom(self):
+        self.grey_min_slider.setMinimum(int(self.sender().text()) / self.grey_min_step)
+        self.grey_min_slider.setValue(self.grey_min)
+
+    def update_grey_min_slider_current(self):
+        self.grey_min = float(self.sender().text()) / self.grey_min_step
+
+        if float(self.sender().text()) / self.grey_min_step < self.grey_min_slider.minimum():
+            self.grey_min = self.grey_min_slider.minimum()
         
-        if int(self.sender().text()) > self.greyscale_min_slider.maximum():
-            self.greyscale_min = self.greyscale_min_slider.maximum()
+        if float(self.sender().text()) / self.grey_min_step > self.grey_min_slider.maximum():
+            self.grey_min = self.grey_min_slider.maximum()
 
-        self.greyscale_min_slider.setValue(self.greyscale_min)
+        self.grey_min_slider.setValue(self.grey_min)
 
-    def update_greyscale_min_slider_top(self):
-        self.greyscale_min_slider.setMaximum(int(self.sender().text()))
+    def update_grey_min_slider_top(self):
+        self.grey_min_slider.setMaximum(int(self.sender().text()) / self.grey_min_step)
+        self.grey_min_slider.setValue(self.grey_min)
 
-    def update_greyscale_max(self):
-        self.greyscale_max = self.sender().value()
-        self.greyscale_max_slider_current.setText(f"{str(self.sender().value())}")
-        self.greyscale_max_label.setText(f"Grey max")
-        self.greyscale_max_label.adjustSize()
+    def update_grey_max_step_textbox(self):
+        new = self.scale_range(self.grey_max, self.grey_max_slider.minimum(), self.grey_max_slider.maximum(), int(self.grey_max_slider_bottom.text()) / float(self.sender().text()), int(self.grey_max_slider_top.text()) / float(self.sender().text()))
 
-    def update_greyscale_max_slider_bottom(self):
-        self.greyscale_max_slider.setMinimum(int(self.sender().text()))
+        self.grey_max_step = float(self.sender().text())
+        self.grey_max_slider.setMinimum(int(self.grey_max_slider_bottom.text()) / float(self.sender().text()))
+        self.grey_max_slider.setMaximum(int(self.grey_max_slider_top.text()) / float(self.sender().text()))
 
-    def update_greyscale_max_slider_current(self):
-        self.greyscale_max = int(self.sender().text())
+        self.grey_max_slider.setValue(new)
 
-        if int(self.sender().text()) < self.greyscale_max_slider.minimum():
-            self.greyscale_max = self.greyscale_max_slider.minimum()
+    def update_grey_max(self):
+        self.grey_max = self.sender().value()
+        self.grey_max_slider_current.setText(f"{str(round(self.sender().value() * self.grey_max_step, 2))}")
+
+    def update_grey_max_slider_bottom(self):
+        self.grey_max_slider.setMinimum(int(self.sender().text()) / self.grey_max_step)
+        self.grey_max_slider.setValue(self.grey_max)
+
+    def update_grey_max_slider_current(self):
+        self.grey_max = float(self.sender().text()) / self.grey_max_step
+
+        if float(self.sender().text()) / self.grey_max_step < self.grey_max_slider.minimum():
+            self.grey_max = self.grey_max_slider.minimum()
         
-        if int(self.sender().text()) > self.greyscale_max_slider.maximum():
-            self.greyscale_max = self.greyscale_max_slider.maximum()
+        if float(self.sender().text()) / self.grey_max_step > self.grey_max_slider.maximum():
+            self.grey_max = self.grey_max_slider.maximum()
 
-        self.greyscale_max_slider.setValue(self.greyscale_max)
+        self.grey_max_slider.setValue(self.grey_max)
 
-    def update_greyscale_max_slider_top(self):
-        self.greyscale_max_slider.setMaximum(int(self.sender().text()))
+    def update_grey_max_slider_top(self):
+        self.grey_max_slider.setMaximum(int(self.sender().text()) / self.grey_max_step)
+        self.grey_max_slider.setValue(self.grey_max)
 
     def update_grey_scale_step_textbox(self):
         new = self.scale_range(self.grey_scale, self.grey_scale_slider.minimum(), self.grey_scale_slider.maximum(), int(self.grey_scale_slider_bottom.text()) / float(self.sender().text()), int(self.grey_scale_slider_top.text()) / float(self.sender().text()))
@@ -512,25 +582,29 @@ class MyWindow(QMainWindow):
         self.auto_edit = self.sender().isChecked()
 
         if self.auto_edit:
-            self.greyscale_min_slider.setEnabled(False)
-            self.greyscale_min_slider_bottom.setEnabled(False)
-            self.greyscale_min_slider_current.setEnabled(False)
-            self.greyscale_min_slider_top.setEnabled(False)
-
-            self.greyscale_max_slider.setEnabled(False)
-            self.greyscale_max_slider_bottom.setEnabled(False)
-            self.greyscale_max_slider_current.setEnabled(False)
-            self.greyscale_max_slider_top.setEnabled(False)
+            self.grey_min_step_textbox.setEnabled(False)
+            self.grey_min_slider.setEnabled(False)
+            self.grey_min_slider_bottom.setEnabled(False)
+            self.grey_min_slider_current.setEnabled(False)
+            self.grey_min_slider_top.setEnabled(False)
+            
+            self.grey_max_step_textbox.setEnabled(False)
+            self.grey_max_slider.setEnabled(False)
+            self.grey_max_slider_bottom.setEnabled(False)
+            self.grey_max_slider_current.setEnabled(False)
+            self.grey_max_slider_top.setEnabled(False)
         else:
-            self.greyscale_min_slider.setEnabled(True)
-            self.greyscale_min_slider_bottom.setEnabled(True)
-            self.greyscale_min_slider_current.setEnabled(True)
-            self.greyscale_min_slider_top.setEnabled(True)
+            self.grey_min_step_textbox.setEnabled(True)
+            self.grey_min_slider.setEnabled(True)
+            self.grey_min_slider_bottom.setEnabled(True)
+            self.grey_min_slider_current.setEnabled(True)
+            self.grey_min_slider_top.setEnabled(True)
 
-            self.greyscale_max_slider.setEnabled(True)
-            self.greyscale_max_slider_bottom.setEnabled(True)
-            self.greyscale_max_slider_current.setEnabled(True)
-            self.greyscale_max_slider_top.setEnabled(True)
+            self.grey_max_step_textbox.setEnabled(True)
+            self.grey_max_slider.setEnabled(True)
+            self.grey_max_slider_bottom.setEnabled(True)
+            self.grey_max_slider_current.setEnabled(True)
+            self.grey_max_slider_top.setEnabled(True)
 
     def update_auto_scale(self):
         self.auto_scale = self.sender().isChecked()
@@ -552,8 +626,8 @@ class MyWindow(QMainWindow):
         
     def apply_color_scheme(self):
         if self.color_scheme == "greylog":
-            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.greyscale_min, self.greyscale_max, self.auto_scale, self.grey_scale)
-            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.greyscale_min, self.greyscale_max, self.auto_scale, self.grey_scale)
+            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.grey_min, self.grey_max, self.auto_scale, self.grey_scale)
+            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.grey_min, self.grey_max, self.auto_scale, self.grey_scale)
         """elif self.color_scheme == "grey":
             portImage = samplesToGrayImage(pc, invert, clip)
             stbdImage = samplesToGrayImage(sc, invert, clip)
