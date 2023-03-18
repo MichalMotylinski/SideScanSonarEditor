@@ -14,7 +14,7 @@ from process import *
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QApplication, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSize, QTimer
 from PySide6 import QtGui
@@ -53,7 +53,7 @@ class MyWindow(QMainWindow):
         self._grey_scale = 1
         self._grey_scale_step = 1
 
-        self._auto_edit = True
+        self._auto_min_max = True
         self._auto_scale = True
         
         self.initUI()
@@ -158,9 +158,23 @@ class MyWindow(QMainWindow):
         self._grey_scale_step = val
 
     def init_toolbox(self):
+        frame = QFrame(self)
+        frame.setGeometry(5,5,210, 110)
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setLineWidth(1)
+
+        #frame.setObjectName("AAA")
+        #frame.setStyleSheet("#AAA { border-top: 2px solid black; }")
+
+        """self.label = QLabel(frame)
+        self.label.setText(f"Decimation")
+        self.label.adjustSize()
+        self.label.move(5,-5)"""
+        #frame.setStyleSheet("background-color:red")
+
         # Create main toolbox widget
         self.toolbox_widget = QWidget(self)
-        self.toolbox_widget.setContentsMargins(0, 0, 0, 0)
+        self.toolbox_widget.setContentsMargins(0, 10, 0, 0)
         self.toolbox_widget.setFixedSize(200, 500)
         self.toolbox_widget.move(10, 10)
         #self.toolbox_widget.setStyleSheet("background-color:salmon;")
@@ -171,7 +185,7 @@ class MyWindow(QMainWindow):
         self.toolbox_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Open file button
-        self.open_file_btn = QPushButton(self)
+        self.open_file_btn = QPushButton(frame)
         self.open_file_btn.setText("Open file")
         self.open_file_btn.clicked.connect(self.open_dialog)
 
@@ -193,7 +207,7 @@ class MyWindow(QMainWindow):
         # Reload file button
         self.reload_file_btn = QtWidgets.QPushButton(self)
         self.reload_file_btn.setText("Reload")
-        self.reload_file_btn.clicked.connect(read_xtf)
+        self.reload_file_btn.clicked.connect(self.reload)
 
         # Image display parameters
         self.clip_label = QLabel(self)
@@ -381,14 +395,14 @@ class MyWindow(QMainWindow):
         self.invert_checkbox.setText(f"invert")
         self.invert_checkbox.stateChanged.connect(self.update_invert)
 
-        self.auto_edit_checkbox = QCheckBox(self)
-        self.auto_edit_checkbox.setText(f"auto min/max")
-        self.auto_edit_checkbox.stateChanged.connect(self.update_auto_edit)
-        self.auto_edit_checkbox.setChecked(True)
+        self.auto_min_max_checkbox = QCheckBox(self)
+        self.auto_min_max_checkbox.setText(f"auto min/max")
+        self.auto_min_max_checkbox.stateChanged.connect(self.update_auto_min_max)
+        self.auto_min_max_checkbox.setChecked(True)
 
-        self.auto_edit_checkbox_layout = QHBoxLayout()
-        self.auto_edit_checkbox_layout.addWidget(self.invert_checkbox)
-        self.auto_edit_checkbox_layout.addWidget(self.auto_edit_checkbox)
+        self.auto_min_max_checkbox_layout = QHBoxLayout()
+        self.auto_min_max_checkbox_layout.addWidget(self.invert_checkbox)
+        self.auto_min_max_checkbox_layout.addWidget(self.auto_min_max_checkbox)
 
         self.auto_scale_checkbox = QCheckBox(self)
         self.auto_scale_checkbox.setText(f"auto scale")
@@ -435,7 +449,7 @@ class MyWindow(QMainWindow):
         self.toolbox_layout.addWidget(self.grey_scale_slider)
         self.toolbox_layout.addLayout(self.grey_scale_slider_layout)
 
-        self.toolbox_layout.addLayout(self.auto_edit_checkbox_layout)
+        self.toolbox_layout.addLayout(self.auto_min_max_checkbox_layout)
         self.toolbox_layout.addWidget(self.auto_scale_checkbox)
 
         self.toolbox_layout.addWidget(self.color_scheme_combobox)
@@ -578,10 +592,10 @@ class MyWindow(QMainWindow):
     def update_invert(self):
         self.invert = self.sender().isChecked()
 
-    def update_auto_edit(self):
-        self.auto_edit = self.sender().isChecked()
+    def update_auto_min_max(self):
+        self.auto_min_max = self.sender().isChecked()
 
-        if self.auto_edit:
+        if self.auto_min_max:
             self.grey_min_step_textbox.setEnabled(False)
             self.grey_min_slider.setEnabled(False)
             self.grey_min_slider_bottom.setEnabled(False)
@@ -626,8 +640,8 @@ class MyWindow(QMainWindow):
         
     def apply_color_scheme(self):
         if self.color_scheme == "greylog":
-            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.grey_min, self.grey_max, self.auto_scale, self.grey_scale)
-            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.grey_min, self.grey_max, self.auto_scale, self.grey_scale)
+            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max * self.grey_max_step, self.auto_scale, self.grey_scale)
+            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max * self.grey_max_step, self.auto_scale, self.grey_scale)
         """elif self.color_scheme == "grey":
             portImage = samplesToGrayImage(pc, invert, clip)
             stbdImage = samplesToGrayImage(sc, invert, clip)
@@ -655,6 +669,9 @@ class MyWindow(QMainWindow):
             new_range = new_max - new_min
             new_value = (((old_value - old_min) * new_range) / old_range) + new_min
         return new_value
+    
+    def reload(self):
+        self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.stretch)
 
     @pyqtSlot()
     def open_dialog(self):
