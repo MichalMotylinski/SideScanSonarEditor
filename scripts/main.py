@@ -2,7 +2,7 @@ import sys
 import os
 import pyXTF
 import numpy as np
-import math
+from math import floor, ceil
 import time
 from PIL import Image
 from PIL.ImageQt import ImageQt, toqpixmap
@@ -52,6 +52,8 @@ class MyWindow(QMainWindow):
         self._grey_max_step = 1
         self._grey_scale = 1
         self._grey_scale_step = 1
+
+        self.grey_max_dict = {}
 
         self._auto_min_max = True
         self._auto_scale = True
@@ -337,6 +339,7 @@ class MyWindow(QMainWindow):
         self.grey_max_slider_bottom.setPlaceholderText("min")
         self.grey_max_slider_bottom.setValidator(zero_double_validator)
         self.grey_max_slider_bottom.setText("0")
+        self.grey_max_dict[0] = {"val": 0, "scaled": 0}
         self.grey_max_slider_bottom.setEnabled(False)
         self.grey_max_slider_bottom.editingFinished.connect(self.update_grey_max_slider_bottom)
         self.grey_max_slider_current = QLineEdit(self)
@@ -348,6 +351,7 @@ class MyWindow(QMainWindow):
         self.grey_max_slider_top.setPlaceholderText("max")
         self.grey_max_slider_top.setValidator(zero_double_validator)
         self.grey_max_slider_top.setText("100")
+        self.grey_max_dict[10] = {"val": 10, "scaled": 10}
         self.grey_max_slider_top.setEnabled(False)
         self.grey_max_slider_top.editingFinished.connect(self.update_grey_max_slider_top)
 
@@ -563,36 +567,94 @@ class MyWindow(QMainWindow):
         self.grey_min_slider.setValue(self.grey_min)
 
     def update_grey_max_step_textbox(self):
-        new = self.scale_range(self.grey_max, self.grey_max_slider.minimum(), self.grey_max_slider.maximum(), float(self.grey_max_slider_bottom.text()) / float(self.sender().text()), float(self.grey_max_slider_top.text()) / float(self.sender().text()))
-
         self.grey_max_step = float(self.sender().text())
-        self.grey_max_slider.setMinimum(float(self.grey_max_slider_bottom.text()) / float(self.sender().text()))
-        self.grey_max_slider.setMaximum(float(self.grey_max_slider_top.text()) / float(self.sender().text()))
 
-        self.grey_max_slider.setValue(new)
+        for key in sorted(list(self.grey_max_dict))[1:-1]:
+            del self.grey_max_dict[key]
+
+        steps = floor((list(self.grey_max_dict)[-1] - list(self.grey_max_dict)[0]) / self.grey_max_step)
+        if floor((list(self.grey_max_dict)[-1] - list(self.grey_max_dict)[0]) / self.grey_max_step) < 2:
+            steps += 1
+
+        steps = self.grey_max_dict[0]["val"] + self.grey_max_step
+        count = 1
+        while steps < self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]:
+            self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                     "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
+            steps += self.grey_max_step
+            count += 1
+
+        self.grey_max_slider.setMinimum(0)
+        self.grey_max_slider.setMaximum(len(self.grey_max_dict) - 1)
+        self.grey_max_slider.setValue(0)
 
     def update_grey_max(self):
         self.grey_max = self.sender().value()
-        self.grey_max_slider_current.setText(f"{str(round(self.sender().value() * self.grey_max_step, 2))}")
+
+        self.grey_max = self.grey_max_dict[sorted(self.grey_max_dict)[self.sender().value()]]["val"]
+        self.grey_max_slider_current.setText(f"{str(round(self.grey_max_dict[sorted(self.grey_max_dict)[self.sender().value()]]['val'], 2))}")
 
     def update_grey_max_slider_bottom(self):
-        self.grey_max_slider.setMinimum(float(self.sender().text()) / self.grey_max_step)
-        self.grey_max_slider.setValue(self.grey_max)
+        for key in sorted(list(self.grey_max_dict))[1:-1]:
+            del self.grey_max_dict[key]
+
+        self.grey_max_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_max_step}
+        steps = floor((list(self.grey_max_dict)[-1] - list(self.grey_max_dict)[0]) / self.grey_max_step)
+        if floor((list(self.grey_max_dict)[-1] - list(self.grey_max_dict)[0]) / self.grey_max_step) < 2:
+            steps = 3
+            
+        for i in range(1, steps):
+            if self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"] <= self.grey_max_dict[i - 1]["val"] + self.grey_max_step:
+                break
+            self.grey_max_dict[i] = {"val": self.grey_max_dict[i - 1]["val"] + self.grey_max_step,
+                                     "scaled": self.grey_max_dict[i - 1]["scaled"] + self.grey_max_step}
+
+        self.grey_max_slider.setMinimum(0)
+        self.grey_max_slider.setMaximum(len(self.grey_max_dict) - 1)
+
+        #if self.grey_max < self.grey_max_dict[0]["val"]:
+        self.grey_max = self.grey_max_dict[0]["val"]
+        self.grey_max_slider.setValue(0)
+        self.grey_max_slider_current.setText(str(self.grey_max_dict[0]["val"]))
 
     def update_grey_max_slider_current(self):
         self.grey_max = float(self.sender().text()) / self.grey_max_step
 
         if float(self.sender().text()) / self.grey_max_step < self.grey_max_slider.minimum():
             self.grey_max = self.grey_max_slider.minimum()
+            self.grey_max_dict[0] = {"val": self.grey_max_slider.minimum(), "scaled": self.grey_max_slider.minimum() * self.grey_max_step}
         
         if float(self.sender().text()) / self.grey_max_step > self.grey_max_slider.maximum():
             self.grey_max = self.grey_max_slider.maximum()
+            self.grey_max_dict[-1] = self.grey_max_slider.maximum()
 
-        self.grey_max_slider.setValue(self.grey_max)
+        close = closest([self.grey_max_dict[x]["val"] for x in sorted(self.grey_max_dict)], float(self.sender().text()))
+        for key in self.grey_max_dict:
+            if self.grey_max_dict[key]["val"] == close:
+                self.grey_max_slider.setValue(key)
+                break 
 
     def update_grey_max_slider_top(self):
-        self.grey_max_slider.setMaximum(float(self.sender().text()) / self.grey_max_step)
-        self.grey_max_slider.setValue(self.grey_max)
+        for key in sorted(list(self.grey_max_dict))[1:]:
+            del self.grey_max_dict[key]
+
+        self.grey_max_dict[int(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_max_step}
+        steps = floor((list(self.grey_max_dict)[-1] - list(self.grey_max_dict)[0]) / self.grey_max_step)
+        if floor((list(self.grey_max_dict)[-1] - list(self.grey_max_dict)[0]) / self.grey_max_step) < 2:
+            steps = 3
+            
+        for i in range(1, steps):
+            if self.grey_max_dict[i - 1]["val"] + self.grey_max_step >= self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]:
+                break
+            self.grey_max_dict[i] = {"val": self.grey_max_dict[i - 1]["val"] + self.grey_max_step,
+                                     "scaled": self.grey_max_dict[i - 1]["scaled"] + self.grey_max_step}
+
+        self.grey_max_slider.setMinimum(0)
+        self.grey_max_slider.setMaximum(len(self.grey_max_dict) - 1)
+
+        self.grey_max = self.grey_max_dict[0]["val"]
+        self.grey_max_slider.setValue(0)
+        self.grey_max_slider_current.setText(str(self.grey_max_dict[0]["val"]))
 
     def update_grey_scale_step_textbox(self):
         new = self.scale_range(self.grey_scale, self.grey_scale_slider.minimum(), self.grey_scale_slider.maximum(), float(self.grey_scale_slider_bottom.text()) / float(self.sender().text()), float(self.grey_scale_slider_top.text()) / float(self.sender().text()))
@@ -723,6 +785,9 @@ class MyWindow(QMainWindow):
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}.png"
             self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.stretch)
+
+def closest(lst, K):
+        return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
 def window():
     app = QApplication(sys.argv)
