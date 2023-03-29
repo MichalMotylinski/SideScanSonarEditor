@@ -53,9 +53,9 @@ class MyWindow(QMainWindow):
         self._grey_scale = 1
         self._grey_scale_step = 1
 
-        self.grey_min_dict = {x: {"val": x, "scaled": x} for x in range(101)}
-        self.grey_max_dict = {x: {"val": x, "scaled": x} for x in range(101)}
-        self.grey_scale_dict = {x: {"val": x, "scaled": x} for x in range(101)}
+        self.grey_min_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
+        self.grey_max_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
+        self.grey_scale_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
 
         self._auto_min_max = True
         self._auto_scale = True
@@ -231,7 +231,7 @@ class MyWindow(QMainWindow):
         self.clip_slider.setMinimum(0)
         self.clip_slider.setMaximum(100)
         self.clip_slider.setFixedSize(200, 15)
-        self.clip_slider.setValue(self.clip * 100)
+        self.clip_slider.setValue(int(self.clip * 100))
         self.clip_slider.setTickInterval(1)
         self.clip_slider.valueChanged.connect(self.update_clip)
 
@@ -246,7 +246,7 @@ class MyWindow(QMainWindow):
         self.stretch_slider.setMinimum(0)
         self.stretch_slider.setMaximum(100)
         self.stretch_slider.setFixedSize(200, 15)
-        self.stretch_slider.setValue(self.stretch * 100)
+        self.stretch_slider.setValue(int(self.stretch * 100))
         self.stretch_slider.setTickInterval(1)
         self.stretch_slider.valueChanged.connect(self.update_stretch)
 
@@ -284,7 +284,7 @@ class MyWindow(QMainWindow):
         self.grey_min_slider_bottom = QLineEdit(self)
         self.grey_min_slider_bottom.setPlaceholderText("min")
         self.grey_min_slider_bottom.setValidator(zero_double_validator)
-        self.grey_min_slider_bottom.setText("0")
+        self.grey_min_slider_bottom.setText("0.0")
         self.grey_min_slider_bottom.setEnabled(False)
         self.grey_min_slider_bottom.editingFinished.connect(self.update_grey_min_slider_bottom)
         self.grey_min_slider_current = QLineEdit(self)
@@ -295,7 +295,7 @@ class MyWindow(QMainWindow):
         self.grey_min_slider_top = QLineEdit(self)
         self.grey_min_slider_top.setPlaceholderText("max")
         self.grey_min_slider_top.setValidator(zero_double_validator)
-        self.grey_min_slider_top.setText("100")
+        self.grey_min_slider_top.setText("100.0")
         self.grey_min_slider_top.setEnabled(False)
         self.grey_min_slider_top.editingFinished.connect(self.update_grey_min_slider_top)
 
@@ -319,7 +319,7 @@ class MyWindow(QMainWindow):
         self.grey_max_step_textbox.setValidator(non_zero_double_validator)
         self.grey_max_step_textbox.setEnabled(False)
         self.grey_max_step_textbox.editingFinished.connect(self.update_grey_max_step_textbox)
-        self.grey_max_step_textbox.setText(str(self._grey_max_step))
+        self.grey_max_step_textbox.setText(str(float(self._grey_max_step)))
 
         self.grey_max_step_layout_sub = QHBoxLayout()
         self.grey_max_step_layout_sub.addWidget(self.grey_max_step_label)
@@ -341,7 +341,7 @@ class MyWindow(QMainWindow):
         self.grey_max_slider_bottom = QLineEdit(self)
         self.grey_max_slider_bottom.setPlaceholderText("min")
         self.grey_max_slider_bottom.setValidator(zero_double_validator)
-        self.grey_max_slider_bottom.setText("0")
+        self.grey_max_slider_bottom.setText("0.0")
         self.grey_max_slider_bottom.setEnabled(False)
         self.grey_max_slider_bottom.editingFinished.connect(self.update_grey_max_slider_bottom)
         self.grey_max_slider_current = QLineEdit(self)
@@ -352,7 +352,7 @@ class MyWindow(QMainWindow):
         self.grey_max_slider_top = QLineEdit(self)
         self.grey_max_slider_top.setPlaceholderText("max")
         self.grey_max_slider_top.setValidator(zero_double_validator)
-        self.grey_max_slider_top.setText("100")
+        self.grey_max_slider_top.setText("100.0")
         self.grey_max_slider_top.setEnabled(False)
         self.grey_max_slider_top.editingFinished.connect(self.update_grey_max_slider_top)
 
@@ -397,7 +397,7 @@ class MyWindow(QMainWindow):
         self.grey_scale_slider_bottom = QLineEdit(self)
         self.grey_scale_slider_bottom.setPlaceholderText("min")
         self.grey_scale_slider_bottom.setValidator(zero_double_validator)
-        self.grey_scale_slider_bottom.setText("0")
+        self.grey_scale_slider_bottom.setText("0.0")
         self.grey_scale_slider_bottom.setEnabled(False)
         self.grey_scale_slider_bottom.editingFinished.connect(self.update_grey_scale_slider_bottom)
         self.grey_scale_slider_current = QLineEdit(self)
@@ -408,7 +408,7 @@ class MyWindow(QMainWindow):
         self.grey_scale_slider_top = QLineEdit(self)
         self.grey_scale_slider_top.setPlaceholderText("max")
         self.grey_scale_slider_top.setValidator(zero_double_validator)
-        self.grey_scale_slider_top.setText("100")
+        self.grey_scale_slider_top.setText("100.0")
         self.grey_scale_slider_top.setEnabled(False)
         self.grey_scale_slider_top.editingFinished.connect(self.update_grey_scale_slider_top)
 
@@ -573,12 +573,27 @@ class MyWindow(QMainWindow):
         for key in sorted(list(self.grey_max_dict))[1:-1]:
             del self.grey_max_dict[key]
 
-        steps = self.grey_max_dict[0]["val"] + self.grey_max_step
         count = 1
-        while steps < self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]:
-            self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
-                                     "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
-            steps += self.grey_max_step
+        max = self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]
+        if self.grey_max_step < 1:
+            steps = 0
+            scope = (max - self.grey_max_dict[0]["val"]) / self.grey_max_step
+        else:
+            steps = self.grey_max_dict[0]["val"] + self.grey_max_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_max_step < 1:
+                self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                        "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) * self.grey_max_step}
+                if count > scope:
+                    self.grey_max_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_max_step}
+                steps += 1
+            else:
+                self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                        "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
+                steps += self.grey_max_step
             count += 1
 
         closest_val = closest([self.grey_max_dict[x]["val"] for x in sorted(self.grey_max_dict)], self.grey_max)
@@ -589,9 +604,11 @@ class MyWindow(QMainWindow):
         for key in self.grey_max_dict:
             if self.grey_max_dict[key]["val"] == closest_val:
                 self.grey_max = self.grey_max_dict[key]["val"]
-                self.grey_max_slider.setValue(key)
-                self.grey_max_slider_current.setText(str(self.grey_max_dict[key]["val"]))
+                self.grey_max_slider.setValue(int(key))
+                self.grey_max_slider_current.setText(str(round(self.grey_max_dict[key]["val"], 2)))
                 break
+
+        self.grey_max_step_textbox.setText(str(float(self.sender().text())))
 
     def update_grey_max(self):
         self.grey_max = self.sender().value()
@@ -600,16 +617,35 @@ class MyWindow(QMainWindow):
         self.grey_max_slider_current.setText(f"{str(round(self.grey_max_dict[sorted(self.grey_max_dict)[self.sender().value()]]['val'], 2))}")
 
     def update_grey_max_slider_bottom(self):
+        if float(self.sender().text()) >= self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]:
+            self.grey_max_slider_bottom.setText(str(self.grey_max_dict[0]["val"]))
+            return
+
         for key in sorted(list(self.grey_max_dict))[1:-1]:
             del self.grey_max_dict[key]
 
         self.grey_max_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_max_step}
-        steps = self.grey_max_dict[0]["val"] + self.grey_max_step
         count = 1
-        while steps < self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]:
-            self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
-                                     "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
-            steps += self.grey_max_step
+        max = self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]
+        if self.grey_max_step < 1:
+            steps = 0
+            scope = (max - self.grey_max_dict[0]["val"]) / self.grey_max_step
+        else:
+            steps = self.grey_max_dict[0]["val"] + self.grey_max_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_max_step < 1:
+                self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                        "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) * self.grey_max_step}
+                if count > scope:
+                    self.grey_max_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_max_step}
+                steps += 1
+            else:
+                self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                        "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
+                steps += self.grey_max_step
             count += 1
 
         self.grey_max_slider.setMinimum(0)
@@ -619,9 +655,11 @@ class MyWindow(QMainWindow):
         for key in self.grey_max_dict:
             if self.grey_max_dict[key]["val"] == closest_val:
                 self.grey_max = self.grey_max_dict[key]["val"]
-                self.grey_max_slider.setValue(key)
-                self.grey_max_slider_current.setText(str(self.grey_max_dict[key]["val"]))
+                self.grey_max_slider.setValue(int(key))
+                self.grey_max_slider_current.setText(str(round(self.grey_max_dict[key]["val"], 2)))
                 break
+        
+        self.grey_max_slider_bottom.setText(str(float(self.sender().text())))
 
     def update_grey_max_slider_current(self):
         if float(self.sender().text()) < self.grey_max_dict[0]["val"]:
@@ -637,21 +675,40 @@ class MyWindow(QMainWindow):
         closest_val = closest([self.grey_max_dict[x]["val"] for x in sorted(self.grey_max_dict)], float(self.sender().text()))
         for key in self.grey_max_dict:
             if self.grey_max_dict[key]["val"] == closest_val:
-                self.grey_max_slider.setValue(key)
-                self.grey_max_slider_current.setText(str(self.grey_max_dict[key]["val"]))
+                self.grey_max_slider.setValue(int(key))
+                self.grey_max_slider_current.setText(str(round(self.grey_max_dict[key]["val"], 2)))
                 break
 
     def update_grey_max_slider_top(self):
+        if float(self.sender().text()) <= self.grey_max_dict[0]["val"]:
+            self.grey_max_slider_top.setText(str(self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]))
+            return
+        
         for key in sorted(list(self.grey_max_dict))[1:]:
             del self.grey_max_dict[key]
 
-        self.grey_max_dict[int(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_max_step}
-        steps = self.grey_max_dict[0]["val"] + self.grey_max_step
+        self.grey_max_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_max_step}
         count = 1
-        while steps < self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]:
-            self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
-                                     "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
-            steps += self.grey_max_step
+        max = self.grey_max_dict[sorted(self.grey_max_dict)[-1]]["val"]
+        if self.grey_max_step < 1:
+            steps = 0
+            scope = (max - self.grey_max_dict[0]["val"]) / self.grey_max_step
+        else:
+            steps = self.grey_max_dict[0]["val"] + self.grey_max_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_max_step < 1:
+                self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                        "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) * self.grey_max_step}
+                if count > scope:
+                    self.grey_max_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_max_step}
+                steps += 1
+            else:
+                self.grey_max_dict[count] = {"val": self.grey_max_dict[count - 1]["val"] + self.grey_max_step,
+                                        "scaled": (self.grey_max_dict[count - 1]["val"] + self.grey_max_step) / self.grey_max_step}
+                steps += self.grey_max_step
             count += 1
 
         self.grey_max_slider.setMinimum(0)
@@ -661,9 +718,11 @@ class MyWindow(QMainWindow):
         for key in self.grey_max_dict:
             if self.grey_max_dict[key]["val"] == closest_val:
                 self.grey_max = self.grey_max_dict[key]["val"]
-                self.grey_max_slider.setValue(key)
-                self.grey_max_slider_current.setText(str(self.grey_max_dict[key]["val"]))
+                self.grey_max_slider.setValue(int(key))
+                self.grey_max_slider_current.setText(str(round(self.grey_max_dict[key]["val"], 2)))
                 break
+
+        self.grey_max_slider_top.setText(str(float(self.sender().text())))
 
     def update_grey_scale_step_textbox(self):
         new = self.scale_range(self.grey_scale, self.grey_scale_slider.minimum(), self.grey_scale_slider.maximum(), float(self.grey_scale_slider_bottom.text()) / float(self.sender().text()), float(self.grey_scale_slider_top.text()) / float(self.sender().text()))
@@ -748,8 +807,8 @@ class MyWindow(QMainWindow):
         
     def apply_color_scheme(self):
         if self.color_scheme == "greylog":
-            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max * self.grey_max_step, self.auto_scale, self.grey_scale)
-            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max * self.grey_max_step, self.auto_scale, self.grey_scale)
+            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
+            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
         """elif self.color_scheme == "grey":
             portImage = samplesToGrayImage(pc, invert, clip)
             stbdImage = samplesToGrayImage(sc, invert, clip)

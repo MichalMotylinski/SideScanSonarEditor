@@ -92,6 +92,8 @@ def samples_to_grey_image_logarithmic(samples, invert, clip, auto_min_max, chann
     #create numpy arrays so we can compute stats
     channel = np.array(samples)
 
+    print("AAA", channel_max)
+
     if auto_min_max:
         # compute the clips
         if clip > 0:
