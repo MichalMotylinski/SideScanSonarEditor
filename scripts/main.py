@@ -2,6 +2,7 @@ import sys
 import os
 import pyXTF
 import numpy as np
+import pickle
 from math import floor, ceil
 import time
 from PIL import Image
@@ -1330,6 +1331,12 @@ class MyWindow(QMainWindow):
         self.image_viewer.setPhoto(pixmap)
 
     def save_image(self):
+        if self.image is None:
+            return
+        
+        with open(f"{self.image_filename}.pickle", "wb") as f:
+            pickle.dump({"port_data": self.port_data, "starboard_data": self.starboard_data}, f, protocol=pickle.HIGHEST_PROTOCOL)
+        
         self.image.save(f"{self.image_filename}.png")
 
     def update(self):
@@ -1360,7 +1367,7 @@ class MyWindow(QMainWindow):
 
         if self.filepath:
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
-            self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}.png"
+            self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
             self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
 
 def closest(lst, K):
