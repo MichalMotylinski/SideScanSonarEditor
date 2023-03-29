@@ -1311,6 +1311,9 @@ class MyWindow(QMainWindow):
         self.color_scheme = self.sender().currentText()
         
     def apply_color_scheme(self):
+        if self.port_data is None:
+            return
+        
         if self.color_scheme == "greylog":
             portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.auto_clip, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
             stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.auto_clip, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
@@ -1342,7 +1345,9 @@ class MyWindow(QMainWindow):
         return new_value
     
     def reload(self):
-        self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.stretch)
+        if self.filepath is None:
+            return
+        self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
 
     @pyqtSlot()
     def open_dialog(self):
