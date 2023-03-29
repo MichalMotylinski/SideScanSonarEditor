@@ -174,9 +174,11 @@ class MyWindow(QMainWindow):
         self._decimation = 4
         
         # Image display params
-        self.auto_clip = True
+        self._auto_clip = True
         self._clip = 0.0
-        self._stretch = 1.0
+        self._auto_stretch = True
+        self._stretch = 1
+        self._stretch_max = 100
         self._invert = False
         self._color_scheme = "greylog"
         self._grey_min = 0
@@ -186,9 +188,9 @@ class MyWindow(QMainWindow):
         self._grey_scale = 1
         self._grey_scale_step = 1
 
-        self.grey_min_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
-        self.grey_max_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
-        self.grey_scale_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
+        self._grey_min_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
+        self._grey_max_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
+        self._grey_scale_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
 
         self._auto_min_max = True
         self._auto_scale = True
@@ -205,6 +207,15 @@ class MyWindow(QMainWindow):
         self._decimation = val
 
     @property
+    def auto_clip(self):
+        """The auto_clip property."""
+        return self._auto_clip
+    
+    @auto_clip.setter
+    def auto_clip(self, val):
+        self._auto_clip = val
+
+    @property
     def clip(self):
         """The clip property."""
         return self._clip
@@ -214,6 +225,15 @@ class MyWindow(QMainWindow):
         self._clip = val
 
     @property
+    def auto_stretch(self):
+        """The auto_stretch property."""
+        return self._auto_stretch
+    
+    @auto_stretch.setter
+    def auto_stretch(self, val):
+        self._auto_stretch = val
+
+    @property
     def stretch(self):
         """The stretch property."""
         return self._stretch
@@ -221,6 +241,15 @@ class MyWindow(QMainWindow):
     @stretch.setter
     def stretch(self, val):
         self._stretch = val
+
+    @property
+    def stretch_max(self):
+        """The stretch_max property."""
+        return self._stretch_max
+    
+    @stretch_max.setter
+    def stretch_max(self, val):
+        self._stretch_max = val
 
     @property
     def color_scheme(self):
@@ -294,9 +323,55 @@ class MyWindow(QMainWindow):
     def grey_scale_step(self, val):
         self._grey_scale_step = val
 
+    @property
+    def grey_min_dict(self):
+        """The grey_min_dict property."""
+        return self._grey_min_dict
+    
+    @grey_min_dict.setter
+    def grey_min_dict(self, val):
+        self._grey_min_dict = val
+
+    @property
+    def grey_max_dict(self):
+        """The grey_max_dict property."""
+        return self._grey_max_dict
+    
+    @grey_max_dict.setter
+    def grey_max_dict(self, val):
+        self._grey_max_dict = val
+
+    @property
+    def grey_scale_dict(self):
+        """The grey_scale_dict property."""
+        return self._grey_scale_dict
+    
+    @grey_scale_dict.setter
+    def grey_scale_dict(self, val):
+        self._grey_scale_dict = val
+
+    @property
+    def auto_min_max(self):
+        """The auto_min_max property."""
+        return self._auto_min_max
+    
+    @auto_min_max.setter
+    def auto_min_max(self, val):
+        self._auto_min_max = val
+
+    @property
+    def auto_scale(self):
+        """The auto_scale property."""
+        return self._auto_scale
+    
+    @auto_scale.setter
+    def auto_scale(self, val):
+        self._auto_scale = val
+
     def init_toolbox(self):
         non_zero_double_validator = QDoubleValidator(0.0001, float("inf"), 10)
         zero_double_validator = QDoubleValidator(0, float("inf"), 10)
+        non_zero_int_validator = QIntValidator(1, 2**31 - 1)
 
         # Create main toolbox widget
         self.toolbox_widget = QWidget(self)
@@ -311,7 +386,7 @@ class MyWindow(QMainWindow):
 
         # Load data frame
         self.load_data_frame = QFrame(self)
-        self.load_data_frame.setGeometry(10,9,218, 90)
+        self.load_data_frame.setGeometry(10, 9, 218, 160)
         self.load_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.load_data_frame.setLineWidth(1)
 
@@ -346,16 +421,46 @@ class MyWindow(QMainWindow):
         self.decimation_slider.setTickInterval(1)
         self.decimation_slider.valueChanged.connect(self.update_decimation)
 
+        # Strech slider
+        self.stretch_label = QLabel(self)
+        self.stretch_label.setFixedSize(200, 15)
+        self.stretch_label.setText(f"Stretch: {self.stretch}")
+        self.stretch_label.adjustSize()
+
+        self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.stretch_slider.setGeometry(100, 15, 100, 40)
+        self.stretch_slider.setMinimum(1)
+        self.stretch_slider.setMaximum(100)
+        self.stretch_slider.setFixedSize(200, 15)
+        self.stretch_slider.setValue(self.stretch)
+        self.stretch_slider.valueChanged.connect(self.update_stretch)
+
+        self.stretch_max_textbox = QLineEdit(self)
+        self.stretch_max_textbox.setValidator(non_zero_int_validator)
+        self.stretch_max_textbox.setEnabled(False)
+        self.stretch_max_textbox.editingFinished.connect(self.update_stretch_max_textbox)
+        self.stretch_max_textbox.setText(str(self.stretch_max))
+
+        self.stretch_checkbox = QCheckBox(self)
+        self.stretch_checkbox.setText(f"auto stretch")
+        self.stretch_checkbox.stateChanged.connect(self.update_auto_stretch)
+        self.stretch_checkbox.setChecked(True)
+        
+        self.stretch_layout = QHBoxLayout()
+        self.stretch_layout.addWidget(self.stretch_checkbox)
+        self.stretch_layout.addSpacing(57)
+        self.stretch_layout.addWidget(self.stretch_max_textbox)
+
         # Process data frame
         self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(10,98,218, 420)
+        self.process_data_frame.setGeometry(10, 168, 218, 402)
         self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.process_data_frame.setLineWidth(1)
 
         # Image display parameters
         # Clipping slider
         self.clip_label = QLabel(self)
-        self.clip_label.setFixedSize(200, 10)
+        self.clip_label.setFixedSize(200, 15)
         self.clip_label.setText(f"Clip: {self.clip}")
         self.clip_label.adjustSize()
 
@@ -375,21 +480,6 @@ class MyWindow(QMainWindow):
         self.clip_layout = QHBoxLayout()
         self.clip_layout.addWidget(self.clip_label)
         self.clip_layout.addWidget(self.clip_checkbox)
-
-        # Strech slider
-        self.stretch_label = QLabel(self)
-        self.stretch_label.setFixedSize(200, 15)
-        self.stretch_label.setText(f"Stretch: {self.stretch}")
-        self.stretch_label.adjustSize()
-
-        self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.stretch_slider.setGeometry(100, 15, 100, 40)
-        self.stretch_slider.setMinimum(0)
-        self.stretch_slider.setMaximum(100)
-        self.stretch_slider.setFixedSize(200, 15)
-        self.stretch_slider.setValue(int(self.stretch * 100))
-        self.stretch_slider.setTickInterval(1)
-        self.stretch_slider.valueChanged.connect(self.update_stretch)
 
         # Gray minimum value slider
         self.grey_min_label = QLabel(self)
@@ -599,7 +689,7 @@ class MyWindow(QMainWindow):
 
         # Save data frame
         self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(10,517,218, 40)
+        self.process_data_frame.setGeometry(10, 528, 218, 42)
         self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.process_data_frame.setLineWidth(1)
 
@@ -613,13 +703,14 @@ class MyWindow(QMainWindow):
         self.toolbox_layout.addWidget(self.decimation_label)
         self.toolbox_layout.addWidget(self.decimation_slider)
 
+        self.toolbox_layout.addWidget(self.stretch_label)
+        self.toolbox_layout.addWidget(self.stretch_slider)
+        self.toolbox_layout.addLayout(self.stretch_layout)
+
         self.toolbox_layout.addSpacing(20)
 
         self.toolbox_layout.addLayout(self.clip_layout)
         self.toolbox_layout.addWidget(self.clip_slider)
-
-        self.toolbox_layout.addWidget(self.stretch_label)
-        self.toolbox_layout.addWidget(self.stretch_slider)
 
         self.toolbox_layout.addLayout(self.grey_min_step_layout)
         self.toolbox_layout.addWidget(self.grey_min_slider)
@@ -674,11 +765,24 @@ class MyWindow(QMainWindow):
         self.clip = self.sender().value() / 100
         self.clip_label.setText(f"Clip: {str(self.sender().value() / 100)}")
         self.clip_label.adjustSize()
-    
+
     def update_stretch(self):
-        self.stretch = self.sender().value() / 100
-        self.stretch_label.setText(f"Stretch: {str(self.sender().value() / 100)}")
+        self.stretch = self.sender().value()
+        self.stretch_label.setText(f"Stretch: {str(self.sender().value())}")
         self.stretch_label.adjustSize()
+
+    def update_auto_stretch(self):
+        self.auto_stretch = self.sender().isChecked()
+        if self.auto_stretch:
+            self.stretch_slider.setEnabled(False)
+            self.stretch_max_textbox.setEnabled(False)
+        else:
+            self.stretch_slider.setEnabled(True)
+            self.stretch_max_textbox.setEnabled(True)
+
+    def update_stretch_max_textbox(self):
+        self.stretch_max = int(self.sender().text())
+        self.stretch_slider.setMaximum(self.stretch_max)
     
     def update_grey_min_step_textbox(self):
         self.grey_min_step = float(self.sender().text())
@@ -1252,7 +1356,7 @@ class MyWindow(QMainWindow):
         if self.filepath:
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}.png"
-            self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.stretch)
+            self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
 
 def closest(lst, K):
         return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]

@@ -6,7 +6,7 @@ import time
 from PIL import Image
 import bisect
 
-def read_xtf(filepath, channel_num, decimation, stretch):
+def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
     max_samples_port, max_slant_range, ping_count, mean_speed, navigation = get_sample_range(filepath, channel_num, True)
     across_track_sample_interval = (max_slant_range / max_samples_port) * decimation # sample interval in metres
 
@@ -14,9 +14,8 @@ def read_xtf(filepath, channel_num, decimation, stretch):
     distance = mean_speed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
     along_track_sample_interval = (distance / ping_count) 
 
-    stretch = math.ceil(along_track_sample_interval / across_track_sample_interval)
-    print("stretch", stretch)
-    stretch = 1
+    if auto_stretch:
+        stretch = math.ceil(along_track_sample_interval / across_track_sample_interval)
 
     data = pyXTF.XTFReader(filepath)
     port_data = []
