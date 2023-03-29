@@ -100,7 +100,12 @@ class ImageViewer(QtWidgets.QGraphicsView):
                     self._zoom -= 1
                 
                 if self._zoom > 0:
+                    view_pos = event.position()
+                    scene_pos = self.mapToScene(view_pos.toPoint())
+                    self.centerOn(scene_pos)
                     self.scale(factor, factor)
+                    delta = self.mapToScene(view_pos.toPoint()) - self.mapToScene(self.viewport().rect().center())
+                    self.centerOn(scene_pos - delta)
                 elif self._zoom == 0:
                     self.fitInView()
                 else:
