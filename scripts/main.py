@@ -263,7 +263,8 @@ class MyWindow(QMainWindow):
         self.grey_min_step_textbox.setValidator(non_zero_double_validator)
         self.grey_min_step_textbox.setEnabled(False)
         self.grey_min_step_textbox.editingFinished.connect(self.update_grey_min_step_textbox)
-        
+        self.grey_min_step_textbox.setText(str(float(self._grey_min_step)))
+
         self.grey_min_step_layout_sub = QHBoxLayout()
         self.grey_min_step_layout_sub.addWidget(self.grey_min_step_label)
         self.grey_min_step_layout_sub.addWidget(self.grey_min_step_textbox)
@@ -376,6 +377,7 @@ class MyWindow(QMainWindow):
         self.grey_scale_step_textbox.setValidator(non_zero_double_validator)
         self.grey_scale_step_textbox.setEnabled(False)
         self.grey_scale_step_textbox.editingFinished.connect(self.update_grey_scale_step_textbox)
+        self.grey_scale_step_textbox.setText(str(float(self._grey_scale_step)))
 
         self.grey_scale_step_layout_sub = QHBoxLayout()
         self.grey_scale_step_layout_sub.addWidget(self.grey_scale_step_label)
@@ -536,36 +538,161 @@ class MyWindow(QMainWindow):
         self.stretch_label.adjustSize()
     
     def update_grey_min_step_textbox(self):
-        new = self.scale_range(self.grey_min, self.grey_min_slider.minimum(), self.grey_min_slider.maximum(), float(self.grey_min_slider_bottom.text()) / float(self.sender().text()), float(self.grey_min_slider_top.text()) / float(self.sender().text()))
-
         self.grey_min_step = float(self.sender().text())
-        self.grey_min_slider.setMinimum(float(self.grey_min_slider_bottom.text()) / float(self.sender().text()))
-        self.grey_min_slider.setMaximum(float(self.grey_min_slider_top.text()) / float(self.sender().text()))
 
-        self.grey_min_slider.setValue(new)
+        for key in sorted(list(self.grey_min_dict))[1:-1]:
+            del self.grey_min_dict[key]
+
+        count = 1
+        max = self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]
+        if self.grey_min_step < 1:
+            steps = 0
+            scope = (max - self.grey_min_dict[0]["val"]) / self.grey_min_step
+        else:
+            steps = self.grey_min_dict[0]["val"] + self.grey_min_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_min_step < 1:
+                self.grey_min_dict[count] = {"val": self.grey_min_dict[count - 1]["val"] + self.grey_min_step,
+                                        "scaled": (self.grey_min_dict[count - 1]["val"] + self.grey_min_step) * self.grey_min_step}
+                if count > scope:
+                    self.grey_min_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_min_step}
+                steps += 1
+            else:
+                self.grey_min_dict[count] = {"val": self.grey_min_dict[count - 1]["val"] + self.grey_min_step,
+                                        "scaled": (self.grey_min_dict[count - 1]["val"] + self.grey_min_step) / self.grey_min_step}
+                steps += self.grey_min_step
+            count += 1
+
+        closest_val = closest([self.grey_min_dict[x]["val"] for x in sorted(self.grey_min_dict)], self.grey_min)
+        
+        self.grey_min_slider.setMinimum(0)
+        self.grey_min_slider.setMaximum(len(self.grey_min_dict) - 1)
+
+        for key in self.grey_min_dict:
+            if self.grey_min_dict[key]["val"] == closest_val:
+                self.grey_min = self.grey_min_dict[key]["val"]
+                self.grey_min_slider.setValue(int(key))
+                self.grey_min_slider_current.setText(str(round(self.grey_min_dict[key]["val"], 2)))
+                break
+
+        self.grey_min_step_textbox.setText(str(float(self.sender().text())))
 
     def update_grey_min(self):
         self.grey_min = self.sender().value()
-        self.grey_min_slider_current.setText(f"{str(round(self.sender().value() * self.grey_min_step, 2))}")
+
+        self.grey_min = self.grey_min_dict[sorted(self.grey_min_dict)[self.sender().value()]]["val"]
+        self.grey_min_slider_current.setText(f"{str(round(self.grey_min_dict[sorted(self.grey_min_dict)[self.sender().value()]]['val'], 2))}")
 
     def update_grey_min_slider_bottom(self):
-        self.grey_min_slider.setMinimum(float(self.sender().text()) / self.grey_min_step)
-        self.grey_min_slider.setValue(self.grey_min)
+        if float(self.sender().text()) >= self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]:
+            self.grey_min_slider_bottom.setText(str(self.grey_min_dict[0]["val"]))
+            return
+
+        for key in sorted(list(self.grey_min_dict))[1:-1]:
+            del self.grey_min_dict[key]
+
+        self.grey_min_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_min_step}
+        count = 1
+        max = self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]
+        if self.grey_min_step < 1:
+            steps = 0
+            scope = (max - self.grey_min_dict[0]["val"]) / self.grey_min_step
+        else:
+            steps = self.grey_min_dict[0]["val"] + self.grey_min_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_min_step < 1:
+                self.grey_min_dict[count] = {"val": self.grey_min_dict[count - 1]["val"] + self.grey_min_step,
+                                        "scaled": (self.grey_min_dict[count - 1]["val"] + self.grey_min_step) * self.grey_min_step}
+                if count > scope:
+                    self.grey_min_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_min_step}
+                steps += 1
+            else:
+                self.grey_min_dict[count] = {"val": self.grey_min_dict[count - 1]["val"] + self.grey_min_step,
+                                        "scaled": (self.grey_min_dict[count - 1]["val"] + self.grey_min_step) / self.grey_min_step}
+                steps += self.grey_min_step
+            count += 1
+
+        self.grey_min_slider.setMinimum(0)
+        self.grey_min_slider.setMaximum(len(self.grey_min_dict) - 1)
+
+        closest_val = closest([self.grey_min_dict[x]["val"] for x in sorted(self.grey_min_dict)], self.grey_min)
+        for key in self.grey_min_dict:
+            if self.grey_min_dict[key]["val"] == closest_val:
+                self.grey_min = self.grey_min_dict[key]["val"]
+                self.grey_min_slider.setValue(int(key))
+                self.grey_min_slider_current.setText(str(round(self.grey_min_dict[key]["val"], 2)))
+                break
+        
+        self.grey_min_slider_bottom.setText(str(float(self.sender().text())))
 
     def update_grey_min_slider_current(self):
-        self.grey_min = float(self.sender().text()) / self.grey_min_step
+        if float(self.sender().text()) < self.grey_min_dict[0]["val"]:
+            self.grey_min = self.grey_min_dict[0]["val"]
+            self.grey_min_slider.setValue(sorted(self.grey_min_dict)[0])
+            return
 
-        if float(self.sender().text()) / self.grey_min_step < self.grey_min_slider.minimum():
-            self.grey_min = self.grey_min_slider.minimum()
-        
-        if float(self.sender().text()) / self.grey_min_step > self.grey_min_slider.maximum():
-            self.grey_min = self.grey_min_slider.maximum()
+        if float(self.sender().text()) > self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]:
+            self.grey_min = self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]
+            self.grey_min_slider.setValue(sorted(self.grey_min_dict)[-1])
+            return
 
-        self.grey_min_slider.setValue(self.grey_min)
+        closest_val = closest([self.grey_min_dict[x]["val"] for x in sorted(self.grey_min_dict)], float(self.sender().text()))
+        for key in self.grey_min_dict:
+            if self.grey_min_dict[key]["val"] == closest_val:
+                self.grey_min_slider.setValue(int(key))
+                self.grey_min_slider_current.setText(str(round(self.grey_min_dict[key]["val"], 2)))
+                break
 
     def update_grey_min_slider_top(self):
-        self.grey_min_slider.setMaximum(float(self.sender().text()) / self.grey_min_step)
-        self.grey_min_slider.setValue(self.grey_min)
+        if float(self.sender().text()) <= self.grey_min_dict[0]["val"]:
+            self.grey_min_slider_top.setText(str(self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]))
+            return
+        
+        for key in sorted(list(self.grey_min_dict))[1:]:
+            del self.grey_min_dict[key]
+
+        self.grey_min_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_min_step}
+        count = 1
+        max = self.grey_min_dict[sorted(self.grey_min_dict)[-1]]["val"]
+        if self.grey_min_step < 1:
+            steps = 0
+            scope = (max - self.grey_min_dict[0]["val"]) / self.grey_min_step
+        else:
+            steps = self.grey_min_dict[0]["val"] + self.grey_min_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_min_step < 1:
+                self.grey_min_dict[count] = {"val": self.grey_min_dict[count - 1]["val"] + self.grey_min_step,
+                                        "scaled": (self.grey_min_dict[count - 1]["val"] + self.grey_min_step) * self.grey_min_step}
+                if count > scope:
+                    self.grey_min_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_min_step}
+                steps += 1
+            else:
+                self.grey_min_dict[count] = {"val": self.grey_min_dict[count - 1]["val"] + self.grey_min_step,
+                                        "scaled": (self.grey_min_dict[count - 1]["val"] + self.grey_min_step) / self.grey_min_step}
+                steps += self.grey_min_step
+            count += 1
+
+        self.grey_min_slider.setMinimum(0)
+        self.grey_min_slider.setMaximum(len(self.grey_min_dict) - 1)
+
+        closest_val = closest([self.grey_min_dict[x]["val"] for x in sorted(self.grey_min_dict)], self.grey_min)
+        for key in self.grey_min_dict:
+            if self.grey_min_dict[key]["val"] == closest_val:
+                self.grey_min = self.grey_min_dict[key]["val"]
+                self.grey_min_slider.setValue(int(key))
+                self.grey_min_slider_current.setText(str(round(self.grey_min_dict[key]["val"], 2)))
+                break
+
+        self.grey_min_slider_top.setText(str(float(self.sender().text())))
 
     def update_grey_max_step_textbox(self):
         self.grey_max_step = float(self.sender().text())
@@ -725,36 +852,161 @@ class MyWindow(QMainWindow):
         self.grey_max_slider_top.setText(str(float(self.sender().text())))
 
     def update_grey_scale_step_textbox(self):
-        new = self.scale_range(self.grey_scale, self.grey_scale_slider.minimum(), self.grey_scale_slider.maximum(), float(self.grey_scale_slider_bottom.text()) / float(self.sender().text()), float(self.grey_scale_slider_top.text()) / float(self.sender().text()))
-
         self.grey_scale_step = float(self.sender().text())
-        self.grey_scale_slider.setMinimum(float(self.grey_scale_slider_bottom.text()) / float(self.sender().text()))
-        self.grey_scale_slider.setMaximum(float(self.grey_scale_slider_top.text()) / float(self.sender().text()))
 
-        self.grey_scale_slider.setValue(new)
+        for key in sorted(list(self.grey_scale_dict))[1:-1]:
+            del self.grey_scale_dict[key]
+
+        count = 1
+        max = self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]
+        if self.grey_scale_step < 1:
+            steps = 0
+            scope = (max - self.grey_scale_dict[0]["val"]) / self.grey_scale_step
+        else:
+            steps = self.grey_scale_dict[0]["val"] + self.grey_scale_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_scale_step < 1:
+                self.grey_scale_dict[count] = {"val": self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step,
+                                        "scaled": (self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step) * self.grey_scale_step}
+                if count > scope:
+                    self.grey_scale_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_scale_step}
+                steps += 1
+            else:
+                self.grey_scale_dict[count] = {"val": self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step,
+                                        "scaled": (self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step) / self.grey_scale_step}
+                steps += self.grey_scale_step
+            count += 1
+
+        closest_val = closest([self.grey_scale_dict[x]["val"] for x in sorted(self.grey_scale_dict)], self.grey_scale)
+        
+        self.grey_scale_slider.setMinimum(0)
+        self.grey_scale_slider.setMaximum(len(self.grey_scale_dict) - 1)
+
+        for key in self.grey_scale_dict:
+            if self.grey_scale_dict[key]["val"] == closest_val:
+                self.grey_scale = self.grey_scale_dict[key]["val"]
+                self.grey_scale_slider.setValue(int(key))
+                self.grey_scale_slider_current.setText(str(round(self.grey_scale_dict[key]["val"], 2)))
+                break
+
+        self.grey_scale_step_textbox.setText(str(float(self.sender().text())))
 
     def update_grey_scale(self):
         self.grey_scale = self.sender().value()
-        self.grey_scale_slider_current.setText(f"{str(round(self.sender().value() * self.grey_scale_step, 2))}")
+
+        self.grey_scale = self.grey_scale_dict[sorted(self.grey_scale_dict)[self.sender().value()]]["val"]
+        self.grey_scale_slider_current.setText(f"{str(round(self.grey_scale_dict[sorted(self.grey_scale_dict)[self.sender().value()]]['val'], 2))}")
 
     def update_grey_scale_slider_bottom(self):
-        self.grey_scale_slider.setMinimum(float(self.sender().text()) / self.grey_scale_step)
-        self.grey_scale_slider.setValue(self.grey_scale)
+        if float(self.sender().text()) >= self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]:
+            self.grey_scale_slider_bottom.setText(str(self.grey_scale_dict[0]["val"]))
+            return
+
+        for key in sorted(list(self.grey_scale_dict))[1:-1]:
+            del self.grey_scale_dict[key]
+
+        self.grey_scale_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_scale_step}
+        count = 1
+        max = self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]
+        if self.grey_scale_step < 1:
+            steps = 0
+            scope = (max - self.grey_scale_dict[0]["val"]) / self.grey_scale_step
+        else:
+            steps = self.grey_scale_dict[0]["val"] + self.grey_scale_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_scale_step < 1:
+                self.grey_scale_dict[count] = {"val": self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step,
+                                        "scaled": (self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step) * self.grey_scale_step}
+                if count > scope:
+                    self.grey_scale_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_scale_step}
+                steps += 1
+            else:
+                self.grey_scale_dict[count] = {"val": self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step,
+                                        "scaled": (self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step) / self.grey_scale_step}
+                steps += self.grey_scale_step
+            count += 1
+
+        self.grey_scale_slider.setMinimum(0)
+        self.grey_scale_slider.setMaximum(len(self.grey_scale_dict) - 1)
+
+        closest_val = closest([self.grey_scale_dict[x]["val"] for x in sorted(self.grey_scale_dict)], self.grey_scale)
+        for key in self.grey_scale_dict:
+            if self.grey_scale_dict[key]["val"] == closest_val:
+                self.grey_scale = self.grey_scale_dict[key]["val"]
+                self.grey_scale_slider.setValue(int(key))
+                self.grey_scale_slider_current.setText(str(round(self.grey_scale_dict[key]["val"], 2)))
+                break
+        
+        self.grey_scale_slider_bottom.setText(str(float(self.sender().text())))
 
     def update_grey_scale_slider_current(self):
-        self.grey_scale = float(self.sender().text()) / self.grey_scale_step
+        if float(self.sender().text()) < self.grey_scale_dict[0]["val"]:
+            self.grey_scale = self.grey_scale_dict[0]["val"]
+            self.grey_scale_slider.setValue(sorted(self.grey_scale_dict)[0])
+            return
 
-        if float(self.sender().text()) / self.grey_scale_step < self.grey_scale_slider.minimum():
-            self.grey_scale = self.grey_scale_slider.minimum()
-        
-        if float(self.sender().text()) / self.grey_scale_step > self.grey_scale_slider.maximum():
-            self.grey_scale = self.grey_scale_slider.maximum()
+        if float(self.sender().text()) > self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]:
+            self.grey_scale = self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]
+            self.grey_scale_slider.setValue(sorted(self.grey_scale_dict)[-1])
+            return
 
-        self.grey_scale_slider.setValue(self.grey_scale)
+        closest_val = closest([self.grey_scale_dict[x]["val"] for x in sorted(self.grey_scale_dict)], float(self.sender().text()))
+        for key in self.grey_scale_dict:
+            if self.grey_scale_dict[key]["val"] == closest_val:
+                self.grey_scale_slider.setValue(int(key))
+                self.grey_scale_slider_current.setText(str(round(self.grey_scale_dict[key]["val"], 2)))
+                break
 
     def update_grey_scale_slider_top(self):
-        self.grey_scale_slider.setMaximum(float(self.sender().text()) / self.grey_scale_step)
-        self.grey_scale_slider.setValue(self.grey_scale)
+        if float(self.sender().text()) <= self.grey_scale_dict[0]["val"]:
+            self.grey_scale_slider_top.setText(str(self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]))
+            return
+        
+        for key in sorted(list(self.grey_scale_dict))[1:]:
+            del self.grey_scale_dict[key]
+
+        self.grey_scale_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.grey_scale_step}
+        count = 1
+        max = self.grey_scale_dict[sorted(self.grey_scale_dict)[-1]]["val"]
+        if self.grey_scale_step < 1:
+            steps = 0
+            scope = (max - self.grey_scale_dict[0]["val"]) / self.grey_scale_step
+        else:
+            steps = self.grey_scale_dict[0]["val"] + self.grey_scale_step
+            scope = max
+
+        while steps < scope:
+            if self.grey_scale_step < 1:
+                self.grey_scale_dict[count] = {"val": self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step,
+                                        "scaled": (self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step) * self.grey_scale_step}
+                if count > scope:
+                    self.grey_scale_dict[count] = {"val": max,
+                                        "scaled": max * self.grey_scale_step}
+                steps += 1
+            else:
+                self.grey_scale_dict[count] = {"val": self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step,
+                                        "scaled": (self.grey_scale_dict[count - 1]["val"] + self.grey_scale_step) / self.grey_scale_step}
+                steps += self.grey_scale_step
+            count += 1
+
+        self.grey_scale_slider.setMinimum(0)
+        self.grey_scale_slider.setMaximum(len(self.grey_scale_dict) - 1)
+
+        closest_val = closest([self.grey_scale_dict[x]["val"] for x in sorted(self.grey_scale_dict)], self.grey_scale)
+        for key in self.grey_scale_dict:
+            if self.grey_scale_dict[key]["val"] == closest_val:
+                self.grey_scale = self.grey_scale_dict[key]["val"]
+                self.grey_scale_slider.setValue(int(key))
+                self.grey_scale_slider_current.setText(str(round(self.grey_scale_dict[key]["val"], 2)))
+                break
+
+        self.grey_scale_slider_top.setText(str(float(self.sender().text())))
 
     def update_invert(self):
         self.invert = self.sender().isChecked()
@@ -828,7 +1080,6 @@ class MyWindow(QMainWindow):
         self.label.adjustSize()
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
-        print("vals", old_value, old_min, old_max, new_min, new_max)
         old_range = old_max - old_min
         if old_range == 0:
             new_value = new_min
