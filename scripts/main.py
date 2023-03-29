@@ -174,7 +174,8 @@ class MyWindow(QMainWindow):
         self._decimation = 4
         
         # Image display params
-        self._clip = 1.0
+        self.auto_clip = True
+        self._clip = 0.0
         self._stretch = 1.0
         self._invert = False
         self._color_scheme = "greylog"
@@ -364,8 +365,16 @@ class MyWindow(QMainWindow):
         self.clip_slider.setMaximum(100)
         self.clip_slider.setFixedSize(200, 15)
         self.clip_slider.setValue(int(self.clip * 100))
-        self.clip_slider.setTickInterval(1)
         self.clip_slider.valueChanged.connect(self.update_clip)
+
+        self.clip_checkbox = QCheckBox(self)
+        self.clip_checkbox.setText(f"auto clip")
+        self.clip_checkbox.stateChanged.connect(self.update_auto_clip)
+        self.clip_checkbox.setChecked(True)
+        
+        self.clip_layout = QHBoxLayout()
+        self.clip_layout.addWidget(self.clip_label)
+        self.clip_layout.addWidget(self.clip_checkbox)
 
         # Strech slider
         self.stretch_label = QLabel(self)
@@ -606,7 +615,7 @@ class MyWindow(QMainWindow):
 
         self.toolbox_layout.addSpacing(20)
 
-        self.toolbox_layout.addWidget(self.clip_label)
+        self.toolbox_layout.addLayout(self.clip_layout)
         self.toolbox_layout.addWidget(self.clip_slider)
 
         self.toolbox_layout.addWidget(self.stretch_label)
@@ -653,6 +662,13 @@ class MyWindow(QMainWindow):
         self.decimation = self.sender().value()
         self.decimation_label.setText(f"Decimation: {str(self.sender().value())}")
         self.decimation_label.adjustSize()
+
+    def update_auto_clip(self):
+        self.auto_clip = self.sender().isChecked()
+        if self.auto_clip:
+            self.clip_slider.setEnabled(False)
+        else:
+            self.clip_slider.setEnabled(True)
     
     def update_clip(self):
         self.clip = self.sender().value() / 100
@@ -1142,6 +1158,9 @@ class MyWindow(QMainWindow):
         self.auto_min_max = self.sender().isChecked()
 
         if self.auto_min_max:
+            self.clip_checkbox.setEnabled(True)
+            self.clip_slider.setEnabled(True)
+
             self.grey_min_step_textbox.setEnabled(False)
             self.grey_min_slider.setEnabled(False)
             self.grey_min_slider_bottom.setEnabled(False)
@@ -1154,6 +1173,9 @@ class MyWindow(QMainWindow):
             self.grey_max_slider_current.setEnabled(False)
             self.grey_max_slider_top.setEnabled(False)
         else:
+            self.clip_checkbox.setEnabled(False)
+            self.clip_slider.setEnabled(False)
+            
             self.grey_min_step_textbox.setEnabled(True)
             self.grey_min_slider.setEnabled(True)
             self.grey_min_slider_bottom.setEnabled(True)
@@ -1186,8 +1208,8 @@ class MyWindow(QMainWindow):
         
     def apply_color_scheme(self):
         if self.color_scheme == "greylog":
-            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
-            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
+            portImage = samples_to_grey_image_logarithmic(self.port_data, self.invert, self.auto_clip, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
+            stbdImage = samples_to_grey_image_logarithmic(self.starboard_data, self.invert, self.auto_clip, self.clip, self.auto_min_max, self.grey_min * self.grey_min_step, self.grey_max, self.auto_scale, self.grey_scale)
         """elif self.color_scheme == "grey":
             portImage = samplesToGrayImage(pc, invert, clip)
             stbdImage = samplesToGrayImage(sc, invert, clip)

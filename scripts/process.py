@@ -15,6 +15,8 @@ def read_xtf(filepath, channel_num, decimation, stretch):
     along_track_sample_interval = (distance / ping_count) 
 
     stretch = math.ceil(along_track_sample_interval / across_track_sample_interval)
+    print("stretch", stretch)
+    stretch = 1
 
     data = pyXTF.XTFReader(filepath)
     port_data = []
@@ -78,30 +80,28 @@ def find_min_max_clip_values(channel, clip):
 
     # instead of spreading across the entire data range, we can clip the outer n percent by using the cumsum.
     # from the cumsum of histogram density, we can figure out what cut off sample amplitude removes n % of data
-    cumsum = np.cumsum(hist)   
+    cumsum = np.cumsum(hist)
     
     minimum_bin_index = bisect.bisect(cumsum, clip / 100)
     maximum_bin_index = bisect.bisect(cumsum, (1 - clip / 100))
 
     return minimum_bin_index, maximum_bin_index
 
-def samples_to_grey_image_logarithmic(samples, invert, clip, auto_min_max, channel_min=None, channel_max=None, auto_scale=True, scale=None):
+def samples_to_grey_image_logarithmic(samples, invert, auto_clip, clip, auto_min_max, channel_min=None, channel_max=None, auto_scale=True, scale=None):
     gs_min = 0
     gs_max = 255
     
     #create numpy arrays so we can compute stats
     channel = np.array(samples)
-
-    print("AAA", channel_max)
-
+    
     if auto_min_max:
         # compute the clips
-        if clip > 0:
-            channel_min, channel_max = find_min_max_clip_values(channel, clip)
-        else:
+        if auto_clip:
             channel_min = channel.min()
             channel_max = channel.max()
-
+        else:
+            channel_min, channel_max = find_min_max_clip_values(channel, clip)
+            
         if channel_min > 0:
             channel_min = math.log(channel_min)
         else:
@@ -111,12 +111,12 @@ def samples_to_grey_image_logarithmic(samples, invert, clip, auto_min_max, chann
             channel_max = math.log(channel_max)
         else:
             channel_max = 0
-    print(channel_max, channel_min, scale)
+    
     # this scales from the range of image values to the range of output grey levels
     if auto_scale:
         if (channel_max - channel_min) != 0:
             scale = (gs_max - gs_min) / (channel_max - channel_min)
-    print(scale)
+    
     np.seterr(divide='ignore')
     channel = np.log(samples)
     channel = np.subtract(channel, channel_min)
