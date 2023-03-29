@@ -10,16 +10,143 @@ import bisect
 from PyQt6 import QtGui
 from process import *
 
-#os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000"
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QDialog, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QPixmap, QDoubleValidator, QIntValidator
-from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSize, QTimer
+from PyQt6.QtCore import pyqtSlot, Qt, QRect, QRectF, QSize, QTimer, pyqtSignal, QPointF
 from PySide6 import QtGui
 
-#QtGui.QImageReader.setAllocationLimit(0)
+ZOOM_NUM = 0
+X_POS = 0
+Y_POS = 0
+
+class ImageViewer(QtWidgets.QGraphicsView):
+    photo_clicked = pyqtSignal(QPointF)
+
+    def __init__(self, parent):
+        super(ImageViewer, self).__init__(parent)
+        self._zoom = 0
+        self._empty = True
+        self._scene = QtWidgets.QGraphicsScene(self)
+        self._photo = QtWidgets.QGraphicsPixmapItem()
+        self._scene.addItem(self._photo)
+        self._panning = False
+        self._last_pos = QPointF()
+
+        self.setScene(self._scene)
+        self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.setInteractive(True)
+        self.setMouseTracking(True)
+
+    def hasPhoto(self):
+        return not self._empty
+
+    def fitInView(self):
+        rect = QRectF(self._photo.pixmap().rect())
+        if not rect.isNull():
+            self.setSceneRect(rect)
+            if self.hasPhoto():
+                unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
+                self.scale(1 / unity.width(), 1 / unity.height())
+                viewrect = self.viewport().rect()
+                scenerect = self.transform().mapRect(rect)
+                factor = min(viewrect.width() / scenerect.width(),
+                             viewrect.height() / scenerect.height())
+                self.scale(factor, factor)
+            self._zoom = 0
+
+    def setPhoto(self, pixmap=None):
+        global ZOOM_NUM, X_POS, Y_POS
+        self._zoom = 0
+
+        initial = False
+        if self._empty:
+            initial = True
+
+        if pixmap and not pixmap.isNull():
+            self._empty = False
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
+            self._photo.setPixmap(pixmap)
+        else:
+            self._empty = True
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.NoDrag)
+            self._photo.setPixmap(QtGui.QPixmap())
+        
+        if initial:
+            self.fitInView()
+        else:
+            if ZOOM_NUM > 0:
+                self._zoom = ZOOM_NUM
+            elif ZOOM_NUM == 0:
+                self.fitInView()
+            else:
+                ZOOM_NUM = 0
+            
+            self.horizontalScrollBar().setValue(X_POS)
+            self.verticalScrollBar().setValue(Y_POS)
+
+    def wheelEvent(self, event):
+        global ZOOM_NUM, X_POS, Y_POS
+
+        if self.hasPhoto():
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                if event.angleDelta().y() > 0:
+                    factor = 1.25
+                    self._zoom += 1
+                else:
+                    factor = 0.8
+                    self._zoom -= 1
+                
+                if self._zoom > 0:
+                    self.scale(factor, factor)
+                elif self._zoom == 0:
+                    self.fitInView()
+                else:
+                    self._zoom = 0
+            elif event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                delta = event.angleDelta().y()
+                x = self.horizontalScrollBar().value()
+                self.horizontalScrollBar().setValue(x - delta)
+            else:
+                super().wheelEvent(event)
+
+        ZOOM_NUM = self._zoom
+        X_POS = self.horizontalScrollBar().value()
+        Y_POS = self.verticalScrollBar().value()
+
+    def toggleDragMode(self):
+        if self.dragMode() == QtWidgets.QGraphicsView.DragMode.ScrollHandDrag:
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.NoDrag)
+        elif not self._photo.pixmap().isNull():
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.RightButton:
+            self._panning = True
+            self._last_pos = event.position()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.RightButton:
+            self._panning = False
+        super().mouseReleaseEvent(event)
+
+    def mouseMoveEvent(self, event):
+        global X_POS, Y_POS
+
+        if self._panning:
+            delta = event.position() - self._last_pos
+            self._last_pos = event.position()
+
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+
+            X_POS = self.horizontalScrollBar().value()
+            Y_POS = self.verticalScrollBar().value()
+
+            super().mouseMoveEvent(event)
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -168,7 +295,7 @@ class MyWindow(QMainWindow):
         # Create main toolbox widget
         self.toolbox_widget = QWidget(self)
         self.toolbox_widget.setContentsMargins(10, 10, 0, 0)
-        self.toolbox_widget.setFixedSize(210, 550)
+        self.toolbox_widget.setFixedSize(213, 550)
         self.toolbox_widget.move(10, 10)
 
         # Create toolbox inner layout
@@ -178,7 +305,7 @@ class MyWindow(QMainWindow):
 
         # Load data frame
         self.load_data_frame = QFrame(self)
-        self.load_data_frame.setGeometry(10,9,220, 90)
+        self.load_data_frame.setGeometry(10,9,218, 90)
         self.load_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.load_data_frame.setLineWidth(1)
 
@@ -215,7 +342,7 @@ class MyWindow(QMainWindow):
 
         # Process data frame
         self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(10,98,220, 420)
+        self.process_data_frame.setGeometry(10,98,218, 420)
         self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.process_data_frame.setLineWidth(1)
 
@@ -458,7 +585,7 @@ class MyWindow(QMainWindow):
 
         # Save data frame
         self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(10,517,220, 40)
+        self.process_data_frame.setGeometry(10,517,218, 40)
         self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.process_data_frame.setLineWidth(1)
 
@@ -503,15 +630,10 @@ class MyWindow(QMainWindow):
     def initUI(self):
         self.init_toolbox()
 
-        self.label_display = QLabel(self)
-        self.label_display.setGeometry(QRect(0, 0, 1024, 1024))
-
-        scrollArea = QScrollArea()
-        scrollArea.setWidgetResizable(True) 
-        scrollArea.setWidget(self.label_display)
+        self.image_viewer = ImageViewer(self)
 
         image_layout = QVBoxLayout()
-        image_layout.addWidget(scrollArea)
+        image_layout.addWidget(self.image_viewer)
 
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.toolbox_widget, 0, Qt.AlignmentFlag.AlignTop)
@@ -1071,7 +1193,7 @@ class MyWindow(QMainWindow):
         # Display merged image
         self.image = merge_images(portImage, stbdImage)
         pixmap = toqpixmap(self.image)
-        self.label_display.setPixmap(pixmap)
+        self.image_viewer.setPhoto(pixmap)
 
     def save_image(self):
         self.image.save(f"{self.image_filename}.png")
