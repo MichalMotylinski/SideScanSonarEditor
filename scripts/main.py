@@ -1765,10 +1765,14 @@ class MyWindow(QMainWindow):
             self,
             "Open File",
             "",
-            "All Files (*);; Triton Extended Format (*.xtf)",
+            "Triton Extended Format (*.xtf)",
         )[0]
-
+        
         if self.filepath:
+            arr = np.full((self.image_viewer.size().height(), self.image_viewer.size().width()), 255)
+            pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
+            self.image_viewer.setPhoto(pixmap)
+
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
             self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
