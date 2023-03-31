@@ -2,7 +2,10 @@
 import pyXTF
 import numpy as np
 import math
+import matplotlib as mpl
 import time
+import pickle
+import pandas as pd
 from PIL import Image
 import bisect
 
@@ -54,7 +57,6 @@ def get_sample_range(filepath, channel_num, load_navigation):
     print("Gathering data limits...")
     #   open the XTF file for reading 
     data = pyXTF.XTFReader(filepath)
-    print(data)
     if load_navigation:
         navigation = data.loadNavigation()
     
@@ -86,7 +88,7 @@ def find_min_max_clip_values(channel, clip):
 
     return minimum_bin_index, maximum_bin_index
 
-def samples_to_grey_image_logarithmic(samples, invert, auto_clip, clip, auto_min_max, channel_min=None, channel_max=None, auto_scale=True, scale=None):
+def convert_to_image(samples, invert, auto_min_max, channel_min=None, auto_scale=True, scale=None, color_scheme="greylog", cmap=None):
     gs_min = 0
     gs_max = 255
     
@@ -95,12 +97,9 @@ def samples_to_grey_image_logarithmic(samples, invert, auto_clip, clip, auto_min
     
     if auto_min_max:
         # compute the clips
-        if auto_clip:
-            channel_min = channel.min()
-            channel_max = channel.max()
-        else:
-            channel_min, channel_max = find_min_max_clip_values(channel, clip)
-            
+        channel_min = channel.min()
+        channel_max = channel.max()
+
         if channel_min > 0:
             channel_min = math.log(channel_min)
         else:
@@ -117,7 +116,10 @@ def samples_to_grey_image_logarithmic(samples, invert, auto_clip, clip, auto_min
             scale = (gs_max - gs_min) / (channel_max - channel_min)
     
     np.seterr(divide='ignore')
-    channel = np.log(samples)
+
+    if color_scheme == "greylog":
+        channel = np.log(samples)
+
     channel = np.subtract(channel, channel_min)
     channel = np.multiply(channel, scale)
 
@@ -126,9 +128,44 @@ def samples_to_grey_image_logarithmic(samples, invert, auto_clip, clip, auto_min
     else:
         channel = np.add(gs_min, channel)
 
-    image = Image.fromarray(channel).convert('L')
-    
+    if color_scheme == "color":
+        if cmap is None:
+            cmap = mpl.colors.ListedColormap({
+                'black': (
+                    (0.0, 0.0, 0.0),
+                    (0.5, 0.0, 0.1),
+                    (1.0, 1.0, 1.0),
+                ),
+                'white': (
+                    (0.0, 0.0, 0.0),
+                    (1.0, 0.0, 0.0),
+                    (1.0, 1.0, 1.0),
+                ),
+                'yellow': (
+                    (0.0, 0.0, 0.0),
+                    (1.0, 0.0, 0.0),
+                    (1.0, 1.0, 1.0),
+                )})
+        else:
+            cmap = mpl.colors.ListedColormap(cmap)
+        image = Image.fromarray(np.uint8(cmap(channel)*255))
+    else:
+        image = Image.fromarray(channel).convert('L')
     return image
+
+def load_color_map(path):
+    df = pd.read_csv(path, delim_whitespace=True)
+    cmap = mpl.colors.ListedColormap({
+        'black': (
+            (0.0, 0.0, 0.0),
+            (0.5, 0.0, 0.1),
+            (1.0, 1.0, 1.0),
+        ),
+        'yellow': (
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+        )})
+    return
 
 def merge_images(image1, image2):
     """Merge two images into one, displayed side by side
@@ -143,7 +180,7 @@ def merge_images(image1, image2):
     result_width = width1 + width2
     result_height = max(height1, height2)
 
-    result = Image.new('L', (result_width, result_height))
+    result = Image.new("RGBA", size=(result_width, result_height))
     result.paste(im=image1, box=(0, 0))
     result.paste(im=image2, box=(width1, 0))
     return result

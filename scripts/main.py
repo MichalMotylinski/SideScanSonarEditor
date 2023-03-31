@@ -192,6 +192,7 @@ class MyWindow(QMainWindow):
         self._port_auto_scale = True
         self._port_invert = False
         self._port_color_scheme = "greylog"
+        self._port_cmap = None
 
         self._starboard_channel_min = 0
         self._starboard_channel_min_step = 1
@@ -203,6 +204,7 @@ class MyWindow(QMainWindow):
         self._starboard_auto_scale = True
         self._starboard_invert = False
         self._starboard_color_scheme = "greylog"
+        self._starboard_cmap = None
         
         self.initUI()
 
@@ -333,6 +335,15 @@ class MyWindow(QMainWindow):
         self._port_color_scheme = val
 
     @property
+    def port_cmap(self):
+        """The port_cmap property."""
+        return self._port_cmap
+    
+    @port_cmap.setter
+    def port_cmap(self, val):
+        self._port_cmap = val
+
+    @property
     def starboard_channel_min(self):
         """The starboard_channel_min property."""
         return self._starboard_channel_min
@@ -421,6 +432,15 @@ class MyWindow(QMainWindow):
     @starboard_color_scheme.setter
     def starboard_color_scheme(self, val):
         self._starboard_color_scheme = val
+
+    @property
+    def starboard_cmap(self):
+        """The starboard_cmap property."""
+        return self._starboard_cmap
+    
+    @starboard_cmap.setter
+    def starboard_cmap(self, val):
+        self._starboard_cmap = val
 
     def init_toolbox(self):
         non_zero_double_validator = QDoubleValidator(0.0001, float("inf"), 10)
@@ -708,6 +728,10 @@ class MyWindow(QMainWindow):
         self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.port_color_scheme_combobox.currentIndexChanged.connect(self.update_port_color_scheme)
 
+        self.upload_port_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.upload_port_color_scheme_btn.setText("Upload cmap")
+        self.upload_port_color_scheme_btn.clicked.connect(self.upload_port_color_scheme)
+
         # Apply selected display parameter values
         self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self)
         self.apply_port_color_scheme_btn.setText("Apply")
@@ -718,6 +742,7 @@ class MyWindow(QMainWindow):
         self.port_color_selection_layout.addWidget(self.port_auto_scale_checkbox)
         self.port_color_selection_layout.addWidget(self.port_invert_checkbox)
         self.port_color_selection_layout.addWidget(self.port_color_scheme_combobox)
+        self.port_color_selection_layout.addWidget(self.upload_port_color_scheme_btn)
         self.port_color_selection_layout.addWidget(self.apply_port_color_scheme_btn)
 
         self.port_params_layout = QHBoxLayout()
@@ -907,6 +932,10 @@ class MyWindow(QMainWindow):
         self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
+        self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.upload_starboard_color_scheme_btn.setText("Upload cmap")
+        self.upload_starboard_color_scheme_btn.clicked.connect(self.upload_starboard_color_scheme)
+
         # Apply selected display parameter values
         self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self)
         self.apply_starboard_color_scheme_btn.setText("Apply")
@@ -917,6 +946,7 @@ class MyWindow(QMainWindow):
         self.starboard_color_selection_layout.addWidget(self.starboard_auto_scale_checkbox)
         self.starboard_color_selection_layout.addWidget(self.starboard_invert_checkbox)
         self.starboard_color_selection_layout.addWidget(self.starboard_color_scheme_combobox)
+        self.starboard_color_selection_layout.addWidget(self.upload_starboard_color_scheme_btn)
         self.starboard_color_selection_layout.addWidget(self.apply_starboard_color_scheme_btn)
 
         self.starboard_params_layout = QHBoxLayout()
@@ -1333,19 +1363,26 @@ class MyWindow(QMainWindow):
 
     def update_port_color_scheme(self):
         self.port_color_scheme = self.sender().currentText()
+
+    @pyqtSlot()
+    def upload_port_color_scheme(self):
+        filepath = ""
+        filepath = QFileDialog.getOpenFileName(
+            self,
+            "Open File",
+            "",
+            "Pickle Format (*.pickle)",
+        )[0]
+
+        if filepath:
+            with open(filepath, "rb") as f:
+                self.port_cmap = pickle.load(f)
         
     def apply_port_color_scheme(self):
         if self.port_data is None:
             return
         
-        if self.port_color_scheme == "greylog":
-            self.port_image = samples_to_grey_image_logarithmic(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min * self.port_channel_min_step, self.port_auto_scale, self.port_channel_scale)
-        """elif self.port_color_scheme == "grey":
-            portImage = samplesToGrayImage(pc, port_invert, clip)
-            stbdImage = samplesToGrayImage(sc, port_invert, clip)
-        else:
-            portImage = samplesToColorImage(pc, port_invert, clip, colorScale)
-            stbdImage = samplesToColorImage(sc, port_invert, clip, colorScale)"""
+        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min * self.port_channel_min_step, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
 
         if self.starboard_image is None:
             arr = np.full(np.array(self.port_image).shape, 255)
@@ -1708,19 +1745,26 @@ class MyWindow(QMainWindow):
 
     def update_starboard_color_scheme(self):
         self.starboard_color_scheme = self.sender().currentText()
+
+    @pyqtSlot()
+    def upload_starboard_color_scheme(self):
+        filepath = ""
+        filepath = QFileDialog.getOpenFileName(
+            self,
+            "Open File",
+            "",
+            "Pickle Format (*.pickle)",
+        )[0]
+
+        if filepath:
+            with open(filepath, "rb") as f:
+                self.starboard_cmap = pickle.load(f)
         
     def apply_starboard_color_scheme(self):
         if self.starboard_data is None:
             return
-        
-        if self.starboard_color_scheme == "greylog":
-            self.starboard_image = samples_to_grey_image_logarithmic(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min * self.starboard_channel_min_step, self.starboard_auto_scale, self.starboard_channel_scale)
-        """elif self.starboard_color_scheme == "grey":
-            starboardImage = samplesToGrayImage(pc, starboard_invert, clip)
-            stbdImage = samplesToGrayImage(sc, starboard_invert, clip)
-        else:
-            starboardImage = samplesToColorImage(pc, starboard_invert, clip, colorScale)
-            stbdImage = samplesToColorImage(sc, starboard_invert, clip, colorScale)"""
+
+        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min * self.starboard_channel_min_step, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
 
         if self.port_image is None:
             arr = np.full(np.array(self.starboard_image).shape, 255)
