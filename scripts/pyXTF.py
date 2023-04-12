@@ -29,7 +29,7 @@ class XTFNAVIGATIONRECORD:
         self.sensorSpeed = sensorSpeed
            
 class XTFPINGHEADER:
-    def __init__(self, fileptr, XTFFileHdr, SubChannelNumber, NumChansToFollow, NumBytesThisRecord):
+    def __init__(self, fileptr, XTFFileHdr, SubChannelNumber, NumChansToFollow):
         # start_time = time.time() # time the process
 
         data = fileptr.read(XTFFileHdr.XTFPingHeader_len)
@@ -306,7 +306,7 @@ class XTFReader:
         self.fileptr = open(XTFfileName, 'rb')        
         self.fileSize = self.fileptr.seek(0, 2)
         # go back to start of file
-        self.fileptr.seek(0, 0)                
+        self.fileptr.seek(0, 0)      
         self.XTFFileHdr = XTFFILEHDR(self.fileptr)
             
     def __str__(self):
@@ -338,6 +338,25 @@ class XTFReader:
         self.rewind()
         print("Get navigation Range Duration %.3fs" % (time.time() - start_time)) # print the processing time.
         return (navigation)
+
+    def get_packet_size(self):
+        ping = self.readPacket()
+        _, _, _, NumBytesThisRecord = self.readPacketheader()
+        d = datetime (ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000)
+        r = XTFNAVIGATIONRECORD(d, ping.PingNumber, ping.SensorXcoordinate, ping.SensorYcoordinate, ping.SensorDepth, ping.SensorPrimaryAltitude, ping.SensorHeading, ping.SensorSpeed)
+        return NumBytesThisRecord, r.dateTime.timestamp()
+
+    def get_duration(self, channel_num):
+        max_samples_port = 0
+        max_range = 0
+        ping = self.readPacket()
+        max_samples_port = max(ping.pingChannel[channel_num].NumSamples, max_samples_port)
+        max_range = max(max_range, ping.pingChannel[channel_num].SlantRange)
+        
+        d = datetime (ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000)
+        r = XTFNAVIGATIONRECORD(d, ping.PingNumber, ping.SensorXcoordinate, ping.SensorYcoordinate, ping.SensorDepth, ping.SensorPrimaryAltitude, ping.SensorHeading, ping.SensorSpeed)
+        return max_samples_port, max_range, 1, r.dateTime.timestamp()
+
     
     def computeSpeedFromPositions(self, navData):
         if (navData[0].sensorX <= 180) & (navData[0].sensorY <= 90): #data is in geographicals
@@ -385,7 +404,7 @@ class XTFReader:
         # read the packet header.  This permits us to skip packets we do not support
         HeaderType, SubChannelNumber, NumChansToFollow, NumBytesThisRecord = self.readPacketheader()
         if HeaderType == 0:
-            ping = XTFPINGHEADER(self.fileptr, self.XTFFileHdr, SubChannelNumber, NumChansToFollow, NumBytesThisRecord)
+            ping = XTFPINGHEADER(self.fileptr, self.XTFFileHdr, SubChannelNumber, NumChansToFollow)
             
             # now read the padbytes at the end of the packet
             padBytes = currentPacketPosition + NumBytesThisRecord - self.fileptr.tell()
