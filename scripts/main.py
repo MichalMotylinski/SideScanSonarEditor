@@ -184,6 +184,7 @@ class MyWindow(QMainWindow):
 
         self.selected_split = 1
         self.selected_split_auto = 1
+        self.shift = 0
         
         # Image display params
         self._port_channel_min = 0
@@ -1005,10 +1006,16 @@ class MyWindow(QMainWindow):
         self.selected_split_spinbox.setMaximum(1)
         self.selected_split_spinbox.setValue(self.selected_split)
         self.selected_split_spinbox.valueChanged.connect(self.update_selected_split)
+
+        self.shift_textbox = QLineEdit(self.side_toolbar_groupbox)
+        self.shift_textbox.setGeometry(220, 50, 50, 20)
+        self.shift_textbox.setValidator(zero_int_validator)
+        self.shift_textbox.setText("0")
+        self.shift_textbox.editingFinished.connect(self.update_shift_textbox)
         
         self.load_split_btn = QPushButton(self.side_toolbar_groupbox)
-        self.load_split_btn.setGeometry(220, 50, 80, 20)
-        self.load_split_btn.setText("Apply split")
+        self.load_split_btn.setGeometry(220, 90, 80, 20)
+        self.load_split_btn.setText("Show split")
         self.load_split_btn.clicked.connect(self.load_split)
 
     def update_selected_split(self):
@@ -1024,14 +1031,21 @@ class MyWindow(QMainWindow):
             self.splits = int(self.sender().text())
         self.selected_split_spinbox.setMaximum(self.splits)
 
+    def update_shift_textbox(self):
+        if int(self.sender().text()) > 5000:
+            self.sender().setText("5000")
+            self.shift = 5000
+            return
+        self.shift = int(self.sender().text())
+
     def load_split(self):
         if self.port_data is None and self.starboard_data is None:
             return
         start = time.perf_counter()
         if self.auto_stretch:
-            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.packet_size, self.splits, self.selected_split)
+            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.shift, self.packet_size, self.splits, self.selected_split)
         else:
-            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch, self.packet_size, self.splits, self.selected_split)
+            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch, self.shift, self.packet_size, self.splits, self.selected_split)
         end = time.perf_counter()
         print("process data", end-start)
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -1879,7 +1893,7 @@ class MyWindow(QMainWindow):
         if self.filepath is None:
             return
         
-        self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
+        self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
         
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -1904,7 +1918,7 @@ class MyWindow(QMainWindow):
 
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
-            self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
+            self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
             
             self.splits_textbox.setText(str(self.splits))
             self.selected_split_spinbox.setMaximum(self.splits)
