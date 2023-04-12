@@ -7,18 +7,89 @@ import time
 import pickle
 import pandas as pd
 from PIL import Image
+import sys
+import os
+import psutil
 import bisect
 
 def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
-    max_samples_port, max_slant_range, ping_count, mean_speed, navigation = get_sample_range(filepath, channel_num, True)
-    across_track_sample_interval = (max_slant_range / max_samples_port) * decimation # sample interval in metres
+    data = pyXTF.XTFReader(filepath)
 
-    # to make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
-    distance = mean_speed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
+    first_pos = data.fileptr.tell()
+
+    # Read the first packet and get its size and time
+    packet_size, time_first = data.get_packet_size()
+    ping_count = (data.fileSize - first_pos) / packet_size
+
+    # Read the last packet and get its size and time
+    data.fileptr.seek(data.fileSize - packet_size, 0)
+    max_samples_port, max_slant_range, mean_speed, time_last = data.get_duration(channel_num)
+    data.fileptr.seek(first_pos, 0)
+
+    # Sample interval in metres
+    across_track_sample_interval = (max_slant_range / max_samples_port) * decimation
+
+    # To make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
+    distance = mean_speed * (time_last - time_first)
     along_track_sample_interval = (distance / ping_count) 
 
+    # Automatic calculation of stretch that needs to be applied to the data
     if auto_stretch:
         stretch = math.ceil(along_track_sample_interval / across_track_sample_interval)
+
+    # Roughly calculate the size of channel data array with float64 dtype
+    size_bytes = ((max_samples_port / decimation * ping_count * stretch) * 8)
+    req_size = size_bytes * 2
+    available_size = psutil.virtual_memory().available
+
+    data_limit = 536870912
+    if available_size < data_limit:
+        data_limit == available_size
+    
+    print("Size", req_size, data_limit)
+    if req_size > data_limit:
+        print("Not enough memory, splitting the data.")
+        
+        splits = math.ceil(req_size / data_limit)
+
+        port_data = []
+        starboard_data = []
+
+        print("stretch, splits", stretch, splits)
+        
+        pos = first_pos
+        selected_split = 1
+        
+        pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1)
+        print(pos, math.ceil(data.fileSize / splits) * (selected_split - 1), math.ceil(data.fileSize / splits) * selected_split)
+        while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
+            data.fileptr.seek(pos, 0)
+            ping = data.readPacket()
+            
+            if ping == -999:
+                continue
+            pos = pos + packet_size
+            
+            channel = np.array(ping.pingChannel[0].data[::decimation])
+            channel = np.multiply(channel, math.pow(2, - ping.pingChannel[0].Weight))
+            filtered_port_data = channel.tolist()
+            
+            for i in range(stretch):
+                port_data.insert(0, filtered_port_data[::-1])
+            
+            channel = np.array(ping.pingChannel[1].data[::decimation])
+            channel = np.multiply(channel, math.pow(2, - ping.pingChannel[1].Weight))
+            raw_starboard_data = channel.tolist()
+
+            for i in range(stretch):
+                starboard_data.insert(0, raw_starboard_data)
+
+            if pos > math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
+                print(pos)
+        
+        print(sys.getsizeof(np.array(port_data)), sys.getsizeof(np.array(port_data)) * 2)
+        
+        return np.array(port_data), np.array(starboard_data), splits, stretch, packet_size
 
     data = pyXTF.XTFReader(filepath)
     port_data = []
@@ -43,8 +114,49 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
 
         for i in range(stretch):
             starboard_data.insert(0, raw_starboard_data)
+
+    return np.array(port_data), np.array(starboard_data), 1, stretch, packet_size
+
+def load_selected_split(filepath, decimation, stretch, packet_size, splits, selected_split):
+    start = time.perf_counter()
+    data = pyXTF.XTFReader(filepath)
+    end = time.perf_counter()
+    print("Load data", end-start)
+    port_data = []
+    starboard_data = []
+
+    pos = 1024
+
+    print(stretch)
+    print(data.fileSize, splits, packet_size)
+    print("SIZES", data.fileSize, math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1))
+    start = time.perf_counter()
+    pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1)
+    while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
+        data.fileptr.seek(pos, 0)
+        ping = data.readPacket()
+
+        if ping == -999:
+            continue
+        pos = pos + packet_size
+        
+        channel = np.array(ping.pingChannel[0].data[::decimation])
+        channel = np.multiply(channel, math.pow(2, - ping.pingChannel[0].Weight))
+        filtered_port_data = channel.tolist()
+        
+        for i in range(stretch):
+            port_data.insert(0, filtered_port_data[::-1])
+        
+        channel = np.array(ping.pingChannel[1].data[::decimation])
+        channel = np.multiply(channel, math.pow(2, - ping.pingChannel[1].Weight))
+        raw_starboard_data = channel.tolist()
+
+        for i in range(stretch):
+            starboard_data.insert(0, raw_starboard_data)
     
-    return np.array(port_data), np.array(starboard_data)
+    end = time.perf_counter()
+    print("Calc data", end-start)
+    return np.array(port_data), np.array(starboard_data), splits, stretch
 
 
 def get_sample_range(filepath, channel_num, load_navigation):
@@ -54,6 +166,7 @@ def get_sample_range(filepath, channel_num, load_navigation):
     ping_count = 0
     navigation = 0
     
+    start_time = time.time() # time the process
     print("Gathering data limits...")
     #   open the XTF file for reading 
     data = pyXTF.XTFReader(filepath)
@@ -61,7 +174,6 @@ def get_sample_range(filepath, channel_num, load_navigation):
         navigation = data.loadNavigation()
     
     mean_speed = 1
-    start_time = time.time() # time the process
 
     while data.moreData():
         ping = data.readPacket()
@@ -91,6 +203,8 @@ def find_min_max_clip_values(channel, clip):
 def convert_to_image(samples, invert, auto_min_max, channel_min=None, auto_scale=True, scale=None, color_scheme="greylog", cmap=None):
     gs_min = 0
     gs_max = 255
+
+    channel_max = 1
     
     #create numpy arrays so we can compute stats
     channel = np.array(samples)
@@ -116,7 +230,6 @@ def convert_to_image(samples, invert, auto_min_max, channel_min=None, auto_scale
             scale = (gs_max - gs_min) / (channel_max - channel_min)
     
     np.seterr(divide='ignore')
-
     if color_scheme == "greylog":
         channel = np.log(samples)
 
