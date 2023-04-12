@@ -12,7 +12,7 @@ import os
 import psutil
 import bisect
 
-def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
+def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
     data = pyXTF.XTFReader(filepath)
 
     first_pos = data.fileptr.tell()
@@ -50,19 +50,16 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
     if req_size > data_limit:
         print("Not enough memory, splitting the data.")
         
-        splits = math.ceil(req_size / data_limit)
-
         port_data = []
         starboard_data = []
 
-        print("stretch, splits", stretch, splits)
-        
+        splits = math.ceil(req_size / data_limit)  
         pos = first_pos
         selected_split = 1
         
         pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1)
-        print(pos, math.ceil(data.fileSize / splits) * (selected_split - 1), math.ceil(data.fileSize / splits) * selected_split)
-        while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
+        stop_point = math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split + shift * packet_size
+        while pos < stop_point:
             data.fileptr.seek(pos, 0)
             ping = data.readPacket()
             
@@ -86,9 +83,6 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
 
             if pos > math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
                 print(pos)
-        
-        print(sys.getsizeof(np.array(port_data)), sys.getsizeof(np.array(port_data)) * 2)
-        
         return np.array(port_data), np.array(starboard_data), splits, stretch, packet_size
 
     data = pyXTF.XTFReader(filepath)
@@ -117,7 +111,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch):
 
     return np.array(port_data), np.array(starboard_data), 1, stretch, packet_size
 
-def load_selected_split(filepath, decimation, stretch, packet_size, splits, selected_split):
+def load_selected_split(filepath, decimation, stretch, shift, packet_size, splits, selected_split):
     start = time.perf_counter()
     data = pyXTF.XTFReader(filepath)
     end = time.perf_counter()
@@ -126,13 +120,20 @@ def load_selected_split(filepath, decimation, stretch, packet_size, splits, sele
     starboard_data = []
 
     pos = 1024
-
-    print(stretch)
-    print(data.fileSize, splits, packet_size)
-    print("SIZES", data.fileSize, math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1))
+    
     start = time.perf_counter()
-    pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1)
-    while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
+    if selected_split == 1:
+        pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1)
+    else:
+        if math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1) - shift * packet_size > pos:
+            pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1) - shift * packet_size
+ 
+    stop_point = data.fileSize
+    if math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split + shift * packet_size < data.fileSize:
+        stop_point = math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split + shift * packet_size
+
+    while pos < stop_point:
+        #while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
         data.fileptr.seek(pos, 0)
         ping = data.readPacket()
 
