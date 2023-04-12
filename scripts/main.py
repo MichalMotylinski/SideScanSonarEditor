@@ -10,11 +10,12 @@ from PIL.ImageQt import ImageQt, toqpixmap
 import bisect
 from PyQt6 import QtGui
 from process import *
+import threading
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QDialog, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QDialog, QSpinBox, QGroupBox, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QPixmap, QDoubleValidator, QIntValidator, QFont
 from PyQt6.QtCore import pyqtSlot, Qt, QRect, QRectF, QSize, QTimer, pyqtSignal, QPointF
 from PySide6 import QtGui
@@ -174,12 +175,15 @@ class MyWindow(QMainWindow):
         self.image = None
         self.image_filename = None
         
-
         # Image load params
         self._decimation = 4
         self._auto_stretch = True
         self._stretch = 1
-        self._stretch_max = 100
+        self._stretch_max = 10
+        self.stretch_auto = 1
+
+        self.selected_split = 1
+        self.selected_split_auto = 1
         
         # Image display params
         self._port_channel_min = 0
@@ -518,7 +522,7 @@ class MyWindow(QMainWindow):
         self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self)
         self.stretch_slider.setGeometry(100, 15, 100, 40)
         self.stretch_slider.setMinimum(1)
-        self.stretch_slider.setMaximum(100)
+        self.stretch_slider.setMaximum(10)
         self.stretch_slider.setFixedSize(300, 15)
         self.stretch_slider.setValue(self.stretch)
         self.stretch_slider.valueChanged.connect(self.update_stretch)
@@ -958,12 +962,6 @@ class MyWindow(QMainWindow):
         self.starboard_frame_layout.addWidget(self.starboard_frame_title)
         self.starboard_frame_layout.addLayout(self.starboard_params_layout)
 
-        # Save data frame
-        self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(10, 528, 218, 42)
-        self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.process_data_frame.setLineWidth(1)
-
         # Add widgets to the toolbox layout
         self.toolbox_layout.addLayout(self.load_params_layout)
         self.toolbox_layout.addSpacing(20)
@@ -973,17 +971,94 @@ class MyWindow(QMainWindow):
 
         self.toolbox_widget.setLayout(self.toolbox_layout)
 
+    def init_side_toolbox(self):
+        non_zero_double_validator = QDoubleValidator(0.0001, float("inf"), 10)
+        zero_double_validator = QDoubleValidator(0, float("inf"), 10)
+        non_zero_int_validator = QIntValidator(1, 2**31 - 1)
+        zero_int_validator = QIntValidator(0, 2**31 - 1)
+
+        font = QFont()
+        font.setBold(True)
+
+        self.side_toolbar_groupbox = QGroupBox(self)
+        self.side_toolbar_groupbox.setMinimumWidth(320)
+        self.side_toolbar_groupbox.setTitle('Group Box Example')
+        self.side_toolbar_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+
+        self.splits_label = QLabel(self.side_toolbar_groupbox)
+        self.splits_label.setGeometry(20, 30, 100, 20)
+        self.splits_label.setText("Max splits")
+
+        self.splits_textbox = QLineEdit(self.side_toolbar_groupbox)
+        self.splits_textbox.setGeometry(20, 50, 50, 20)
+        self.splits_textbox.setValidator(zero_int_validator)
+        self.splits_textbox.setText("1")
+        self.splits_textbox.editingFinished.connect(self.update_splits_textbox)
+
+        self.selected_split_label = QLabel(self.side_toolbar_groupbox)
+        self.selected_split_label.setGeometry(120, 30, 100, 20)
+        self.selected_split_label.setText("Selected split")
+
+        self.selected_split_spinbox = QSpinBox(self.side_toolbar_groupbox)
+        self.selected_split_spinbox.setGeometry(120, 50, 50, 20)
+        self.selected_split_spinbox.setMinimum(1)
+        self.selected_split_spinbox.setMaximum(1)
+        self.selected_split_spinbox.setValue(self.selected_split)
+        self.selected_split_spinbox.valueChanged.connect(self.update_selected_split)
+        
+        self.load_split_btn = QPushButton(self.side_toolbar_groupbox)
+        self.load_split_btn.setGeometry(220, 50, 80, 20)
+        self.load_split_btn.setText("Apply split")
+        self.load_split_btn.clicked.connect(self.load_split)
+
+    def update_selected_split(self):
+        if "QSpinBox" not in str(type(self.sender())):
+            return
+        self.selected_split = self.sender().value()
+
+    def update_splits_textbox(self):
+        if int(self.sender().text()) == 0:
+            self.splits = 1
+            self.sender().setText(str(self.splits))
+        else:
+            self.splits = int(self.sender().text())
+        self.selected_split_spinbox.setMaximum(self.splits)
+
+    def load_split(self):
+        if self.port_data is None and self.starboard_data is None:
+            return
+        start = time.perf_counter()
+        if self.auto_stretch:
+            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.packet_size, self.splits, self.selected_split)
+        else:
+            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch, self.packet_size, self.splits, self.selected_split)
+        end = time.perf_counter()
+        print("process data", end-start)
+        self.selected_split_spinbox.setMaximum(self.splits)
+
+        start = time.perf_counter()
+
+        self.apply_port_color_scheme()
+        self.apply_starboard_color_scheme()
+
+        end = time.perf_counter()
+        print("draw data", end-start)
+
     def initUI(self):
         self.init_toolbox()
+        self.init_side_toolbox()
 
         self.image_viewer = ImageViewer(self)
-        image_layout = QVBoxLayout()
-        image_layout.addWidget(self.image_viewer)
+
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(self.side_toolbar_groupbox)
+        
+        bottom_layout.addWidget(self.image_viewer)
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.toolbox_widget, 0 , Qt.AlignmentFlag.AlignTop)
         main_layout.setSpacing(0)
-        main_layout.addLayout(image_layout)
+        main_layout.addLayout(bottom_layout)
 
         main_widget = QWidget()
         main_widget.setLayout(main_layout)
@@ -996,6 +1071,8 @@ class MyWindow(QMainWindow):
         self.decimation_label.adjustSize()
 
     def update_stretch(self):
+        if "QSlider" not in str(type(self.sender())):
+            return
         self.stretch = self.sender().value()
         self.stretch_label.setText(f"Stretch: {str(self.sender().value())}")
         self.stretch_label.adjustSize()
@@ -1382,7 +1459,7 @@ class MyWindow(QMainWindow):
         if self.port_data is None:
             return
         
-        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min * self.port_channel_min_step, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
+        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
 
         if self.starboard_image is None:
             arr = np.full(np.array(self.port_image).shape, 255)
@@ -1764,8 +1841,8 @@ class MyWindow(QMainWindow):
         if self.starboard_data is None:
             return
 
-        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min * self.starboard_channel_min_step, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
-
+        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
+        
         if self.port_image is None:
             arr = np.full(np.array(self.starboard_image).shape, 255)
             port_image = Image.fromarray(arr.astype(np.uint8))
@@ -1801,7 +1878,15 @@ class MyWindow(QMainWindow):
     def reload(self):
         if self.filepath is None:
             return
-        self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
+        
+        self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
+        
+        self.splits_textbox.setText(str(self.splits))
+        self.selected_split_spinbox.setMaximum(self.splits)
+
+        self.stretch_auto = self.stretch
+        self.stretch_slider.setValue(self.stretch)
+        self.stretch_label.setText(f"Stretch: {self.stretch}")
 
     @pyqtSlot()
     def open_dialog(self):
@@ -1819,7 +1904,14 @@ class MyWindow(QMainWindow):
 
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
-            self.port_data, self.starboard_data = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
+            self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch)
+            
+            self.splits_textbox.setText(str(self.splits))
+            self.selected_split_spinbox.setMaximum(self.splits)
+            
+            self.stretch_auto = self.stretch
+            self.stretch_slider.setValue(self.stretch)
+            self.stretch_label.setText(f"Stretch: {self.stretch}")
 
 def closest(lst, K):
         return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
