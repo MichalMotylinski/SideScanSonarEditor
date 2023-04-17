@@ -15,14 +15,51 @@ import threading
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QDialog, QSpinBox, QGroupBox, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
-from PyQt6.QtGui import QPixmap, QDoubleValidator, QIntValidator, QFont
-from PyQt6.QtCore import pyqtSlot, Qt, QRect, QRectF, QSize, QTimer, pyqtSignal, QPointF
+from PyQt6.QtWidgets import QDialog, QSpinBox, QGraphicsItem, QGraphicsPolygonItem, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGroupBox, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtGui import QPixmap, QPolygonF, QCursor, QDoubleValidator, QIntValidator, QFont, QBrush, QColor
+from PyQt6.QtCore import pyqtSlot, Qt, QRect,  QRectF, QSize, QTimer, pyqtSignal, QPointF
 from PySide6 import QtGui
 
 ZOOM_NUM = 0
 X_POS = 0
 Y_POS = 0
+
+class CornerEllipse(QGraphicsEllipseItem):
+    def __init__(self, parent, polygon_idx, ellipse_idx):
+        super().__init__(parent)
+        self.setBrush(QBrush(QColor(255, 0, 0)))
+        self.setAcceptHoverEvents(True)
+        self.pos = QPointF(parent.x(), parent.y())
+        self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+        self.ellipse_idx = ellipse_idx
+        self.polygon_idx = polygon_idx
+        
+    #def hasCursor(self) -> bool:
+        #print(super().hasCursor())
+
+    """def hoverEnterEvent(self, event):
+        print("hover")
+        self.setBrush(QBrush(QColor(0, 255, 0)))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            print(event.pos(), self.pos)
+            self._offset = event.pos() - QPointF(self.x(), self.y())
+            self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        self.pos = QPointF(event.scenePos().x(), event.scenePos().y())
+        #self.y = event.scenePos().y()
+
+    #def hoverMoveEvent(self, event):
+        #self.setBrush(QBrush(QColor(0, 255, 0)))
+
+    
+    def hoverLeaveEvent(self, event):
+        self.setBrush(QBrush(QColor(0, 0, 255)))"""
 
 class ImageViewer(QtWidgets.QGraphicsView):
     photo_clicked = pyqtSignal(QPointF)
@@ -42,6 +79,29 @@ class ImageViewer(QtWidgets.QGraphicsView):
         self.setInteractive(True)
         self.setMouseTracking(True)
 
+        self.horizontalScrollBar().setStyleSheet("QScrollBar:horizontal { height: 14px; }")
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.verticalScrollBar().setStyleSheet("QScrollBar:vertical { width: 14px; }")
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        
+        
+        self._draw_mode = False
+        self._drawing = False
+
+        self.global_factor = 1
+
+        self._polygons = []
+        self._polygon = []
+        self.line = None
+        self.selected_corner = None
+        self.pressed = False
+
+        self.active_draw = {"points": [], "ellipses": [], "lines": []}
+
+        self.show()
+
+        
+
     def hasPhoto(self):
         return not self._empty
 
@@ -49,14 +109,23 @@ class ImageViewer(QtWidgets.QGraphicsView):
         rect = QRectF(self._photo.pixmap().rect())
         if not rect.isNull():
             self.setSceneRect(rect)
+            print(rect)
             if self.hasPhoto():
                 unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
+                print("unity", 1 / unity.width(), 1 / unity.height())
                 self.scale(1 / unity.width(), 1 / unity.height())
                 viewrect = self.viewport().rect()
                 scenerect = self.transform().mapRect(rect)
+                print(viewrect, scenerect)
                 factor = min(viewrect.width() / scenerect.width(),
                              viewrect.height() / scenerect.height())
+                self.global_factor = factor
+                factor = 1
                 self.scale(factor, factor)
+                print("scale", viewrect.width(), scenerect.width(), viewrect.width() / scenerect.width(), viewrect.height(), scenerect.height(), viewrect.height() / scenerect.height())
+                print(min(viewrect.width() / scenerect.width(),
+                             viewrect.height() / scenerect.height()))
+                print(factor)
             self._zoom = 0
 
     def setPhoto(self, pixmap=None):
@@ -69,7 +138,6 @@ class ImageViewer(QtWidgets.QGraphicsView):
 
         if pixmap and not pixmap.isNull():
             self._empty = False
-            self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
         else:
             self._empty = True
@@ -78,27 +146,52 @@ class ImageViewer(QtWidgets.QGraphicsView):
         
         if initial:
             self.fitInView()
+            print("A")
         else:
             if ZOOM_NUM > 0:
                 self._zoom = ZOOM_NUM
             elif ZOOM_NUM == 0:
                 self.fitInView()
+                print("B")
             else:
                 ZOOM_NUM = 0
             
             self.horizontalScrollBar().setValue(X_POS)
             self.verticalScrollBar().setValue(Y_POS)
+            
+        """self.x_padding = (self.viewport().width() - self.scene().items()[-1].boundingRect().width() / (0.8**self._zoom))
+        if self.x_padding <= 0:
+            self.x_padding = 0
+        self.y_padding = (self.viewport().height() - self.scene().items()[-1].boundingRect().height() / (0.8**self._zoom))
+        if self.y_padding <= 0:
+            self.y_padding = 0
+        print(self.x_padding)"""
+        print(self.viewport().size(), self.scene().items()[-1].boundingRect(), self.verticalScrollBar().width())
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        rect_view_width = self.scene().items()[-1].boundingRect().width()
+        self.x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
+        if self.x_padding <= 0:
+            self.x_padding = 0
+        print(self.x_padding)
+        rect_view_height = self.scene().items()[-1].boundingRect().height()
+        self.y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
+        if self.y_padding <= 0:
+            self.y_padding = 0
+        print(self.x_padding, self.y_padding)
 
     def wheelEvent(self, event):
         global ZOOM_NUM, X_POS, Y_POS
 
         if self.hasPhoto():
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                print("angle", event.angleDelta().y())
                 if event.angleDelta().y() > 0:
                     factor = 1.25
+                    self.global_factor = self.global_factor + self.global_factor * 0.25
                     self._zoom += 1
                 else:
                     factor = 0.8
+                    self.global_factor = self.global_factor - self.global_factor * 0.20
                     self._zoom -= 1
                 
                 if self._zoom > 0:
@@ -106,12 +199,28 @@ class ImageViewer(QtWidgets.QGraphicsView):
                     scene_pos = self.mapToScene(view_pos.toPoint())
                     self.centerOn(scene_pos)
                     self.scale(factor, factor)
+                    print(factor)
                     delta = self.mapToScene(view_pos.toPoint()) - self.mapToScene(self.viewport().rect().center())
                     self.centerOn(scene_pos - delta)
+                    print(factor)
+
+                    
+
                 elif self._zoom == 0:
                     self.fitInView()
                 else:
                     self._zoom = 0
+                print(self.viewport().size(), self.scene().items()[-1].boundingRect())
+                rect_view_width = self.scene().items()[-1].boundingRect().width()
+                self.x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
+                if self.x_padding <= 0:
+                    self.x_padding = 0
+
+                rect_view_height = self.scene().items()[-1].boundingRect().height()
+                self.y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
+                if self.y_padding <= 0:
+                    self.y_padding = 0
+                print("Wheel change", self.x_padding, self.y_padding)
             elif event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                 delta = event.angleDelta().y()
                 x = self.horizontalScrollBar().value()
@@ -130,19 +239,157 @@ class ImageViewer(QtWidgets.QGraphicsView):
             self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
 
     def mousePressEvent(self, event):
+        global X_POS, Y_POS
         if event.button() == Qt.MouseButton.RightButton:
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
+            
             self._panning = True
             self._last_pos = event.position()
+        elif event.button() == Qt.MouseButton.LeftButton:
+            print("initial", X_POS, Y_POS, event.position().x() + X_POS, event.position().y() + Y_POS)
+            print("global", self.global_factor, self.size(), self.verticalScrollBar().size())
+            #print(self._scene.sceneRect().width(), self._photo.pixmap().rect().width())
+            a = self._scene.sceneRect().width() - event.position().x() + (event.position().x() * (1 - self.global_factor))
+            blank = self._scene.sceneRect().width() - self._photo.pixmap().rect().width()
+            b = event.position().x() - self.verticalScrollBar().size().width() + ((event.position().x() - self.verticalScrollBar().size().width()) * (1 - self.global_factor)) - blank / 2
+            #print(a, b, blank, event.position().x() + (event.position().x() * (1 - self.global_factor)), event.position().y() + (event.position().y() * (1- self.global_factor)))
+            #self.verticalScrollBar().setStyleSheet("QScrollBar:vertical { width: 20px; }")
+            #print("viewport", self.viewport().width(), self.scene().items()[0].boundingRect())
+            points = []
+            if self._draw_mode:
+                
+                print("sizes", self.viewport().size() ,self.scene().items()[-1].boundingRect())
+                print("padding", self.x_padding, self.y_padding)
+                print(event.position())
+
+
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+
+                if len(self.active_draw["points"]) > 0:
+                    if self.distance(x_point, y_point, self.active_draw["points"][0].x(), self.active_draw["points"][0].y()) > 5:
+                        self.active_draw["points"].append(QPointF(x_point, y_point))
+                        rect = CornerEllipse(QRectF(x_point - 5 , y_point - 5 , 10.0,10.0), len(self._polygons), len(self.active_draw["ellipses"]))
+                        rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                        #rect.hoverEnterEvent()
+                        self.active_draw["ellipses"].append(rect)
+                        self.scene().addItem(rect)
+                else:
+                    self.active_draw["points"].append(QPointF(x_point, y_point))
+                    rect = CornerEllipse(QRectF(x_point - 5 , y_point - 5 , 10.0,10.0), len(self._polygons), len(self.active_draw["ellipses"]))
+                    rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                    #rect.hoverEnterEvent()
+                    self.active_draw["ellipses"].append(rect)
+                    self.scene().addItem(rect)
+                
+
+                if len(self.active_draw["points"]) > 1:
+                    line = QGraphicsLineItem(self.active_draw["points"][-2].x(), self.active_draw["points"][-2].y(), x_point, y_point)
+                    self.active_draw["lines"].append(line)
+                    self.scene().addItem(line)
+
+                
+                if len(self.active_draw["points"]) > 2:
+                    if self.distance(x_point, y_point, self.active_draw["points"][0].x(), self.active_draw["points"][0].y()) < 5:
+                        print("AAA")
+                        #self.scene().addPolygon(QPolygonF(self.active_draw["points"]))
+                        polygon = QGraphicsPolygonItem(QPolygonF(self.active_draw["points"]))
+                        self.scene().addItem(polygon)
+                        for i in self.active_draw["lines"]:
+                            self.scene().removeItem(i)
+
+                        self.scene().removeItem(self.line)
+
+                        self._polygons.append({"polygon": polygon, "ellipses": self.active_draw["ellipses"]})
+                        
+                        self.active_draw = {"points": [], "ellipses": [], "lines": []}
+
+                        self._draw_mode = False
+            else:
+                items = self.items(event.position().toPoint())
+                for item in items:
+                    if type(item) == CornerEllipse:
+                        self.selected_corner = item
+                        self.pressed = True
+
+
+                
+                #QRectF(event.position().x(), event.position().y(), 10, 10), brush=QtGui.QBrush(QtGui.QColor("red")))
+
+                ########
+                # Working but needs a rework as it does not update!!!!!!!
+                #############
+                """points.append(point)
+                print("zoom", self._zoom)
+                factor = 0
+                # Calculate the padding at current zoom level
+                print(self.viewport().width() ,self.scene().items()[0].boundingRect().width())
+                rect_view_width = self.scene().items()[0].boundingRect().width()
+                print("AAKAKA", rect_view_width / (0.8**self._zoom))
+                
+                x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
+                if x_padding <= 0:
+                    x_padding = 0
+
+                rect_view_height = self.scene().items()[0].boundingRect().height()
+                y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
+                if y_padding <= 0:
+                    y_padding = 0
+                
+                print((event.position().x() + X_POS - x_padding / 2))
+                print((event.position().y() + Y_POS - y_padding / 2))
+                x_point = (event.position().x() + X_POS - x_padding / 2) * (0.8**self._zoom)
+                y_point = (event.position().y() + Y_POS - y_padding / 2) * (0.8**self._zoom)
+            
+                self._polygon.append(QPointF(x_point, y_point))
+                print(self._polygon)
+                print(points)"""
+
+                
+                #print(self._zoom, ZOOM_NUM)
+            #if len(self._polygon) > 5:
+                #self._draw_mode = False
+                #print(self._polygon)
+
+                """rect_view_width = self.scene().items()[0].boundingRect().width()
+
+                x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
+                if x_padding <= 0:
+                    x_padding = 0
+
+                rect_view_height = self.scene().items()[0].boundingRect().height()
+                y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
+                if y_padding <= 0:
+                    y_padding = 0
+
+                x_point = (event.position().x() + X_POS - x_padding / 2) * (0.8**self._zoom)
+                y_point = (event.position().y() + Y_POS - y_padding / 2) * (0.8**self._zoom)
+
+                for i in range(len(self._polygon)):
+                    self._polygon[i] = QPointF((self._polygon[i].x() + X_POS - x_padding / 2) * (0.8**self._zoom),
+                                                (self._polygon[i].y() + Y_POS - y_padding / 2) * (0.8**self._zoom))
+                
+"""
+                #self.scene().addPolygon(QPolygonF(self._polygon))
+
+                #print(self.scene().items())
+                #print(self.scene().items()[0])
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.RightButton:
             self._panning = False
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.NoDrag)
+
+        elif event.button() == Qt.MouseButton.LeftButton:
+            self.pressed = False
+            
         super().mouseReleaseEvent(event)
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event) -> None:
+        super(ImageViewer, self).mouseMoveEvent(event)
         global X_POS, Y_POS
-
+        #print(event.position())
         if self._panning:
             delta = event.position() - self._last_pos
             self._last_pos = event.position()
@@ -153,7 +400,36 @@ class ImageViewer(QtWidgets.QGraphicsView):
             X_POS = self.horizontalScrollBar().value()
             Y_POS = self.verticalScrollBar().value()
 
-            super().mouseMoveEvent(event)
+        
+
+        elif self._draw_mode:
+            if len(self.active_draw["points"]) > 1:
+                #print(self._polygon[-1].x(), self._polygon[-1].y())
+                if self.line != None:
+                    self.scene().removeItem(self.line)
+                
+                
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+
+                self.line = QGraphicsLineItem(self.active_draw["points"][-1].x(), self.active_draw["points"][-1].y(), x_point, y_point)
+                self.scene().addItem(self.line)
+                #print(self.scene().items())
+        elif self.selected_corner != None:
+            if self.pressed:
+                print(QPointF(event.scenePosition()))
+                self._polygons[self.selected_corner.polygon_idx]["ellipses"][self.selected_corner.ellipse_idx] = QPointF(event.scenePosition())
+                print(self._polygons[self.selected_corner.polygon_idx]["polygon"].polygon()[self.selected_corner.ellipse_idx])
+                pol = self._polygons[self.selected_corner.polygon_idx]["polygon"].polygon()
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                pol[self.selected_corner.ellipse_idx] = QPointF(x_point, y_point)
+                self._polygons[self.selected_corner.polygon_idx]["polygon"].setPolygon(pol)
+                print(self._polygons[self.selected_corner.polygon_idx]["polygon"].polygon()[self.selected_corner.ellipse_idx])
+        super().mouseMoveEvent(event)
+    
+    def distance(self, x1, y1, x2, y2):
+        return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -1018,6 +1294,11 @@ class MyWindow(QMainWindow):
         self.load_split_btn.setText("Show split")
         self.load_split_btn.clicked.connect(self.load_split)
 
+        self.draw_polygons_btn = QPushButton(self.side_toolbar_groupbox)
+        self.draw_polygons_btn.setGeometry(200, 150, 100, 20)
+        self.draw_polygons_btn.setText("Draw polygons")
+        self.draw_polygons_btn.clicked.connect(self.draw_polygons)
+
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):
             return
@@ -1057,6 +1338,9 @@ class MyWindow(QMainWindow):
 
         end = time.perf_counter()
         print("draw data", end-start)
+
+    def draw_polygons(self):
+        self.image_viewer._draw_mode = True
 
     def initUI(self):
         self.init_toolbox()
@@ -1877,8 +2161,6 @@ class MyWindow(QMainWindow):
         
         self.image.save(f"{self.image_filename}.png")
 
-    def update(self):
-        self.label.adjustSize()
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
         old_range = old_max - old_min
@@ -1919,7 +2201,7 @@ class MyWindow(QMainWindow):
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
             self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
-            
+            print(self.port_data.shape, self.starboard_data.shape)
             self.splits_textbox.setText(str(self.splits))
             self.selected_split_spinbox.setMaximum(self.splits)
             
