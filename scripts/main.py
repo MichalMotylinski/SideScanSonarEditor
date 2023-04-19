@@ -17,7 +17,7 @@ os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QDialog, QSpinBox, QGraphicsItem, QGraphicsPolygonItem, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGroupBox, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QPixmap, QPolygonF, QCursor, QDoubleValidator, QIntValidator, QFont, QBrush, QColor
-from PyQt6.QtCore import pyqtSlot, Qt, QRect,  QRectF, QSize, QTimer, pyqtSignal, QPointF
+from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSizeF, QRectF, QSize, QTimer, pyqtSignal, QPointF
 from PySide6 import QtGui
 
 ZOOM_NUM = 0
@@ -25,19 +25,19 @@ X_POS = 0
 Y_POS = 0
 
 class CornerEllipse(QGraphicsEllipseItem):
-    def __init__(self, parent, polygon_idx, ellipse_idx):
-        super().__init__(parent)
+    def __init__(self, rect, shift, polygon_idx, ellipse_idx):
+        super().__init__(rect)
+        print("paretn", rect)
         self.setBrush(QBrush(QColor(255, 0, 0)))
         self.setAcceptHoverEvents(True)
-        self.pos = QPointF(parent.x(), parent.y())
-        self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+        self.position = QPointF(rect.x(), rect.y())
         self.ellipse_idx = ellipse_idx
         self.polygon_idx = polygon_idx
-        
-    #def hasCursor(self) -> bool:
-        #print(super().hasCursor())
+        self.shift = shift
 
-    """def hoverEnterEvent(self, event):
+        self.setRect(rect.x() - shift, rect.y() - shift, shift*2, shift*2)
+
+    def hoverEnterEvent(self, event):
         print("hover")
         self.setBrush(QBrush(QColor(0, 255, 0)))
 
@@ -45,21 +45,69 @@ class CornerEllipse(QGraphicsEllipseItem):
         if event.button() == Qt.MouseButton.LeftButton:
             print(event.pos(), self.pos)
             self._offset = event.pos() - QPointF(self.x(), self.y())
-            self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
             event.accept()
         else:
             super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        self.pos = QPointF(event.scenePos().x(), event.scenePos().y())
-        #self.y = event.scenePos().y()
-
-    #def hoverMoveEvent(self, event):
-        #self.setBrush(QBrush(QColor(0, 255, 0)))
-
     
     def hoverLeaveEvent(self, event):
-        self.setBrush(QBrush(QColor(0, 0, 255)))"""
+        self.setBrush(QBrush(QColor(255, 0, 0)))
+
+class GraphicsPolygonItem(QGraphicsPolygonItem):
+    """def __init__(self, parent):
+        super().__init__(parent)
+        self.setBrush(QBrush(QColor(255, 0, 0)))
+        self.setAcceptHoverEvents(True)
+        self._polygon_idx = None
+        self._polygon_corners = []
+        
+        print(parent)
+        for i in range(parent.size()):
+            print(parent[i])
+            self._polygon_corners.append([parent[i].x(), parent[i].y()])
+        #self.polygon_corners = []#[parent[i] for i in range(parent.size())]
+        #self.setpolygon_corners()
+        print("passsed", self.polygon_corners)
+        print("SDASD", self.polygon())"""
+
+    def __init__(self):
+        super().__init__()
+        
+        self.setBrush(QBrush(QColor(255, 0, 0)))
+        self.setAcceptHoverEvents(True)
+        #self.setVisible(False)
+        self._polygon_idx = None
+        self._polygon_corners = []
+        self._polygon_cornersa = []
+    
+    def remove_polygon_vertex(self, item):
+        self._polygon_corners.remove(item)
+        self.draw()
+    
+    @property
+    def polygon_idx(self):
+        return self._polygon_idx
+    
+    @polygon_idx.setter
+    def polygon_idx(self, val):
+        self._polygon_idx = val
+    
+    @property
+    def polygon_corners(self):
+        return self._polygon_corners
+    
+    def add_polygon_corner(self, val):
+        self.scene().addItem(CornerEllipse(QRectF(val, QSizeF(10.0, 10.0)), 5, self, 1))
+        self._polygon_corners.append(self.scene().items()[0])
+    
+    def insert_polygon_corner(self, idx, val):
+        #self.scene().removeItem(self._polygon_corners[idx])
+        #self.scene().addItem(CornerEllipse(QRectF(val, QSizeF(10.0, 10.0)), 5, self, 1))
+        self._polygon_corners.insert(idx, val)
+        #self.scene().addItem(val)
+
+    def draw(self):
+        self.setPolygon(QPolygonF([QPointF(x.rect().x() + x.shift, x.rect().y() + x.shift) for x in self._polygon_corners]))
+
 
 class ImageViewer(QtWidgets.QGraphicsView):
     photo_clicked = pyqtSignal(QPointF)
@@ -83,6 +131,9 @@ class ImageViewer(QtWidgets.QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.verticalScrollBar().setStyleSheet("QScrollBar:vertical { width: 14px; }")
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+
+        self.horizontalScrollBar().valueChanged.connect(self.update_hor_val)
+        self.verticalScrollBar().valueChanged.connect(self.update_ver_val)
         
         
         self._draw_mode = False
@@ -94,13 +145,35 @@ class ImageViewer(QtWidgets.QGraphicsView):
         self._polygon = []
         self.line = None
         self.selected_corner = None
+        self.selected_polygons = []
         self.pressed = False
+        self.prev_pos = None
+        self.prev_polygon = None
+        self.ellipses_drawn = []
+        
 
         self.active_draw = {"points": [], "ellipses": [], "lines": []}
 
         self.show()
 
-        
+    def delete_polygons(self):
+        for polygon in self.selected_polygons:
+            corners = polygon._polygon_corners.copy()
+            for i in corners:
+                polygon.remove_polygon_vertex(i)
+                self.scene().removeItem(i)
+            self.scene().removeItem(polygon)
+        self.selected_polygons = []
+                    
+
+    def update_hor_val(self):
+        global X_POS
+        print(X_POS, self.sender().value())
+        X_POS = self.sender().value()
+
+    def update_ver_val(self):
+        global Y_POS
+        Y_POS = self.sender().value()
 
     def hasPhoto(self):
         return not self._empty
@@ -248,39 +321,37 @@ class ImageViewer(QtWidgets.QGraphicsView):
         elif event.button() == Qt.MouseButton.LeftButton:
             print("initial", X_POS, Y_POS, event.position().x() + X_POS, event.position().y() + Y_POS)
             print("global", self.global_factor, self.size(), self.verticalScrollBar().size())
-            #print(self._scene.sceneRect().width(), self._photo.pixmap().rect().width())
-            a = self._scene.sceneRect().width() - event.position().x() + (event.position().x() * (1 - self.global_factor))
-            blank = self._scene.sceneRect().width() - self._photo.pixmap().rect().width()
-            b = event.position().x() - self.verticalScrollBar().size().width() + ((event.position().x() - self.verticalScrollBar().size().width()) * (1 - self.global_factor)) - blank / 2
-            #print(a, b, blank, event.position().x() + (event.position().x() * (1 - self.global_factor)), event.position().y() + (event.position().y() * (1- self.global_factor)))
-            #self.verticalScrollBar().setStyleSheet("QScrollBar:vertical { width: 20px; }")
-            #print("viewport", self.viewport().width(), self.scene().items()[0].boundingRect())
-            points = []
+            
             if self._draw_mode:
-                
-                print("sizes", self.viewport().size() ,self.scene().items()[-1].boundingRect())
-                print("padding", self.x_padding, self.y_padding)
-                print(event.position())
-
 
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                
 
                 if len(self.active_draw["points"]) > 0:
+                    
+                        
                     if self.distance(x_point, y_point, self.active_draw["points"][0].x(), self.active_draw["points"][0].y()) > 5:
                         self.active_draw["points"].append(QPointF(x_point, y_point))
-                        rect = CornerEllipse(QRectF(x_point - 5 , y_point - 5 , 10.0,10.0), len(self._polygons), len(self.active_draw["ellipses"]))
-                        rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-                        #rect.hoverEnterEvent()
+                        rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, self._polygon, len(self.active_draw["ellipses"]))
+                        #self._polygon.append(rect)
+                        
+                        self._polygon.add_polygon_corner(QPointF(x_point, y_point))
+
+                        print(rect.rect(), rect.pos())
                         self.active_draw["ellipses"].append(rect)
-                        self.scene().addItem(rect)
+                        #self.scene().addItem(rect)
                 else:
+                    self._polygon = GraphicsPolygonItem()
+                    self.scene().addItem(self._polygon)
+                    
                     self.active_draw["points"].append(QPointF(x_point, y_point))
-                    rect = CornerEllipse(QRectF(x_point - 5 , y_point - 5 , 10.0,10.0), len(self._polygons), len(self.active_draw["ellipses"]))
-                    rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-                    #rect.hoverEnterEvent()
+                    rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, self._polygon, len(self.active_draw["ellipses"]))
+                    #rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                    #self._polygon.append(rect)
+                    self._polygon.add_polygon_corner(QPointF(x_point, y_point))
                     self.active_draw["ellipses"].append(rect)
-                    self.scene().addItem(rect)
+                    #self.scene().addItem(rect)
                 
 
                 if len(self.active_draw["points"]) > 1:
@@ -293,26 +364,76 @@ class ImageViewer(QtWidgets.QGraphicsView):
                     if self.distance(x_point, y_point, self.active_draw["points"][0].x(), self.active_draw["points"][0].y()) < 5:
                         print("AAA")
                         #self.scene().addPolygon(QPolygonF(self.active_draw["points"]))
-                        polygon = QGraphicsPolygonItem(QPolygonF(self.active_draw["points"]))
-                        self.scene().addItem(polygon)
+                        print("real polygon", self._polygon)
+                        #polygon = GraphicsPolygonItem(QPolygonF([x.position for x in self._polygon]))
+                        #polygon.polygon_idx = len(self.scene().items())
+                        #polygon.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                        
+                        """for i in self._polygon:
+                            self.scene().removeItem(i)"""
+
+                        #for i in self.scene().items():
+                            #if isinstance(i, CornerEllipse):
+                                #self.scene().removeItem(i)
+                        
+                        #print("CHECKING", polygon.polygon_corners)
+                        #self.scene().addItem(polygon)
+                        
+                        
+                        #self._polygon.setVisible(True)
+                        self._polygon.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                        self._polygon.draw()
+
+
+                        print("SCENE", self.scene().items()[-2])
+                        for i in self.scene().items()[-2].polygon():
+                            print(i)
+                        
+
+                        """for i in polygon.polygon_corners:
+                            print(i)
+                            self.scene().addItem(CornerEllipse(QRectF(i, QSizeF(10.0, 10.0)), 5, 1, 1))
+                        """
                         for i in self.active_draw["lines"]:
                             self.scene().removeItem(i)
 
                         self.scene().removeItem(self.line)
+                        
 
-                        self._polygons.append({"polygon": polygon, "ellipses": self.active_draw["ellipses"]})
+                        self._polygons.append({"polygon": self._polygon, "ellipses": self.active_draw["ellipses"]})
                         
                         self.active_draw = {"points": [], "ellipses": [], "lines": []}
+                        self._polygon = None
 
-                        self._draw_mode = False
+                        #self._draw_mode = False
             else:
+                print("CLICKED", self.items(event.position().toPoint()))
+                # Get item that was clicked
                 items = self.items(event.position().toPoint())
                 for item in items:
                     if type(item) == CornerEllipse:
                         self.selected_corner = item
                         self.pressed = True
+                        break
+                    """if type(item) == QGraphicsPolygonItem:
+                        self.selected_polygon = item
+                        self.pressed = True
+                        self.prev_pos = event.position()
+                        break"""
+                
+                if isinstance(self.items(event.position().toPoint())[0], GraphicsPolygonItem):
+                    print("Instance", self.items(event.position().toPoint()))
+                    self.selected_polygons.append(self.items(event.position().toPoint())[0])
+                    self.pressed = True
+                    self.prev_pos = event.position()
+                else:
+                    self.selected_polygons = []
 
-
+            if len(self._polygons) > 0:
+                print(self._polygons[0]["polygon"].polygon())
+                for i in self._polygons[0]["polygon"].polygon():
+                    print(i)
+                    
                 
                 #QRectF(event.position().x(), event.position().y(), 10, 10), brush=QtGui.QBrush(QtGui.QColor("red")))
 
@@ -383,7 +504,9 @@ class ImageViewer(QtWidgets.QGraphicsView):
 
         elif event.button() == Qt.MouseButton.LeftButton:
             self.pressed = False
-            
+        
+        self.selected_corner = False
+        #self.selected_polygon = False
         super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
@@ -399,33 +522,101 @@ class ImageViewer(QtWidgets.QGraphicsView):
 
             X_POS = self.horizontalScrollBar().value()
             Y_POS = self.verticalScrollBar().value()
-
-        
-
         elif self._draw_mode:
             if len(self.active_draw["points"]) > 1:
                 #print(self._polygon[-1].x(), self._polygon[-1].y())
                 if self.line != None:
                     self.scene().removeItem(self.line)
                 
-                
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
 
                 self.line = QGraphicsLineItem(self.active_draw["points"][-1].x(), self.active_draw["points"][-1].y(), x_point, y_point)
                 self.scene().addItem(self.line)
-                #print(self.scene().items())
-        elif self.selected_corner != None:
+        
+        elif self.selected_corner != False:
             if self.pressed:
-                print(QPointF(event.scenePosition()))
-                self._polygons[self.selected_corner.polygon_idx]["ellipses"][self.selected_corner.ellipse_idx] = QPointF(event.scenePosition())
-                print(self._polygons[self.selected_corner.polygon_idx]["polygon"].polygon()[self.selected_corner.ellipse_idx])
-                pol = self._polygons[self.selected_corner.polygon_idx]["polygon"].polygon()
+                # Calculate new coordinates
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
-                pol[self.selected_corner.ellipse_idx] = QPointF(x_point, y_point)
-                self._polygons[self.selected_corner.polygon_idx]["polygon"].setPolygon(pol)
-                print(self._polygons[self.selected_corner.polygon_idx]["polygon"].polygon()[self.selected_corner.ellipse_idx])
+
+                print(event.position(), x_point, y_point)
+                # Get index of the polygon to which point belongs and its own index in the polygon
+                ellipse_idx = self.selected_corner.ellipse_idx
+                polygon = self.selected_corner.polygon_idx
+
+                # Remove old ellipse
+                for item in self.scene().items():
+                    if self.selected_corner == item:
+                        self.scene().removeItem(item)
+
+                # Create and draw ellipse using new coordinates
+                rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, polygon, ellipse_idx)
+                rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                self.active_draw["ellipses"].append(rect)
+                self.scene().addItem(rect)
+                self.selected_corner = rect
+                
+                print("OLOLOLO", polygon)
+                # Update polygon data
+                pol = polygon.polygon()
+                pol[ellipse_idx] = QPointF(x_point, y_point)
+                polygon.insert_polygon_corner(ellipse_idx, rect)#QPointF(x_point, y_point))
+
+                polygon.setPolygon(pol)
+        elif len(self.selected_polygons) > 0:
+            if self.pressed == True:
+                for pooo in self.selected_polygons:
+                    # Calculate new coordinates
+                    x_point = (self.prev_pos.x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
+                    y_point = (self.prev_pos.y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                    new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
+                    new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                    print(x_point, y_point, new_x_point, new_y_point)
+
+                    x_change = new_x_point - x_point
+                    y_change = new_y_point - y_point
+
+                    print(x_change, y_change)
+
+                    polygon = GraphicsPolygonItem()
+
+                    pol = pooo.polygon()
+                    self.scene().removeItem(pooo)
+                    for i, item in enumerate(pol):
+                        if i == 0:
+                            print(item.x(),item.y(), item.x() + x_change, item.y() + y_change)
+                        pol[i] = QPointF(item.x() + x_change, item.y() + y_change)
+                        print(pol[i])
+
+                        self.scene().removeItem(pooo._polygon_corners[i])
+                        rect = CornerEllipse(QRectF(item.x() + x_change, item.y() + y_change, 10.0,10.0), 5, polygon, i)
+                        rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                        self.scene().addItem(rect)
+
+                        polygon.insert_polygon_corner(i, rect)
+                    
+                    
+                    
+                    polygon.setPolygon(pol)
+                    self.scene().addItem(polygon)
+
+                    for i in polygon.polygon():
+                        print(i)
+
+                    print(self.scene().items())
+                    
+                    self.selected_polygons[self.selected_polygons.index(pooo)] = self.scene().items()[0]
+
+
+
+
+            """for i in range(self._polygons[0]["polygon"].polygon().size()):
+                point = self._polygons[0]["polygon"].polygon().at(i)
+                print(point)
+            print(self._polygons[0]["ellipses"][0].position, self._polygons[0]["ellipses"][0].mapToScene(self._polygons[0]["ellipses"][0].position))
+            """
+            self.prev_pos = event.position()
         super().mouseMoveEvent(event)
     
     def distance(self, x1, y1, x2, y2):
@@ -1295,9 +1486,19 @@ class MyWindow(QMainWindow):
         self.load_split_btn.clicked.connect(self.load_split)
 
         self.draw_polygons_btn = QPushButton(self.side_toolbar_groupbox)
-        self.draw_polygons_btn.setGeometry(200, 150, 100, 20)
+        self.draw_polygons_btn.setGeometry(0, 150, 100, 20)
         self.draw_polygons_btn.setText("Draw polygons")
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
+
+        self.edit_polygons_btn = QPushButton(self.side_toolbar_groupbox)
+        self.edit_polygons_btn.setGeometry(100, 150, 100, 20)
+        self.edit_polygons_btn.setText("Edit polygons")
+        self.edit_polygons_btn.clicked.connect(self.edit_polygons)
+
+        self.delete_polygons_btn = QPushButton(self.side_toolbar_groupbox)
+        self.delete_polygons_btn.setGeometry(200, 150, 100, 20)
+        self.delete_polygons_btn.setText("Delete polygons")
+        self.delete_polygons_btn.clicked.connect(self.delete_polygons)
 
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):
@@ -1341,6 +1542,12 @@ class MyWindow(QMainWindow):
 
     def draw_polygons(self):
         self.image_viewer._draw_mode = True
+
+    def edit_polygons(self):
+        self.image_viewer._draw_mode = False
+
+    def delete_polygons(self):
+        self.image_viewer.delete_polygons()
 
     def initUI(self):
         self.init_toolbox()
