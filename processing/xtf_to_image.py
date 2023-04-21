@@ -1,5 +1,5 @@
 
-import pyXTF
+import processing.xtf_reader as xtf_reader
 import numpy as np
 import math
 import matplotlib as mpl
@@ -13,7 +13,7 @@ import psutil
 import bisect
 
 def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
-    data = pyXTF.XTFReader(filepath)
+    data = xtf_reader.XTFReader(filepath)
 
     first_pos = data.fileptr.tell()
 
@@ -85,7 +85,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
                 print(pos)
         return np.array(port_data), np.array(starboard_data), splits, stretch, packet_size
 
-    data = pyXTF.XTFReader(filepath)
+    data = xtf_reader.XTFReader(filepath)
     port_data = []
     starboard_data = []
 
@@ -113,7 +113,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
 def load_selected_split(filepath, decimation, stretch, shift, packet_size, splits, selected_split):
     start = time.perf_counter()
-    data = pyXTF.XTFReader(filepath)
+    data = xtf_reader.XTFReader(filepath)
     end = time.perf_counter()
     print("Load data", end-start)
     port_data = []
@@ -170,7 +170,7 @@ def get_sample_range(filepath, channel_num, load_navigation):
     start_time = time.time() # time the process
     print("Gathering data limits...")
     #   open the XTF file for reading 
-    data = pyXTF.XTFReader(filepath)
+    data = xtf_reader.XTFReader(filepath)
     if load_navigation:
         navigation = data.loadNavigation()
     

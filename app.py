@@ -1,6 +1,5 @@
 import sys
 import os
-import pyXTF
 import numpy as np
 import pickle
 from math import floor, ceil
@@ -9,7 +8,7 @@ from PIL import Image
 from PIL.ImageQt import ImageQt, toqpixmap
 import bisect
 from PyQt6 import QtGui
-from process import *
+
 import threading
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
@@ -19,6 +18,8 @@ from PyQt6.QtWidgets import QDialog, QSpinBox, QGraphicsItem, QGraphicsPolygonIt
 from PyQt6.QtGui import QPixmap, QPolygonF, QCursor, QPen,QDoubleValidator, QIntValidator, QFont, QBrush, QColor
 from PyQt6.QtCore import pyqtSlot, Qt, QRect, QLineF, QSizeF, QRectF, QSize, QTimer, pyqtSignal, QPointF
 from PySide6 import QtGui
+
+from processing.xtf_to_image import *
 
 ZOOM_NUM = 0
 X_POS = 0

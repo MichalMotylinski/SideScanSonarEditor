@@ -12,7 +12,7 @@ import pprint
 import struct
 import os.path
 from datetime import datetime
-import geodetic
+from processing import geodetic
 import numpy as np
 import time
 from collections import namedtuple
