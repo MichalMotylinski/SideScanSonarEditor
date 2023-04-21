@@ -74,16 +74,6 @@ class GraphicsPolygonItem(QGraphicsPolygonItem):
         #self.setpolygon_corners()
         #print("passsed", self.polygon_corners)
         #print("SDASD", self.polygon())
-
-    """def __init__(self):
-        super().__init__()
-        
-        self.setBrush(QBrush(QColor(255, 0, 0)))
-        self.setAcceptHoverEvents(True)
-        #self.setVisible(False)
-        self._polygon_idx = None
-        self._polygon_corners = []
-        self._polygon_cornersa = []"""
     
     def remove_polygon_vertex(self, item):
         self._polygon_corners.remove(item)
