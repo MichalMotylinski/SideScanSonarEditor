@@ -16,8 +16,8 @@ os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QDialog, QSpinBox, QGraphicsItem, QGraphicsPolygonItem, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGroupBox, QApplication, QFrame, QLayout, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QScrollArea, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
-from PyQt6.QtGui import QPixmap, QPolygonF, QCursor, QDoubleValidator, QIntValidator, QFont, QBrush, QColor
-from PyQt6.QtCore import pyqtSlot, Qt, QRect, QSizeF, QRectF, QSize, QTimer, pyqtSignal, QPointF
+from PyQt6.QtGui import QPixmap, QPolygonF, QCursor, QPen,QDoubleValidator, QIntValidator, QFont, QBrush, QColor
+from PyQt6.QtCore import pyqtSlot, Qt, QRect, QLineF, QSizeF, QRectF, QSize, QTimer, pyqtSignal, QPointF
 from PySide6 import QtGui
 
 ZOOM_NUM = 0
@@ -28,6 +28,7 @@ class CornerEllipse(QGraphicsEllipseItem):
     def __init__(self, rect, shift, polygon_idx, ellipse_idx):
         super().__init__(rect)
         self.setBrush(QBrush(QColor(255, 0, 0)))
+        self.setPen(QPen(QColor(255, 0, 0), 0))
         self.setAcceptHoverEvents(True)
         self.position = QPointF(rect.x(), rect.y())
         self.ellipse_idx = ellipse_idx
@@ -50,6 +51,12 @@ class CornerEllipse(QGraphicsEllipseItem):
     
     def hoverLeaveEvent(self, event):
         self.setBrush(QBrush(QColor(255, 0, 0)))
+
+class GraphicsLineItem(QGraphicsLineItem):
+    def __init__(self, start_point, end_point):
+        super().__init__(QLineF(start_point, end_point))
+        self.setPen(QPen(QColor(255, 0, 0), 1))
+
 
 class GraphicsPolygonItem(QGraphicsPolygonItem):
     def __init__(self, parent, polygon_idx):
@@ -140,7 +147,6 @@ class ImageViewer(QtWidgets.QGraphicsView):
         self.global_factor = 1
 
         self._polygons = []
-        self._polygon = []
         self.line = None
         self.selected_corner = None
         self.selected_polygons = []
@@ -317,83 +323,37 @@ class ImageViewer(QtWidgets.QGraphicsView):
             self._panning = True
             self._last_pos = event.position()
         elif event.button() == Qt.MouseButton.LeftButton:
-            print("initial", X_POS, Y_POS, event.position().x() + X_POS, event.position().y() + Y_POS)
-            print("global", self.global_factor, self.size(), self.verticalScrollBar().size())
-            
+            # Drawing polygons if in drawing mode
             if self._draw_mode:
+                # Calculate position of the point on image.
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
                 
-                if len(self.active_draw["points"]) > 0:
+                # Starting just add a single point, then draw point and a line connecting it with a previous point
+                if len(self.active_draw["points"]) == 0:
+                    self.active_draw["points"].append(QPointF(x_point, y_point))
+                    rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, len(self._polygons), len(self.active_draw["points"]))
+                    self.scene().addItem(rect)
+                    self.active_draw["ellipses"].append(self.scene().items()[0])
+                else:
                     if self.distance(x_point, y_point, self.active_draw["points"][0].x(), self.active_draw["points"][0].y()) > 5:
                         self.active_draw["points"].append(QPointF(x_point, y_point))
-                        rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, len(self._polygons), len(self.active_draw["points"]))
-                        self._polygon.append(rect)
-                        #print(rect.ellipse_idx)
-                        self.scene().addItem(rect)
-                        #print(rect.polygon_idx)
-                        #self._polygon.add_polygon_corner(rect)
-                        print(len(self._polygons))
                         
+                        line = GraphicsLineItem(self.active_draw["points"][-2], QPointF(x_point, y_point))
+                        self.scene().addItem(line)
+                        self.active_draw["lines"].append(self.scene().items()[0])
 
-                        #print(rect.rect(), rect.pos())
+                        rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, len(self._polygons), len(self.active_draw["points"]))
+                        self.scene().addItem(rect)
                         self.active_draw["ellipses"].append(self.scene().items()[0])
-                        #self.scene().addItem(rect)
-                else:
-                    #self._polygon = GraphicsPolygonItem()
-                    #self.scene().addItem(self._polygon)
-                    
-                    self.active_draw["points"].append(QPointF(x_point, y_point))
-                    #print(len(self._polygons), len(self.active_draw["points"]))
-                    rect = CornerEllipse(QRectF(x_point, y_point, 10.0,10.0), 5, len(self._polygons), len(self.active_draw["points"]))
-                    #rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-                    self._polygon.append(rect)
-                    
-                    self.scene().addItem(rect)
-                    #self._polygon.add_polygon_corner(rect)
-                    #print(rect.polygon_idx)
-                    
-                    self.active_draw["ellipses"].append(self.scene().items()[0])
-                    #self.scene().addItem(rect)
                 
-
-                if len(self.active_draw["points"]) > 1:
-                    line = QGraphicsLineItem(self.active_draw["points"][-2].x(), self.active_draw["points"][-2].y(), x_point, y_point)
-                    self.active_draw["lines"].append(line)
-                    self.scene().addItem(line)
-
-                
+                # If there are at least 3 points allow for connection with a first point drawn
                 if len(self.active_draw["points"]) > 2:
                     if self.distance(x_point, y_point, self.active_draw["points"][0].x(), self.active_draw["points"][0].y()) < 5:
-                        print("AAA")
-                        #self.scene().addPolygon(QPolygonF(self.active_draw["points"]))
-                        print("real polygon", self._polygon)
-                        polygon = GraphicsPolygonItem(QPolygonF([x.position for x in self._polygon]), len(self._polygons))
-                        #polygon.polygon_idx = len(self.scene().items())
-                        #polygon.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                        polygon = GraphicsPolygonItem(QPolygonF([x.position for x in self.active_draw["ellipses"]]), len(self._polygons))
                         
-                        """for i in self._polygon:
-                            self.scene().removeItem(i)"""
-
-                        """for i in self.scene().items():
-                            if isinstance(i, CornerEllipse):
-                                self.scene().removeItem(i)"""
-                        
-                        for i in self._polygon:
+                        for i in self.active_draw["ellipses"]:
                             self.scene().removeItem(i)
-                        
-                        #print("CHECKING", polygon.polygon_corners)
-                        #self.scene().addItem(polygon)
-                        
-                        
-                        #self._polygon.setVisible(True)
-                        #self._polygon.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-                        #self._polygon.draw()
-
-
-                        #print("SCENE", self.scene().items()[-2])
-                        #for i in self.scene().items()[-2].polygon():
-                            #print(i)
                         
                         polygon.setPolygon(QPolygonF([QPointF(x[0], x[1]) for x in polygon._polygon_corners]))
                         self.scene().addItem(polygon)
@@ -401,7 +361,6 @@ class ImageViewer(QtWidgets.QGraphicsView):
                         le = len(self._polygons)
                         self._polygons.append({"polygon": polygon, "ellipses": [x for x in range(len(polygon._polygon_corners))]})
 
-                        print(self._polygons)
                         for i, item in enumerate(polygon._polygon_corners):
                             print(i, len(self._polygons))
                             rect = CornerEllipse(QRectF(QPointF(item[0], item[1]), QSizeF(10.0, 10.0)), 5, len(self._polygons) - 1, i)
@@ -414,13 +373,8 @@ class ImageViewer(QtWidgets.QGraphicsView):
 
                         self.scene().removeItem(self.line)
                         
-                        #print(self.scene().items())
-                        #self._polygons.append({"polygon": polygon, "ellipses": self.active_draw["ellipses"]})
-                        
                         self.active_draw = {"points": [], "ellipses": [], "lines": []}
-                        self._polygon = []
-
-                        #self._draw_mode = False
+                    print(self.scene().items())
             else:
                 print("CLICKED", self.items(event.position().toPoint()))
                 # Get item that was clicked
@@ -444,73 +398,6 @@ class ImageViewer(QtWidgets.QGraphicsView):
                     self.prev_pos = event.position()
                 else:
                     self.selected_polygons = []
-
-            """if len(self._polygons) > 0:
-                print(self._polygons[0]["polygon"].polygon())
-                for i in self._polygons[0]["polygon"].polygon():
-                    print(i)"""
-                    
-                
-            #QRectF(event.position().x(), event.position().y(), 10, 10), brush=QtGui.QBrush(QtGui.QColor("red")))
-
-            ########
-            # Working but needs a rework as it does not update!!!!!!!
-            #############
-            """points.append(point)
-            print("zoom", self._zoom)
-            factor = 0
-            # Calculate the padding at current zoom level
-            print(self.viewport().width() ,self.scene().items()[0].boundingRect().width())
-            rect_view_width = self.scene().items()[0].boundingRect().width()
-            print("AAKAKA", rect_view_width / (0.8**self._zoom))
-            
-            x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
-            if x_padding <= 0:
-                x_padding = 0
-
-            rect_view_height = self.scene().items()[0].boundingRect().height()
-            y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
-            if y_padding <= 0:
-                y_padding = 0
-            
-            print((event.position().x() + X_POS - x_padding / 2))
-            print((event.position().y() + Y_POS - y_padding / 2))
-            x_point = (event.position().x() + X_POS - x_padding / 2) * (0.8**self._zoom)
-            y_point = (event.position().y() + Y_POS - y_padding / 2) * (0.8**self._zoom)
-        
-            self._polygon.append(QPointF(x_point, y_point))
-            print(self._polygon)
-            print(points)"""
-
-            
-            #print(self._zoom, ZOOM_NUM)
-            #if len(self._polygon) > 5:
-                #self._draw_mode = False
-                #print(self._polygon)
-
-            """rect_view_width = self.scene().items()[0].boundingRect().width()
-
-            x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
-            if x_padding <= 0:
-                x_padding = 0
-
-            rect_view_height = self.scene().items()[0].boundingRect().height()
-            y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
-            if y_padding <= 0:
-                y_padding = 0
-
-            x_point = (event.position().x() + X_POS - x_padding / 2) * (0.8**self._zoom)
-            y_point = (event.position().y() + Y_POS - y_padding / 2) * (0.8**self._zoom)
-
-            for i in range(len(self._polygon)):
-                self._polygon[i] = QPointF((self._polygon[i].x() + X_POS - x_padding / 2) * (0.8**self._zoom),
-                                            (self._polygon[i].y() + Y_POS - y_padding / 2) * (0.8**self._zoom))
-            
-"""
-                #self.scene().addPolygon(QPolygonF(self._polygon))
-
-                #print(self.scene().items())
-                #print(self.scene().items()[0])
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -539,15 +426,14 @@ class ImageViewer(QtWidgets.QGraphicsView):
             X_POS = self.horizontalScrollBar().value()
             Y_POS = self.verticalScrollBar().value()
         elif self._draw_mode:
-            if len(self.active_draw["points"]) > 1:
-                #print(self._polygon[-1].x(), self._polygon[-1].y())
+            if len(self.active_draw["points"]) > 0:
                 if self.line != None:
                     self.scene().removeItem(self.line)
                 
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
 
-                self.line = QGraphicsLineItem(self.active_draw["points"][-1].x(), self.active_draw["points"][-1].y(), x_point, y_point)
+                self.line = GraphicsLineItem(self.active_draw["points"][-1], QPointF(x_point, y_point))
                 self.scene().addItem(self.line)
         
         elif self.selected_corner != False:
@@ -677,23 +563,10 @@ class ImageViewer(QtWidgets.QGraphicsView):
                         self._polygons[pooo._polygon_idx]["ellipses"][i] = self.scene().items()[0]
 
                     self.scene().removeItem(pooo)
-                    
-
-                    #for i in polygon.polygon():
-                        #print(i)
-
-                    #print(self.scene().items())
+ 
                     
                     self.selected_polygons[self.selected_polygons.index(pooo)] = polygon
 
-
-
-
-            """for i in range(self._polygons[0]["polygon"].polygon().size()):
-                point = self._polygons[0]["polygon"].polygon().at(i)
-                print(point)
-            print(self._polygons[0]["ellipses"][0].position, self._polygons[0]["ellipses"][0].mapToScene(self._polygons[0]["ellipses"][0].position))
-            """
             self.prev_pos = event.position()
         super().mouseMoveEvent(event)
     
