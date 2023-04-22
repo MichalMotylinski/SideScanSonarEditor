@@ -936,24 +936,24 @@ class MyWindow(QMainWindow):
         print("draw data", end-start)
 
     def draw_polygons(self):
-        self.image_viewer._draw_mode = True
+        self.canvas._draw_mode = True
 
     def edit_polygons(self):
-        self.image_viewer._draw_mode = False
+        self.canvas._draw_mode = False
 
     def delete_polygons(self):
-        self.image_viewer.delete_polygons()
+        self.canvas.delete_polygons()
 
     def initUI(self):
         self.init_toolbox()
         self.init_side_toolbox()
 
-        self.image_viewer = Canvas(self)
+        self.canvas = Canvas(self)
 
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.side_toolbar_groupbox)
         
-        bottom_layout.addWidget(self.image_viewer)
+        bottom_layout.addWidget(self.canvas)
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.toolbox_widget, 0 , Qt.AlignmentFlag.AlignTop)
@@ -1370,7 +1370,7 @@ class MyWindow(QMainWindow):
         # Display merged image
         self.image = merge_images(self.port_image, starboard_image)
         pixmap = toqpixmap(self.image)
-        self.image_viewer.setPhoto(pixmap)
+        self.canvas.set_image(pixmap)
 
     def update_starboard_channel_min_step_textbox(self):
         self.starboard_channel_min_step = float(self.sender().text())
@@ -1752,7 +1752,7 @@ class MyWindow(QMainWindow):
         # Display merged image
         self.image = merge_images(port_image, self.starboard_image)
         pixmap = toqpixmap(self.image)
-        self.image_viewer.setPhoto(pixmap)
+        self.canvas.set_image(pixmap)
 
     def save_image(self):
         if self.image is None:
@@ -1796,9 +1796,9 @@ class MyWindow(QMainWindow):
         )[0]
         
         if self.filepath:
-            arr = np.full((self.image_viewer.size().height(), self.image_viewer.size().width()), 255)
+            arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
             pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
-            self.image_viewer.setPhoto(pixmap)
+            self.canvas.set_image(pixmap)
 
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
