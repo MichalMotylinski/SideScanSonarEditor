@@ -415,7 +415,8 @@ class Canvas(QGraphicsView):
                         rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                         self.scene().addItem(rect)
                         self._polygons[pooo._polygon_idx]["corners"][i] = self.scene().items()[0]
-
+                    
+                    self.scene().removeItem(pooo)
                     self.selected_polygons[self.selected_polygons.index(pooo)] = polygon
 
             self.prev_pos = event.position()

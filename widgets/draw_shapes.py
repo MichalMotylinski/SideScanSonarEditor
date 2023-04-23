@@ -47,6 +47,7 @@ class Polygon(QGraphicsPolygonItem):
         self.setAcceptHoverEvents(True)
         self._polygon_idx = polygon_idx
         self._polygon_corners = []
+        self._path = None
         for i in range(parent.size()):
             self._polygon_corners.append([parent[i].x(), parent[i].y()])
     
@@ -55,28 +56,37 @@ class Polygon(QGraphicsPolygonItem):
         self.draw()
 
     def shape(self):
-        shape = super().shape().simplified()
-        polys = iter(shape.toSubpathPolygons(self.transform()))
-        outline = next(polys)
-        while True:
-            try:
-                other = next(polys)
-            except StopIteration:
-                break
-            for p in other:
-                # check if all points of the other polygon are *contained*
-                # within the current (possible) "outline"
-                if outline.containsPoint(p, Qt.FillRule.WindingFill):
-                    # the point is *inside*, meaning that the "other"
-                    # polygon is probably an internal intersection
+        if self._path is None:
+            shape = super().shape().simplified()
+            polys = iter(shape.toSubpathPolygons(self.transform()))
+            outline = next(polys)
+            while True:
+                try:
+                    other = next(polys)
+                except StopIteration:
                     break
-            else:
-                # no intersection found, the "other" polygon is probably the
-                # *actual* outline of the QPainterPathStroker
-                outline = other
-        path = QPainterPath()
-        path.addPolygon(outline)
-        return path
+                for p in other:
+                    # check if all points of the other polygon are *contained*
+                    # within the current (possible) "outline"
+                    if outline.containsPoint(p, Qt.FillRule.WindingFill):
+                        # the point is *inside*, meaning that the "other"
+                        # polygon is probably an internal intersection
+                        break
+                else:
+                    # no intersection found, the "other" polygon is probably the
+                    # *actual* outline of the QPainterPathStroker
+                    outline = other
+            self._path = QPainterPath()
+            self._path.addPolygon(outline)
+        return self._path
+    
+    def setPen(self, pen: QPen):
+        super().setPen(pen)
+        self._path = None
+
+    def setPolygon(self, polygon: QPolygonF):
+        super().setPolygon(polygon)
+        self._path = None
     
     @property
     def polygon_idx(self):
