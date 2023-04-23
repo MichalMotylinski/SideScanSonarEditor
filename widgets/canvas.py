@@ -42,7 +42,7 @@ class Canvas(QGraphicsView):
         self.prev_polygon = None
         self.ellipses_drawn = []
 
-        self.ellipse_size = QPointF(10.0, 10.0)
+        self.ellipse_size = QPointF(2.0, 2.0)
         self.ellipse_shift = self.ellipse_size.x() / 2
         
 
@@ -55,6 +55,11 @@ class Canvas(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.horizontalScrollBar().valueChanged.connect(self.update_hor_val)
         self.verticalScrollBar().valueChanged.connect(self.update_ver_val)
+
+        """polygon = aPolygon(QPolygonF([QPointF(10, 10), QPointF(50, 60), QPointF(100, 150), QPointF(200, 20)]))
+        #polygon.setPolygon(QPolygonF([QPointF(10, 10), QPointF(50, 60), QPointF(100, 150), QPointF(200, 20)]))
+        self.scene().addItem(polygon)
+        """
 
         self.show()
 
@@ -247,6 +252,35 @@ class Canvas(QGraphicsView):
                     self.selected_polygons = []
                 
                 if isinstance(self.items(event.position().toPoint())[0], Polygon):
+                    #for i in self.items(event.position().toPoint())[0].polygon():
+                        #print(i)
+                    x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
+                    y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                    pos = QPointF(x_point, y_point)
+                    print(event.position(), pos, self.items(event.position().toPoint())[0].contains(pos))
+                    print(pos + QPointF(1, 1), self.items(event.position().toPoint())[0].contains(pos + QPointF(1, 1)))
+                    print(pos - QPointF(1, 1), self.items(event.position().toPoint())[0].contains(pos - QPointF(1, 1)))
+                    #if self.items(event.position().toPoint())[0].contains(pos) and not self.items(event.position().toPoint())[0].contains(pos + QPointF(1, 1)) and self.items(event.position().toPoint())[0].contains(pos - QPointF(1, 1)):
+                    polygon = self.items(event.position().toPoint())[0].polygon()
+
+                    for i in range(len(polygon) - 1):
+                        current_vertex = polygon[i]
+                        next_vertex = polygon[(i + 1) % len(polygon)]
+
+                        # Calculate the equation of the line passing through the current and next vertices
+                        a = current_vertex.y() - next_vertex.y()
+                        b = next_vertex.x() - current_vertex.x()
+                        c = current_vertex.x() * next_vertex.y() - next_vertex.x() * current_vertex.y()
+                        
+                        # Calculate the distance between the clicked point and the line
+                        distance = abs(a * pos.x() + b * pos.y() + c) / (a**2 + b**2)**0.5
+
+                        # If the distance is smaller than a threshold, the click is considered to be on the edge
+                        threshold = 0.5  # adjust this value to control the sensitivity
+                        if distance < threshold:
+                            print(f"Click is on the edge between {current_vertex} and {next_vertex}")
+                            break
+
                     if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                         if self.items(event.position().toPoint())[0] not in self.selected_polygons:
                             self.selected_polygons.append(self.items(event.position().toPoint())[0])
@@ -273,7 +307,8 @@ class Canvas(QGraphicsView):
                         if self.items(event.position().toPoint())[0] in self.selected_polygons:
                             self.selected_polygons.remove(self.items(event.position().toPoint())[0])
                     else:
-                        self.selected_polygons.remove(self.items(event.position().toPoint())[0])
+                        if self.items(event.position().toPoint())[0] in self.selected_polygons:
+                            self.selected_polygons.remove(self.items(event.position().toPoint())[0])
         
             self.mouse_pressed = False
             self.mouse_moved = False
@@ -360,26 +395,6 @@ class Canvas(QGraphicsView):
                     x_change = new_x_point - x_point
                     y_change = new_y_point - y_point
 
-                    #print("PPPPPPPP", pooo._polygon_corners)
-
-                    """polygon = Polygon()
-                    self.scene().addItem(polygon)
-                    pol = pooo.polygon()
-                    self.scene().removeItem(pooo)
-                    for i, item in enumerate(pol):
-                        if i == 0:
-                            print(item.x(),item.y(), item.x() + x_change, item.y() + y_change)
-                        pol[i] = QPointF(item.x() + x_change, item.y() + y_change)
-                        print(pol[i])
-                    
-                        self.scene().removeItem(pooo._polygon_corners[i])
-                        rect = Ellipse(QRectF(item.x() + x_change, item.y() + y_change, 10.0,10.0), 5, polygon, i)
-                        rect.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-                        self.scene().addItem(rect)
-
-                        polygon.insert_polygon_corner(i, rect)"""
-                    
-                    #print(pooo._polygon_idx)
                     
                     pol = pooo.polygon()
                     
@@ -401,9 +416,6 @@ class Canvas(QGraphicsView):
                         self.scene().addItem(rect)
                         self._polygons[pooo._polygon_idx]["corners"][i] = self.scene().items()[0]
 
-                    self.scene().removeItem(pooo)
- 
-                    
                     self.selected_polygons[self.selected_polygons.index(pooo)] = polygon
 
             self.prev_pos = event.position()

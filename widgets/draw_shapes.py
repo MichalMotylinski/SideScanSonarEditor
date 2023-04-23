@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QLineF, QPointF,  Qt
-from PyQt6.QtGui import QColor, QBrush, QPen, QPolygonF
+from PyQt6.QtGui import QColor, QBrush, QPen, QPolygonF, QPainterPath, QVector2D
 from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
@@ -36,18 +36,47 @@ class Line(QGraphicsLineItem):
 
 class Polygon(QGraphicsPolygonItem):
     def __init__(self, parent, polygon_idx):
+        # Ensure the polygon is closed
+        if not parent.isClosed():
+            parent = QPolygonF(parent)
+            parent.append(parent[0])
+
         super().__init__(parent)
         self.setBrush(QBrush(QColor(255, 0, 0, 120)))
+        self.setPen(QPen(QColor(255, 0, 0), 1))
         self.setAcceptHoverEvents(True)
         self._polygon_idx = polygon_idx
         self._polygon_corners = []
         for i in range(parent.size()):
-            print(parent[i])
             self._polygon_corners.append([parent[i].x(), parent[i].y()])
     
     def remove_polygon_vertex(self, item):
         self._polygon_corners.remove(item)
         self.draw()
+
+    def shape(self):
+        shape = super().shape().simplified()
+        polys = iter(shape.toSubpathPolygons(self.transform()))
+        outline = next(polys)
+        while True:
+            try:
+                other = next(polys)
+            except StopIteration:
+                break
+            for p in other:
+                # check if all points of the other polygon are *contained*
+                # within the current (possible) "outline"
+                if outline.containsPoint(p, Qt.FillRule.WindingFill):
+                    # the point is *inside*, meaning that the "other"
+                    # polygon is probably an internal intersection
+                    break
+            else:
+                # no intersection found, the "other" polygon is probably the
+                # *actual* outline of the QPainterPathStroker
+                outline = other
+        path = QPainterPath()
+        path.addPolygon(outline)
+        return path
     
     @property
     def polygon_idx(self):
