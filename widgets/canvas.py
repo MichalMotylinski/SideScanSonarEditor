@@ -1,7 +1,7 @@
 import math
-from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QSizeF, QRectF
+from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QRectF
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QGraphicsItem, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame
+from PyQt6.QtWidgets import QGraphicsItem, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
 
 from widgets.draw_shapes import *
 
@@ -35,7 +35,7 @@ class Canvas(QGraphicsView):
         self._polygons = []
         self.line = None
         self.selected_corner = None
-        self.selected_polygons = []
+        self.selected_polygons = {}
         self.mouse_pressed = False
         self.mouse_moved = False
         self.prev_pos = None
@@ -194,8 +194,6 @@ class Canvas(QGraphicsView):
                 if len(self.active_draw["points"]) == 0:
                     self.active_draw["points"].append(QPointF(x_point, y_point))
                     rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, len(self._polygons), len(self.active_draw["points"]), QColor(0, 255, 0))
-                    #rect.setBrush(QBrush(QColor(0, 255, 0)))
-                    #rect.setPen(QPen(QColor(0, 255, 0), 0))
                     self.scene().addItem(rect)
                     self.active_draw["corners"].append(self.scene().items()[0])
                 else:
@@ -208,8 +206,6 @@ class Canvas(QGraphicsView):
                         self.active_draw["lines"].append(self.scene().items()[0])
 
                         rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, len(self._polygons), len(self.active_draw["points"]), QColor(0, 255, 0))
-                        #rect.setBrush(QBrush(QColor(0, 255, 0)))
-                        #rect.setPen(QPen(QColor(0, 255, 0), 0))
                         self.scene().addItem(rect)
                         self.active_draw["corners"].append(self.scene().items()[0])
                 
@@ -226,6 +222,9 @@ class Canvas(QGraphicsView):
                         
                         # Remove last line connecting first and last point created
                         self.scene().removeItem(self.line)
+                        self.line = None
+
+                        self.active_draw["corners"].append(self.active_draw["corners"][0])
 
                         # Create a polygon object and add it to the scene
                         polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons))
@@ -242,54 +241,67 @@ class Canvas(QGraphicsView):
                             #rect.setPen(QPen(QColor(0, 255, 0), 0))
                             self.scene().addItem(rect)
                             self._polygons[len(self._polygons) - 1]["corners"][i] = self.scene().items()[0]
-                        
+
                         # Reset list of currently drawn objects
                         self.active_draw = {"points": [], "corners": [], "lines": []}
             else:
                 # If not in drawing mode select item that was clicked
                 if isinstance(self.items(event.position().toPoint())[0], Ellipse):
                     self.selected_corner = self.items(event.position().toPoint())[0]
-                    self.selected_polygons = []
+                    self.selected_polygons = {}
                 
                 if isinstance(self.items(event.position().toPoint())[0], Polygon):
-                    #for i in self.items(event.position().toPoint())[0].polygon():
-                        #print(i)
+                    added = False
                     x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                     y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
-                    pos = QPointF(x_point, y_point)
-                    print(event.position(), pos, self.items(event.position().toPoint())[0].contains(pos))
-                    print(pos + QPointF(1, 1), self.items(event.position().toPoint())[0].contains(pos + QPointF(1, 1)))
-                    print(pos - QPointF(1, 1), self.items(event.position().toPoint())[0].contains(pos - QPointF(1, 1)))
-                    #if self.items(event.position().toPoint())[0].contains(pos) and not self.items(event.position().toPoint())[0].contains(pos + QPointF(1, 1)) and self.items(event.position().toPoint())[0].contains(pos - QPointF(1, 1)):
-                    polygon = self.items(event.position().toPoint())[0].polygon()
-
+                    
+                    polygon_item = self._polygons[self.items(event.position().toPoint())[0].polygon_idx]
+                    polygon = polygon_item["polygon"].polygon()
+                  
+                    k = 0
                     for i in range(len(polygon) - 1):
-                        current_vertex = polygon[i]
-                        next_vertex = polygon[(i + 1) % len(polygon)]
-
-                        # Calculate the equation of the line passing through the current and next vertices
-                        a = current_vertex.y() - next_vertex.y()
-                        b = next_vertex.x() - current_vertex.x()
-                        c = current_vertex.x() * next_vertex.y() - next_vertex.x() * current_vertex.y()
-                        
-                        # Calculate the distance between the clicked point and the line
-                        distance = abs(a * pos.x() + b * pos.y() + c) / (a**2 + b**2)**0.5
-
-                        # If the distance is smaller than a threshold, the click is considered to be on the edge
-                        threshold = 0.5  # adjust this value to control the sensitivity
-                        if distance < threshold:
-                            print(f"Click is on the edge between {current_vertex} and {next_vertex}")
+                        item = QGraphicsLineItem(QLineF(QPointF(polygon[i]), QPointF(polygon[i + 1])))
+                        self.scene().addItem(item)
+                        if isinstance(self.items(event.position().toPoint())[0], QGraphicsLineItem):
+                            k = i + 1
+                            self.scene().removeItem(self.scene().items()[0])
+                            added = True
                             break
+                        self.scene().removeItem(self.scene().items()[0])
+                    
+                    if added:
+                        self.scene().removeItem(polygon_item["polygon"])
+                        for j in polygon_item["corners"]:
+                            self.scene().removeItem(j)
 
-                    if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                        if self.items(event.position().toPoint())[0] not in self.selected_polygons:
-                            self.selected_polygons.append(self.items(event.position().toPoint())[0])
+                        rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_item["polygon"].polygon_idx, k, QColor(0, 255, 0))
+                        polygon_item["corners"].insert(k, rect)
+
+                        pol = Polygon(QPolygonF([x.position for x in polygon_item["corners"]]), polygon_item["polygon"].polygon_idx)
+                        self.scene().addItem(pol)
+                        polygon_item["polygon"] = self.scene().items()[0]
+
+                        for j, item in enumerate(polygon_item["corners"]):
+                            item.ellipse_idx = j
+                            self.scene().addItem(item)
+                            polygon_item["corners"][j] = self.scene().items()[0]
+
+                            if j == k:
+                                self.selected_corner = self.scene().items()[0]
+                                self.selected_polygons = {}      
                     else:
-                        if len(self.selected_polygons) <= 1:
-                            self.selected_polygons = [self.items(event.position().toPoint())[0]]
-                    self.prev_pos = event.position()
+                        self.selected_corner = None
+                        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                            if self.items(event.position().toPoint())[0] not in list(self.selected_polygons.keys()):
+                                self.selected_polygons[self.items(event.position().toPoint())[0]] = "add"
+                            else:
+                                del self.selected_polygons[self.items(event.position().toPoint())[0]]
+                        else:
+                            self.selected_polygons = {}
+                            self.selected_polygons[self.items(event.position().toPoint())[0]] = "add"
+                        self.prev_pos = event.position()
                 else:
-                    self.selected_polygons = []
+                    self.selected_polygons = {}
 
         self.mouse_pressed = True
         self.mouse_moved = False
@@ -304,16 +316,20 @@ class Canvas(QGraphicsView):
             if isinstance(self.items(event.position().toPoint())[0], Polygon):
                 if not self.mouse_moved:
                     if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                        if self.items(event.position().toPoint())[0] in self.selected_polygons:
-                            self.selected_polygons.remove(self.items(event.position().toPoint())[0])
+                        print("CONTROL")
+                        if self.items(event.position().toPoint())[0] in list(self.selected_polygons.keys()):
+                            if self.selected_polygons[self.items(event.position().toPoint())[0]] != "add":
+                                print("remove")
+                                self.selected_polygons.remove(self.items(event.position().toPoint())[0])
                     else:
-                        if self.items(event.position().toPoint())[0] in self.selected_polygons:
-                            self.selected_polygons.remove(self.items(event.position().toPoint())[0])
+                        if self.items(event.position().toPoint())[0] in list(self.selected_polygons.keys()):
+                            if self.selected_polygons[self.items(event.position().toPoint())[0]] != "add":
+                                self.selected_polygons.remove(self.items(event.position().toPoint())[0])
         
             self.mouse_pressed = False
             self.mouse_moved = False
         
-        self.selected_corner = False
+        self.selected_corner = None
         super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
@@ -341,7 +357,7 @@ class Canvas(QGraphicsView):
                 self.line.setPen(QPen(QColor(0, 255, 0), 0))
                 self.scene().addItem(self.line)
         
-        elif self.selected_corner != False:
+        elif self.selected_corner != None:
             if self.mouse_pressed:
                 # Calculate new coordinates
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
@@ -350,17 +366,26 @@ class Canvas(QGraphicsView):
                 # Get index of the polygon to which point belongs and its own index in that polygon
                 ellipse_idx = self.selected_corner.ellipse_idx
                 polygon_idx = self.selected_corner.polygon_idx
-                
+
+                # Remove all corners of the polygon
                 for i in self._polygons[polygon_idx]["corners"]:
                     self.scene().removeItem(i)
 
+                # Get polygon and remove it from the scene
                 polygon = self._polygons[polygon_idx]["polygon"]
-                pol = polygon.polygon()
                 self.scene().removeItem(polygon)
+
+                pol = polygon.polygon()
                 points = [x for x in polygon.polygon()]
 
-                points[ellipse_idx] = QPointF(x_point, y_point)
-                pol[ellipse_idx] = QPointF(x_point, y_point)
+                if ellipse_idx == len(points) - 1:
+                    points[0] = QPointF(x_point, y_point)
+                    points[len(points) - 1] = QPointF(x_point, y_point)
+                    pol[0] = QPointF(x_point, y_point)
+                    pol[len(points) - 1] = QPointF(x_point, y_point)
+                else:
+                    points[ellipse_idx] = QPointF(x_point, y_point)
+                    pol[ellipse_idx] = QPointF(x_point, y_point)
                 
                 new_polygon = Polygon(QPolygonF(points), polygon_idx)
 
@@ -370,21 +395,28 @@ class Canvas(QGraphicsView):
 
                 self._polygons[polygon_idx]["polygon"] = new_polygon
 
-
+                #detect just last element and move first with it!!!!!!
                 # Create and draw ellipse using new coordinates
                 rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                 
-                for i, item in enumerate(self._polygons[polygon_idx ]["corners"]):
+                for i, item in enumerate(self._polygons[polygon_idx]["corners"]):
                     if i == ellipse_idx:
+                        if i == len(points) - 1:
+                            self.scene().removeItem(self._polygons[polygon_idx]["corners"][0])
+                            rect1 = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_idx, 0, QColor(255, 0, 0))
+                            self.scene().addItem(rect1)
+                            self._polygons[polygon_idx]["corners"][0] = self.scene().items()[0]
+                        
                         self.scene().addItem(rect)
                         self.selected_corner = self.scene().items()[0]
                     else:
+                        #print("point not", i)
                         self.scene().addItem(item)
                     self._polygons[polygon_idx]["corners"][i] = self.scene().items()[0]
                     
         elif len(self.selected_polygons) > 0:
             if self.mouse_pressed == True:
-                for pooo in self.selected_polygons:
+                for pooo in list(self.selected_polygons.keys()):
                     # Calculate new coordinates
                     x_point = (self.prev_pos.x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
                     y_point = (self.prev_pos.y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
@@ -417,7 +449,9 @@ class Canvas(QGraphicsView):
                         self._polygons[pooo._polygon_idx]["corners"][i] = self.scene().items()[0]
                     
                     self.scene().removeItem(pooo)
-                    self.selected_polygons[self.selected_polygons.index(pooo)] = polygon
+
+                    del self.selected_polygons[pooo]
+                    self.selected_polygons[polygon] = "add"
 
             self.prev_pos = event.position()
 
@@ -427,3 +461,6 @@ class Canvas(QGraphicsView):
     
     def distance(self, x1, y1, x2, y2):
         return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+    def dot(self, a, b, c):
+        return (c[0]-a[0])*(c[0]-b[0]) + (c[1]-a[1])*(c[1]-b[1])
