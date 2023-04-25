@@ -48,6 +48,7 @@ class Polygon(QGraphicsPolygonItem):
         self._polygon_idx = polygon_idx
         self._polygon_corners = []
         self._path = None
+        self._selected = False
         for i in range(parent.size()):
             self._polygon_corners.append([parent[i].x(), parent[i].y()])
     
@@ -102,6 +103,10 @@ class Polygon(QGraphicsPolygonItem):
 
     def hoverEnterEvent(self, event):
         self.setBrush(QBrush(QColor(255, 0, 0, 200)))
+        self.setPen(QPen(QColor(255, 255, 255)))
     
     def hoverLeaveEvent(self, event):
+        if self._selected:
+            return
         self.setBrush(QBrush(QColor(255, 0, 0, 120)))
+        self.setPen(QPen(QColor(255, 0, 0)))

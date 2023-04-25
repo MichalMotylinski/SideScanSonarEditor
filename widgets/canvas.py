@@ -42,6 +42,8 @@ class Canvas(QGraphicsView):
         self.prev_polygon = None
         self.ellipses_drawn = []
 
+        self.adding_polygon_to_list = False
+
         self.ellipse_size = QPointF(2.0, 2.0)
         self.ellipse_shift = self.ellipse_size.x() / 2
         
@@ -294,13 +296,26 @@ class Canvas(QGraphicsView):
                         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                             if self.items(event.position().toPoint())[0] not in list(self.selected_polygons.keys()):
                                 self.selected_polygons[self.items(event.position().toPoint())[0]] = "add"
-                            else:
-                                del self.selected_polygons[self.items(event.position().toPoint())[0]]
+                                self.items(event.position().toPoint())[0]._selected = True
+                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 200)))
+                                self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
+                                self.adding_polygon_to_list = True
                         else:
                             self.selected_polygons = {}
                             self.selected_polygons[self.items(event.position().toPoint())[0]] = "add"
+                            self.items(event.position().toPoint())[0]._selected = True
+                            self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 200)))
+                            self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
+                            self.adding_polygon_to_list = True
                         self.prev_pos = event.position()
                 else:
+                    print(self.selected_polygons)
+                    for i in self.selected_polygons:
+                        for j in self.scene().items():
+                            if i == j:
+                                j._selected = False
+                                j.setBrush(QBrush(QColor(255, 0, 0, 120)))
+                                j.setPen(QPen(QColor(255, 0, 0)))
                     self.selected_polygons = {}
 
         self.mouse_pressed = True
@@ -316,16 +331,25 @@ class Canvas(QGraphicsView):
             if isinstance(self.items(event.position().toPoint())[0], Polygon):
                 if not self.mouse_moved:
                     if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                        print("CONTROL")
                         if self.items(event.position().toPoint())[0] in list(self.selected_polygons.keys()):
-                            if self.selected_polygons[self.items(event.position().toPoint())[0]] != "add":
-                                print("remove")
-                                self.selected_polygons.remove(self.items(event.position().toPoint())[0])
+                            if self.adding_polygon_to_list == False:
+                                #self.adding_polygon_to_list == True
+                                self.items(event.position().toPoint())[0]._selected = False
+                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 120)))
+                                self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
+                                del self.selected_polygons[self.items(event.position().toPoint())[0]]
+                                #self.selected_polygons.remove(self.items(event.position().toPoint())[0])
+                                
                     else:
                         if self.items(event.position().toPoint())[0] in list(self.selected_polygons.keys()):
-                            if self.selected_polygons[self.items(event.position().toPoint())[0]] != "add":
-                                self.selected_polygons.remove(self.items(event.position().toPoint())[0])
-        
+                            if self.adding_polygon_to_list == False:
+                                #self.selected_polygons.remove(self.items(event.position().toPoint())[0])
+                                self.items(event.position().toPoint())[0]._selected = False
+                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 120)))
+                                self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
+                                del self.selected_polygons[self.items(event.position().toPoint())[0]]
+            
+            self.adding_polygon_to_list = False
             self.mouse_pressed = False
             self.mouse_moved = False
         
@@ -454,7 +478,6 @@ class Canvas(QGraphicsView):
                     self.selected_polygons[polygon] = "add"
 
             self.prev_pos = event.position()
-
         if self.mouse_pressed:
             self.mouse_moved = True
         super().mouseMoveEvent(event)
