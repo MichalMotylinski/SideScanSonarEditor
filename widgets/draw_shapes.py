@@ -53,8 +53,7 @@ class Polygon(QGraphicsPolygonItem):
             self._polygon_corners.append([parent[i].x(), parent[i].y()])
     
     def remove_polygon_vertex(self, item):
-        self._polygon_corners.remove(item)
-        self.draw()
+        self._polygon_corners.remove(item) 
 
     def shape(self):
         if self._path is None:

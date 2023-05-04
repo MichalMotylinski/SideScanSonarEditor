@@ -6,11 +6,12 @@ from math import floor, ceil
 import time
 from PIL import Image
 from PIL.ImageQt import toqpixmap
+import json
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QSpinBox, QGroupBox, QApplication, QFrame, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QSpinBox, QGroupBox, QApplication, QListWidget, QFrame, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont
 from PyQt6.QtCore import pyqtSlot, Qt
 
@@ -47,6 +48,11 @@ class MyWindow(QMainWindow):
         self.selected_split = 1
         self.selected_split_auto = 1
         self.shift = 0
+
+        self.full_image_height = 0
+        self.full_image_width = 0
+        self.polygons_data = None
+        self.polygon_data = {}
         
         # Image display params
         self._port_channel_min = 0
@@ -895,6 +901,22 @@ class MyWindow(QMainWindow):
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
 
+        self.label_list_widget = QListWidget(self.side_toolbar_groupbox)
+        self.label_list_widget.setGeometry(0, 300, 200, 115)
+
+        self.label_list_widget.addItem("Item 1")
+        self.label_list_widget.addItem("Item 2")
+        self.label_list_widget.addItem("Item 3")
+        self.label_list_widget.addItem("Item 1")
+        self.label_list_widget.addItem("Item 2")
+        self.label_list_widget.addItem("Item 3")
+        self.label_list_widget.addItem("Item 1")
+        self.label_list_widget.addItem("Item 2")
+        self.label_list_widget.addItem("Item 3")
+
+        self.polygons_list_widget = QListWidget(self.side_toolbar_groupbox)
+        self.polygons_list_widget.setGeometry(0, 500, 200, 115)
+
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):
             return
@@ -918,19 +940,44 @@ class MyWindow(QMainWindow):
     def load_split(self):
         if self.port_data is None and self.starboard_data is None:
             return
+
+        # Load port and starboarrd data
         start = time.perf_counter()
         if self.auto_stretch:
-            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.shift, self.packet_size, self.splits, self.selected_split)
+            self.port_data, self.starboard_data, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.shift, self.packet_size, self.splits, self.selected_split)
         else:
-            self.port_data, self.starboard_data, self.splits, self.stretch = load_selected_split(self.filepath, self.decimation, self.stretch, self.shift, self.packet_size, self.splits, self.selected_split)
+            self.port_data, self.starboard_data, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(self.filepath, self.decimation, self.stretch, self.shift, self.packet_size, self.splits, self.selected_split)
         end = time.perf_counter()
-        print("process data", end-start)
+        
         self.selected_split_spinbox.setMaximum(self.splits)
 
         start = time.perf_counter()
+        
+        # Convert port and starboard data to image
+        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
+        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
 
-        self.apply_port_color_scheme()
-        self.apply_starboard_color_scheme()
+        # 
+        try:
+            self.load_data()
+        except:
+            print("no data")
+        
+        bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
+        top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
+        if self.selected_split == self.splits:
+            top = self.full_image_height
+        if self.polygons_data:
+            self.image = merge_images(self.port_image, self.starboard_image)
+            pixmap = toqpixmap(self.image)
+            self.canvas.set_image(True, pixmap)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+        else:
+            self.image = merge_images(self.port_image, self.starboard_image)
+            pixmap = toqpixmap(self.image)
+            self.canvas.set_image(True, pixmap)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+        
 
         end = time.perf_counter()
         print("draw data", end-start)
@@ -1370,7 +1417,7 @@ class MyWindow(QMainWindow):
         # Display merged image
         self.image = merge_images(self.port_image, starboard_image)
         pixmap = toqpixmap(self.image)
-        self.canvas.set_image(pixmap)
+        self.canvas.set_image(False, pixmap)
 
     def update_starboard_channel_min_step_textbox(self):
         self.starboard_channel_min_step = float(self.sender().text())
@@ -1752,17 +1799,79 @@ class MyWindow(QMainWindow):
         # Display merged image
         self.image = merge_images(port_image, self.starboard_image)
         pixmap = toqpixmap(self.image)
-        self.canvas.set_image(pixmap)
+        self.canvas.set_image(False, pixmap)
 
     def save_image(self):
         if self.image is None:
             return
+        if os.path.exists(f"{self.image_filename}.json"):
+            with open(f"{self.image_filename}.json", "r") as f:
+                old_polygons = json.load(f)
+        else:
+            old_polygons = {}
         
-        with open(f"{self.image_filename}.pickle", "wb") as f:
-            pickle.dump({"port_data": self.port_data, "starboard_data": self.starboard_data}, f, protocol=pickle.HIGHEST_PROTOCOL)
-        
-        self.image.save(f"{self.image_filename}.png")
+        with open(f"{self.image_filename}.json", "w") as f:
+            data = {}
+            data["full_height"] = self.full_image_height
+            data["full_width"] = self.full_image_width
+            self.polygon_data[self.selected_split] = self.canvas._polygons
+            new_polygons = self.canvas._polygons
+            polygons = {}
+            j = 0
+            split_size = floor(self.full_image_height / self.splits)
 
+            for polygon_data in new_polygons:
+                if polygon_data != None:
+                    corners = []
+                    for idx, i in enumerate(polygon_data["polygon"]._polygon_corners):
+                        x = i[0] * self.decimation
+                        y = (self.port_image.size[1] - i[1]) / self.stretch + split_size * (self.selected_split - 1)
+                        
+                        corners.append([x, y])
+                    polygons[j] = corners
+                    j += 1
+                else:
+                    if str(j) in old_polygons["polygons"].keys():
+                        polygons[j] = old_polygons["polygons"][str(j)]
+                        j += 1
+            data["polygons"] = polygons
+            if len(polygons) != 0:
+                json.dump(data, f, indent=4)
+
+    def is_point_in_rectangle(self, point, rectangle):
+        x, y = point
+        x_min, y_min, x_max, y_max = rectangle
+        return x_min <= x <= x_max and y_min <= y <= y_max
+
+    def any_point_in_rectangle(self, points, rectangle):
+        for point in points:
+            if self.is_point_in_rectangle(point, rectangle):
+                return True
+        return False
+
+    def load_data(self):
+        with open(f"{self.image_filename}.json", "r") as f:
+            data = json.load(f)
+
+            self.full_image_height = data["full_height"]
+            self.full_image_width = data["full_width"]
+            polygons = data["polygons"]
+
+            for key in polygons:
+                arr = []
+                inside = False
+                for point in polygons[key]:
+                    min_y = (floor(self.full_image_height / self.splits) * (self.selected_split - 1) / self.stretch) - self.shift
+                    max_y = (floor(self.full_image_height / self.splits) * self.selected_split) / self.stretch + self.shift
+                    
+                    # If at least one point of the polygon can be visible then display the polygon
+                    if self.is_point_in_rectangle(point, [0 , min_y, self.full_image_width, max_y]):
+                        inside = True
+                    p = [point[0], point[1]]#self.port_image.size[1] - point[1]# + (self.full_image_height * self.stretch) * (self.selected_split - 1) / self.stretch]
+                    arr.append(p)
+
+                polygons[key] = arr
+            self.polygons_data = polygons
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
         old_range = old_max - old_min
@@ -1777,7 +1886,7 @@ class MyWindow(QMainWindow):
         if self.filepath is None:
             return
         
-        self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
+        self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
         
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -1798,12 +1907,30 @@ class MyWindow(QMainWindow):
         if self.filepath:
             arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
             pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
-            self.canvas.set_image(pixmap)
-
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
-            self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
-            print(self.port_data.shape, self.starboard_data.shape)
+
+            self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
+            
+            self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
+            self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
+
+            bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
+            top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
+            self.polygons_data = []
+            if os.path.exists(f"{self.image_filename}.json"):
+                
+                self.load_data()
+                self.image = merge_images(self.port_image, self.starboard_image)
+                pixmap = toqpixmap(self.image)
+                self.canvas.set_image(True, pixmap)
+                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+            else:
+                self.image = merge_images(self.port_image, self.starboard_image)
+                pixmap = toqpixmap(self.image)
+                self.canvas.set_image(True, pixmap)
+                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+
             self.splits_textbox.setText(str(self.splits))
             self.selected_split_spinbox.setMaximum(self.splits)
             
@@ -1812,7 +1939,7 @@ class MyWindow(QMainWindow):
             self.stretch_label.setText(f"Stretch: {self.stretch}")
 
 def closest(lst, K):
-        return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
+        return lst[min(range(len(lst)), key = lambda i: abs(lst[i] - K))]
 
 def window():
     app = QApplication(sys.argv)

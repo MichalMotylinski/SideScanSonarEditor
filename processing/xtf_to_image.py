@@ -46,6 +46,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
     if available_size < data_limit:
         data_limit == available_size
     
+
     print("Size", req_size, data_limit)
     if req_size > data_limit:
         print("Not enough memory, splitting the data.")
@@ -63,6 +64,8 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
             data.fileptr.seek(pos, 0)
             ping = data.readPacket()
             
+            image_width = len(ping.pingChannel[0].data) * 2
+
             if ping == -999:
                 continue
             pos = pos + packet_size
@@ -83,7 +86,10 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
             if pos > math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
                 print(pos)
-        return np.array(port_data), np.array(starboard_data), splits, stretch, packet_size
+
+        image_height = (data.fileSize - 1024) / packet_size
+
+        return np.array(port_data), np.array(starboard_data), splits, stretch, packet_size, image_height, image_width
 
     data = xtf_reader.XTFReader(filepath)
     port_data = []
@@ -94,6 +100,8 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
         # this is not a ping so skip it
         if ping == -999:
             continue
+
+        image_width = len(ping.pingChannel[0].data) * 2
 
         channel = np.array(ping.pingChannel[0].data[::decimation])
         channel = np.multiply(channel, math.pow(2, - ping.pingChannel[0].Weight))
@@ -109,7 +117,9 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
         for i in range(stretch):
             starboard_data.insert(0, raw_starboard_data)
 
-    return np.array(port_data), np.array(starboard_data), 1, stretch, packet_size
+    image_height = (data.fileSize - 1024) / packet_size
+
+    return np.array(port_data), np.array(starboard_data), 1, stretch, packet_size, image_height, image_width
 
 def load_selected_split(filepath, decimation, stretch, shift, packet_size, splits, selected_split):
     start = time.perf_counter()
@@ -129,9 +139,14 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
             pos = pos + math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * (selected_split - 1) - shift * packet_size
  
     stop_point = data.fileSize
+    print("filesize", data.fileSize)
     if math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split + shift * packet_size < data.fileSize:
         stop_point = math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split + shift * packet_size
-
+        stop_point = stop_point + 1024
+    if selected_split == splits:
+        stop_point = data.fileSize
+    print(math.floor(math.ceil(data.fileSize / splits) / packet_size), math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size)
+    
     while pos < stop_point:
         #while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
         data.fileptr.seek(pos, 0)
@@ -139,6 +154,9 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
 
         if ping == -999:
             continue
+
+        image_width = len(ping.pingChannel[0].data) * 2
+
         pos = pos + packet_size
         
         channel = np.array(ping.pingChannel[0].data[::decimation])
@@ -157,7 +175,8 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
     
     end = time.perf_counter()
     print("Calc data", end-start)
-    return np.array(port_data), np.array(starboard_data), splits, stretch
+    image_height = (data.fileSize -1024) / packet_size
+    return np.array(port_data), np.array(starboard_data), splits, stretch, image_height, image_width
 
 
 def get_sample_range(filepath, channel_num, load_navigation):
