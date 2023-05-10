@@ -1,7 +1,7 @@
 import math
 from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QRectF
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QGraphicsItem, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
+from PyQt6.QtWidgets import QGraphicsItem, QMenu, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
 
 from widgets.draw_shapes import *
 
@@ -66,7 +66,6 @@ class Canvas(QGraphicsView):
 
         self.ellipse_size = QPointF(2.0, 2.0)
         self.ellipse_shift = self.ellipse_size.x() / 2
-        
 
         self.active_draw = {"points": [], "corners": [], "lines": []}
 
@@ -78,22 +77,37 @@ class Canvas(QGraphicsView):
         self.horizontalScrollBar().valueChanged.connect(self.update_hor_val)
         self.verticalScrollBar().valueChanged.connect(self.update_ver_val)
 
-        """polygon = aPolygon(QPolygonF([QPointF(10, 10), QPointF(50, 60), QPointF(100, 150), QPointF(200, 20)]))
-        #polygon.setPolygon(QPolygonF([QPointF(10, 10), QPointF(50, 60), QPointF(100, 150), QPointF(200, 20)]))
-        self.scene().addItem(polygon)
-        """
+        # Create context menu
+        self.menu = QMenu(self)
+        context_menu_action_1 = self.menu.addAction("Draw Polygons")
+        context_menu_action_2 = self.menu.addAction("Edit Polygons")
+        context_menu_action_3 = self.menu.addAction("Remove Polygons")
+        context_menu_action_4 = self.menu.addAction("Duplicate Polygons")
+        context_menu_action_5 = self.menu.addAction("Copy Polygons")
+        context_menu_action_6 = self.menu.addAction("Remove Selected Point")
+        context_menu_action_7 = self.menu.addAction("Edit Label")
+        context_menu_action_8 = self.menu.addAction("Undo")
+        context_menu_action_9 = self.menu.addAction("Redo")
+
+        # Connect the actions to slots
+        context_menu_action_1.triggered.connect(self.on_context_menu_action_1)
+        context_menu_action_2.triggered.connect(self.on_context_menu_action_2)
+        context_menu_action_3.triggered.connect(self.on_context_menu_action_3)
+        context_menu_action_4.triggered.connect(self.on_context_menu_action_4)
+        context_menu_action_5.triggered.connect(self.on_context_menu_action_5)
+        context_menu_action_6.triggered.connect(self.on_context_menu_action_6)
+        context_menu_action_7.triggered.connect(self.on_context_menu_action_7)
+        context_menu_action_8.triggered.connect(self.on_context_menu_action_8)
+        context_menu_action_9.triggered.connect(self.on_context_menu_action_9)
 
         self.show()
 
     def delete_polygons(self):
         for polygon in self.selected_polygons:
-            print(polygon._polygon_idx)
-            corners = polygon._polygon_corners.copy()
-            print(self._polygons[polygon._polygon_idx])
             for i in self._polygons[polygon._polygon_idx]["corners"]:
                 self.scene().removeItem(i)
             self.scene().removeItem(polygon)
-            self._polygons[polygon._polygon_idx] = None
+            self._polygons[polygon._polygon_idx] = "del"
            
         self.selected_polygons = []
 
@@ -102,7 +116,6 @@ class Canvas(QGraphicsView):
             if isinstance(item, Polygon) or isinstance(item, Ellipse):
                 self.scene().removeItem(item)
         self._polygons = []
-                    
 
     def update_hor_val(self):
         global X_POS
@@ -244,13 +257,17 @@ class Canvas(QGraphicsView):
         elif not self._photo.pixmap().isNull():
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
+    ################################################
+    # Mouse Press event
+    ################################################
     def mousePressEvent(self, event):
         global X_POS, Y_POS
-        if event.button() == Qt.MouseButton.RightButton:
+        if event.button() == Qt.MouseButton.MiddleButton:
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
             
             self._panning = True
             self._last_pos = event.position()
+            self.right_mouse_pressed = True
         elif event.button() == Qt.MouseButton.LeftButton:
             # Drawing polygons if in drawing mode
             if self._draw_mode:
@@ -384,12 +401,15 @@ class Canvas(QGraphicsView):
                                 j.setPen(QPen(QColor(255, 0, 0)))
                     self.selected_polygons = []
 
-        self.mouse_pressed = True
+            self.mouse_pressed = True
         self.mouse_moved = False
         super().mousePressEvent(event)
 
+    ################################################
+    # Mouse Realase event
+    ################################################
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.RightButton:
+        if event.button() == Qt.MouseButton.MiddleButton:
             self._panning = False
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
@@ -418,11 +438,14 @@ class Canvas(QGraphicsView):
             
             self.adding_polygon_to_list = False
             self.mouse_pressed = False
-            self.mouse_moved = False
+        self.mouse_moved = False
         
         self.selected_corner = None
         super().mouseReleaseEvent(event)
 
+    ################################################
+    # Mouse move event
+    ################################################
     def mouseMoveEvent(self, event) -> None:
         super(Canvas, self).mouseMoveEvent(event)
         global X_POS, Y_POS
@@ -548,7 +571,53 @@ class Canvas(QGraphicsView):
         if self.mouse_pressed:
             self.mouse_moved = True
         super().mouseMoveEvent(event)
-    
+
+    ################################################
+    # Right mouse click Context Menu actions
+    ################################################
+    def contextMenuEvent(self, event):
+        # Create a scene position from the view's mouse position
+        pos = self.mapToScene(event.pos())
+
+        # Show the menu at the mouse position
+        self.menu.exec(event.globalPos())
+
+    def on_context_menu_action_1(self):
+        # Draw polygons
+        pass
+
+    def on_context_menu_action_2(self):
+        # Edit polygons
+        pass
+
+    def on_context_menu_action_3(self):
+        # Remove polygons
+        pass
+
+    def on_context_menu_action_4(self):
+        # Duplicate polygons
+        pass
+
+    def on_context_menu_action_5(self):
+        # Copy polygons
+        pass
+
+    def on_context_menu_action_6(self):
+        # Remove Selected Point
+        pass
+
+    def on_context_menu_action_7(self):
+        # Edit polygon label
+        pass
+
+    def on_context_menu_action_8(self):
+        # Undo
+        pass
+
+    def on_context_menu_action_9(self):
+        # Redo
+        pass
+
     def distance(self, x1, y1, x2, y2):
         return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 

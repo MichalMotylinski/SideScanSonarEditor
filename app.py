@@ -1821,7 +1821,17 @@ class MyWindow(QMainWindow):
             split_size = floor(self.full_image_height / self.splits)
 
             for polygon_data in new_polygons:
-                if polygon_data != None:
+                # If polygon not on the slice load it from file
+                # If the polygon was deleted then add "del" string for later removal from dict
+                # Any new or updated polygons add/update to the dict
+                if polygon_data == None:
+                    if str(j) in old_polygons["polygons"].keys():
+                        polygons[j] = old_polygons["polygons"][str(j)]
+                        j += 1
+                elif polygon_data == "del":
+                    polygons[j] = "del"
+                    j += 1
+                else:
                     corners = []
                     for idx, i in enumerate(polygon_data["polygon"]._polygon_corners):
                         x = i[0] * self.decimation
@@ -1830,13 +1840,21 @@ class MyWindow(QMainWindow):
                         corners.append([x, y])
                     polygons[j] = corners
                     j += 1
-                else:
-                    if str(j) in old_polygons["polygons"].keys():
-                        polygons[j] = old_polygons["polygons"][str(j)]
-                        j += 1
-            data["polygons"] = polygons
-            if len(polygons) != 0:
-                json.dump(data, f, indent=4)
+            
+            # Remove polygons from dict 
+            for key in list(polygons.keys()):
+                if polygons[key] == "del":
+                    del polygons[key]
+
+            # Reorder dict
+            new_polygons = {}
+            i = 0
+            for key in sorted(polygons.keys()):
+                new_polygons[i] = polygons[key]
+                i += 1
+
+            data["polygons"] = new_polygons
+            json.dump(data, f, indent=4)
 
     def is_point_in_rectangle(self, point, rectangle):
         x, y = point
