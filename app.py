@@ -16,7 +16,8 @@ from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont
 from PyQt6.QtCore import pyqtSlot, Qt
 
 from processing.xtf_to_image import *
-from widgets.canvas import Canvas
+from widgets.canvas import *
+from widgets.draw_shapes import *
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -53,6 +54,9 @@ class MyWindow(QMainWindow):
         self.full_image_width = 0
         self.polygons_data = None
         self.polygon_data = {}
+        #self.selected_class = None
+        #self.classes = []
+
         
         # Image display params
         self._port_channel_min = 0
@@ -850,8 +854,8 @@ class MyWindow(QMainWindow):
         font.setBold(True)
 
         self.side_toolbar_groupbox = QGroupBox(self)
-        self.side_toolbar_groupbox.setMinimumWidth(320)
-        self.side_toolbar_groupbox.setTitle('Group Box Example')
+        self.side_toolbar_groupbox.setMinimumWidth(330)
+        #self.side_toolbar_groupbox.setTitle('Group Box Example')
         self.side_toolbar_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
 
         self.splits_label = QLabel(self.side_toolbar_groupbox)
@@ -901,21 +905,42 @@ class MyWindow(QMainWindow):
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
 
-        self.label_list_widget = QListWidget(self.side_toolbar_groupbox)
-        self.label_list_widget.setGeometry(0, 300, 200, 115)
+        ################################################
+        # Labels group box
+        ################################################
+        self.labels_list_groupbox = QGroupBox(self.side_toolbar_groupbox)
+        self.labels_list_groupbox.setGeometry(0, 200, 320, 190)
+        self.labels_list_groupbox.setMinimumWidth(330)
+        self.labels_list_groupbox.setTitle('Labels')
+        self.labels_list_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
 
-        self.label_list_widget.addItem("Item 1")
-        self.label_list_widget.addItem("Item 2")
-        self.label_list_widget.addItem("Item 3")
-        self.label_list_widget.addItem("Item 1")
-        self.label_list_widget.addItem("Item 2")
-        self.label_list_widget.addItem("Item 3")
-        self.label_list_widget.addItem("Item 1")
-        self.label_list_widget.addItem("Item 2")
-        self.label_list_widget.addItem("Item 3")
+        self.load_labels_btn = QPushButton(self.labels_list_groupbox)
+        self.load_labels_btn.setGeometry(10, 30, 60, 30)
+        self.load_labels_btn.setText("Load\nlabels")
+        self.load_labels_btn.clicked.connect(self.load_labels)
+
+        self.remove_label_btn = QPushButton(self.labels_list_groupbox)
+        self.remove_label_btn.setGeometry(80, 30, 60, 30)
+        self.remove_label_btn.setText("Remove\nlabel")
+        self.remove_label_btn.clicked.connect(self.remove_label)
+
+        self.add_label_btn = QPushButton(self.labels_list_groupbox)
+        self.add_label_btn.setGeometry(150, 30, 60, 30)
+        self.add_label_btn.setText("Add\nlabel")
+        self.add_label_btn.clicked.connect(self.add_label)
+
+        self.add_label_textbox = QLineEdit(self.labels_list_groupbox)
+        self.add_label_textbox.setGeometry(220, 35, 90, 20)
+        self.add_label_textbox.setText("")
+        self.add_label_textbox.editingFinished.connect(self.update_add_label_textbox)
+
+        self.label_list_widget = QListWidget(self.labels_list_groupbox)
+        self.label_list_widget.setGeometry(60, 70, 200, 115)
+        self.label_list_widget.itemSelectionChanged.connect(self.on_label_list_selection)
+        self.label_list_widget.itemChanged.connect(self.on_label_item_changed)
 
         self.polygons_list_widget = QListWidget(self.side_toolbar_groupbox)
-        self.polygons_list_widget.setGeometry(0, 500, 200, 115)
+        self.polygons_list_widget.setGeometry(0, 600, 200, 115)
 
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):
@@ -990,6 +1015,66 @@ class MyWindow(QMainWindow):
 
     def delete_polygons(self):
         self.canvas.delete_polygons()
+
+    @pyqtSlot()
+    def load_labels(self):
+        self.labels_filepath = QFileDialog.getOpenFileName(
+            self,
+            "Open File",
+            "",
+            "Text File Format (*.txt)",
+        )[0]
+
+        if self.labels_filepath:
+            with open(self.labels_filepath, "r") as f:
+                lines = [line.rstrip('\n') for line in f]
+
+            for item in lines:
+                if item in self.canvas.classes.values():
+                    continue
+
+                label_idx = self.canvas.get_label_idx(None)
+
+                if label_idx == None:
+                    label_idx = len(self.canvas.classes.items())
+
+                self.label_list_widget.addItem(ListWidgetItem(item, POLY_COLORS[label_idx], checked=True))
+                self.canvas.classes[label_idx] = item
+
+    def on_label_list_selection(self):
+        if self.label_list_widget.currentItem() == None:
+            self.canvas.selected_class = None
+        else:
+            self.canvas.selected_class = self.label_list_widget.currentItem().text()
+    
+    def on_label_item_changed(self, item):
+        self.canvas.hide_polygons(item.text(), item.checkState())
+
+    def update_add_label_textbox(self):
+        return
+    
+    def add_label(self):
+        if self.add_label_textbox.text() not in self.canvas.classes.values():
+            label_idx = self.canvas.get_label_idx(None)
+
+            if label_idx == None:
+                label_idx = len(self.canvas.classes.items())
+
+            self.label_list_widget.addItem(ListWidgetItem(self.add_label_textbox.text(), POLY_COLORS[label_idx], checked=True))
+            self.canvas.classes[label_idx] = self.add_label_textbox.text()
+
+    def remove_label(self):
+        labels_used = set([x["polygon"].polygon_class for x in self.canvas._polygons])
+        idx = self.label_list_widget.currentRow()
+        if idx < 0:
+            return
+        if self.label_list_widget.currentItem().text() in labels_used:
+            return
+
+        label_idx = self.canvas.get_label_idx(self.label_list_widget.currentItem().text())
+
+        self.label_list_widget.takeItem(idx)
+        self.canvas.classes[label_idx] = None
 
     def initUI(self):
         self.init_toolbox()
@@ -1825,8 +1910,8 @@ class MyWindow(QMainWindow):
                 # If the polygon was deleted then add "del" string for later removal from dict
                 # Any new or updated polygons add/update to the dict
                 if polygon_data == None:
-                    if str(j) in old_polygons["polygons"].keys():
-                        polygons[j] = old_polygons["polygons"][str(j)]
+                    if str(j) in old_polygons["shapes"].keys():
+                        polygons[j] = old_polygons["shapes"][str(j)]
                         j += 1
                 elif polygon_data == "del":
                     polygons[j] = "del"
@@ -1838,7 +1923,8 @@ class MyWindow(QMainWindow):
                         y = (self.port_image.size[1] - i[1]) / self.stretch + split_size * (self.selected_split - 1)
                         
                         corners.append([x, y])
-                    polygons[j] = corners
+                    polygons[j] = {"label": polygon_data["polygon"].polygon_class,
+                                   "points": corners}
                     j += 1
             
             # Remove polygons from dict 
@@ -1853,7 +1939,7 @@ class MyWindow(QMainWindow):
                 new_polygons[i] = polygons[key]
                 i += 1
 
-            data["polygons"] = new_polygons
+            data["shapes"] = new_polygons
             json.dump(data, f, indent=4)
 
     def is_point_in_rectangle(self, point, rectangle):
@@ -1873,12 +1959,12 @@ class MyWindow(QMainWindow):
 
             self.full_image_height = data["full_height"]
             self.full_image_width = data["full_width"]
-            polygons = data["polygons"]
+            polygons = data["shapes"]
 
             for key in polygons:
                 arr = []
                 inside = False
-                for point in polygons[key]:
+                for point in polygons[key]["points"]:
                     min_y = (floor(self.full_image_height / self.splits) * (self.selected_split - 1) / self.stretch) - self.shift
                     max_y = (floor(self.full_image_height / self.splits) * self.selected_split) / self.stretch + self.shift
                     
@@ -1888,7 +1974,17 @@ class MyWindow(QMainWindow):
                     p = [point[0], point[1]]#self.port_image.size[1] - point[1]# + (self.full_image_height * self.stretch) * (self.selected_split - 1) / self.stretch]
                     arr.append(p)
 
-                polygons[key] = arr
+                polygons[key]["points"] = arr
+
+                label_idx = self.canvas.get_label_idx(polygons[key]["label"])
+                
+                if label_idx == None:
+                    label_idx = len(self.canvas.classes.items())
+
+                if polygons[key]["label"] not in set(self.canvas.classes.keys()):
+                    self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], POLY_COLORS[label_idx], checked=True))
+                    self.canvas.classes[label_idx] = polygons[key]["label"]
+                
             self.polygons_data = polygons
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
@@ -1937,7 +2033,6 @@ class MyWindow(QMainWindow):
             top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
             self.polygons_data = []
             if os.path.exists(f"{self.image_filename}.json"):
-                
                 self.load_data()
                 self.image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.image)

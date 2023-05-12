@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QLineF, QPointF,  Qt
-from PyQt6.QtGui import QColor, QBrush, QPen, QPolygonF, QPainterPath, QVector2D
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsPolygonItem
+from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygonF, QPainterPath, QVector2D
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
     def __init__(self, rect, shift, polygon_idx, ellipse_idx, color):
@@ -11,8 +11,8 @@ class Ellipse(QGraphicsEllipseItem):
         self.shift = shift
         self.color = color
 
-        self.setBrush(QBrush(self.color))
-        self.setPen(QPen(self.color, 1))
+        self.setBrush(QBrush(QColor(*self.color)))
+        self.setPen(QPen(QColor(*self.color), 1))
         self.setRect(rect.x() - shift, rect.y() - shift, shift * 2, shift * 2)
         self.setAcceptHoverEvents(True)
 
@@ -27,7 +27,7 @@ class Ellipse(QGraphicsEllipseItem):
             super().mousePressEvent(event)
     
     def hoverLeaveEvent(self, event):
-        self.setBrush(QBrush(self.color))
+        self.setBrush(QBrush(QColor(*self.color)))
 
 class Line(QGraphicsLineItem):
     def __init__(self, start_point, end_point):
@@ -35,15 +35,17 @@ class Line(QGraphicsLineItem):
         self.setPen(QPen(QColor(255, 0, 0), 1))
 
 class Polygon(QGraphicsPolygonItem):
-    def __init__(self, parent, polygon_idx):
+    def __init__(self, parent, polygon_idx, polygon_class, color):
         # Ensure the polygon is closed
         if not parent.isClosed():
             parent = QPolygonF(parent)
             parent.append(parent[0])
 
         super().__init__(parent)
-        self.setBrush(QBrush(QColor(255, 0, 0, 120)))
-        self.setPen(QPen(QColor(255, 0, 0), 1))
+        self.polygon_class = polygon_class
+        self.color = color
+        self.setBrush(QBrush(QColor(*color)))
+        self.setPen(QPen(QColor(*color[:-1]), 1))
         self.setAcceptHoverEvents(True)
         self._polygon_idx = polygon_idx
         self._polygon_corners = []
@@ -101,11 +103,36 @@ class Polygon(QGraphicsPolygonItem):
         return self._polygon_corners
 
     def hoverEnterEvent(self, event):
-        self.setBrush(QBrush(QColor(255, 0, 0, 200)))
+        #color = [255 if x != 0 else x for x in self.color]
+        self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
         self.setPen(QPen(QColor(255, 255, 255)))
     
     def hoverLeaveEvent(self, event):
         if self._selected:
             return
-        self.setBrush(QBrush(QColor(255, 0, 0, 120)))
-        self.setPen(QPen(QColor(255, 0, 0)))
+        self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
+        self.setPen(QPen(QColor(*self.color[:-1])))
+
+class ListWidgetItem(QListWidgetItem):
+    def __init__(self, text, color, checked=False, parent=None):
+        super().__init__(parent)
+
+        self.color = color
+        
+        circle_size = 16
+        circle_color = QColor(*color)  # red
+        circle_pixmap = QPixmap(circle_size, circle_size)
+        circle_pixmap.fill(Qt.GlobalColor.transparent)#QColor(255, 255, 255))
+        painter = QPainter(circle_pixmap)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(circle_color)
+        painter.drawEllipse(0, 0, circle_size, circle_size)
+        painter.end()
+ 
+        self.setText(text)
+        self.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        
+        self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        self.setIcon(QIcon(circle_pixmap))
+        
+        self.setToolTip(text)

@@ -2,32 +2,16 @@ import math
 from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QRectF
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsItem, QMenu, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
+import copy
 
 from widgets.draw_shapes import *
 
 ZOOM_NUM = 0
 X_POS = 0
 Y_POS = 0
-
-"""def color_list():
-    arr = []
-    base_colors = [[250, 0, 0, 0], [0, 250, 0, 0], [0, 0, 250, 0], [250, 250, 0, 0], [250, 0, 250, 0], [0, 250, 250, 0], [250, 250, 250, 0]]
-    count = 0
-    while len(arr) < 255:
-        for i in base_colors:
-            new_col = []
-            for j in i:
-                if j != 0:
-                    new_col.append(j - 5 * count)
-                else:
-                    new_col.append(0)
-            arr.append(new_col)
-            if len(arr) == 255:
-                break
-        count += 1
-    return arr
-print(color_list(), len(color_list()))"""
-
+POLY_COLORS = [[255, 0, 0], [0, 0, 255], [255, 255, 0],
+                [255, 0, 255], [0, 255, 255], [128, 0, 0], [0, 128, 0],
+                [0, 0, 128], [128, 128, 0], [128, 0, 128], [0, 128, 128]]
 
 class Canvas(QGraphicsView):
     photo_clicked = pyqtSignal(QPointF)
@@ -61,6 +45,9 @@ class Canvas(QGraphicsView):
         self.prev_pos = None
         self.prev_polygon = None
         self.ellipses_drawn = []
+
+        self.selected_class = None
+        self.classes = {}
 
         self.adding_polygon_to_list = False
 
@@ -108,7 +95,6 @@ class Canvas(QGraphicsView):
                 self.scene().removeItem(i)
             self.scene().removeItem(polygon)
             self._polygons[polygon._polygon_idx] = "del"
-           
         self.selected_polygons = []
 
     def clear_canvas(self):
@@ -116,6 +102,20 @@ class Canvas(QGraphicsView):
             if isinstance(item, Polygon) or isinstance(item, Ellipse):
                 self.scene().removeItem(item)
         self._polygons = []
+
+    def hide_polygons(self, label, state):
+        for polygon in self._polygons:
+            if polygon["polygon"].polygon_class == label:
+                if state == Qt.CheckState.Checked:
+                    polygon["polygon"].setVisible(True)
+                    for point in polygon["corners"]:
+                        point.setVisible(True)
+                else:
+                    polygon["polygon"].setVisible(False)
+                    for point in polygon["corners"]:
+                        point.setVisible(False)
+        
+
 
     def update_hor_val(self):
         global X_POS
@@ -159,12 +159,12 @@ class Canvas(QGraphicsView):
         
         # Get padding width and height
         rect_view_width = self.scene().items()[-1].boundingRect().width()
-        self.x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
+        self.x_padding = (self.viewport().width() - rect_view_width / (0.8 ** self._zoom))
         if self.x_padding <= 0:
             self.x_padding = 0
         
         rect_view_height = self.scene().items()[-1].boundingRect().height()
-        self.y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
+        self.y_padding = (self.viewport().height() - rect_view_height / (0.8 ** self._zoom))
         if self.y_padding <= 0:
             self.y_padding = 0
 
@@ -182,19 +182,20 @@ class Canvas(QGraphicsView):
             
             # Check if current polygon is in range of the selected split
             in_range = False
-            for x, y in polygons[key]:
+            for x, y in polygons[key]["points"]:
                 if top > y > bottom:
                     in_range = True
-            
             if in_range:
                 # If in range draw polygon and its corners
-                polygon = Polygon(QPolygonF([QPointF(x[0] / decimation, (top - x[1]) * stretch) for x in polygons[key]]), idx)
+                label_idx = self.get_label_idx(polygons[key]["label"])
+                        
+                polygon = Polygon(QPolygonF([QPointF(x[0] / decimation, (top - x[1]) * stretch) for x in polygons[key]["points"]]), idx, polygons[key]["label"], [*POLY_COLORS[label_idx], 120])
                 self.scene().addItem(polygon)
 
                 self._polygons.append({"polygon": self.scene().items()[0], "corners": []})
                 
-                for i, item in enumerate(polygons[key]):
-                    rect = Ellipse(QRectF(QPointF(item[0] / decimation, (top - item[1]) * stretch), self.ellipse_size), self.ellipse_shift, idx, i, QColor(255, 0, 0))
+                for i, item in enumerate(polygons[key]["points"]):
+                    rect = Ellipse(QRectF(QPointF(item[0] / decimation, (top - item[1]) * stretch), self.ellipse_size), self.ellipse_shift, idx, i, POLY_COLORS[label_idx])
                     self.scene().addItem(rect)
                     self._polygons[-1]["corners"].append(self.scene().items()[0])
             else:
@@ -229,17 +230,15 @@ class Canvas(QGraphicsView):
                     self.fitInView()
                 else:
                     self._zoom = 0
-                print(self.viewport().size(), self.scene().items()[-1].boundingRect())
                 rect_view_width = self.scene().items()[-1].boundingRect().width()
-                self.x_padding = (self.viewport().width() - rect_view_width / (0.8**self._zoom))
+                self.x_padding = (self.viewport().width() - rect_view_width / (0.8 ** self._zoom))
                 if self.x_padding <= 0:
                     self.x_padding = 0
 
                 rect_view_height = self.scene().items()[-1].boundingRect().height()
-                self.y_padding = (self.viewport().height() - rect_view_height / (0.8**self._zoom))
+                self.y_padding = (self.viewport().height() - rect_view_height / (0.8 ** self._zoom))
                 if self.y_padding <= 0:
                     self.y_padding = 0
-                print("Wheel change", self.x_padding, self.y_padding)
             elif event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                 delta = event.angleDelta().y()
                 x = self.horizontalScrollBar().value()
@@ -272,13 +271,13 @@ class Canvas(QGraphicsView):
             # Drawing polygons if in drawing mode
             if self._draw_mode:
                 # Calculate position of the point on image.
-                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
-                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
                 
                 # Starting just add a single point, then draw point and a line connecting it with a previous point
                 if len(self.active_draw["points"]) == 0:
                     self.active_draw["points"].append(QPointF(x_point, y_point))
-                    rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, len(self._polygons), len(self.active_draw["points"]), QColor(0, 255, 0))
+                    rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, len(self._polygons), len(self.active_draw["points"]), [0, 255, 0])
                     self.scene().addItem(rect)
                     self.active_draw["corners"].append(self.scene().items()[0])
                 else:
@@ -290,7 +289,7 @@ class Canvas(QGraphicsView):
                         self.scene().addItem(line)
                         self.active_draw["lines"].append(self.scene().items()[0])
 
-                        rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, len(self._polygons), len(self.active_draw["points"]), QColor(0, 255, 0))
+                        rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, len(self._polygons), len(self.active_draw["points"]), [0, 255, 0])
                         self.scene().addItem(rect)
                         self.active_draw["corners"].append(self.scene().items()[0])
                 
@@ -312,7 +311,8 @@ class Canvas(QGraphicsView):
                         self.active_draw["corners"].append(self.active_draw["corners"][0])
 
                         # Create a polygon object and add it to the scene
-                        polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons))
+                        label_idx = self.get_label_idx(self.selected_class)
+                        polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons), self.selected_class, [*POLY_COLORS[label_idx], 120])
                         polygon.setPolygon(QPolygonF([QPointF(x[0], x[1]) for x in polygon._polygon_corners]))
                         self.scene().addItem(polygon)
 
@@ -321,7 +321,7 @@ class Canvas(QGraphicsView):
 
                         # Loop over all polygon corners and draw them as separate entities so user can interact with them.
                         for i, item in enumerate(polygon._polygon_corners):
-                            rect = Ellipse(QRectF(QPointF(item[0], item[1]), self.ellipse_size), self.ellipse_shift, len(self._polygons) - 1, i, QColor(255, 0, 0))
+                            rect = Ellipse(QRectF(QPointF(item[0], item[1]), self.ellipse_size), self.ellipse_shift, len(self._polygons) - 1, i, POLY_COLORS[label_idx])
                             #rect.setBrush(QBrush(QColor(0, 255, 0)))
                             #rect.setPen(QPen(QColor(0, 255, 0), 0))
                             self.scene().addItem(rect)
@@ -331,14 +331,16 @@ class Canvas(QGraphicsView):
                         self.active_draw = {"points": [], "corners": [], "lines": []}
             else:
                 # If not in drawing mode select item that was clicked
+                if len(self.items(event.position().toPoint())) == 0:
+                    return
                 if isinstance(self.items(event.position().toPoint())[0], Ellipse):
                     self.selected_corner = self.items(event.position().toPoint())[0]
                     self.selected_polygons = []
                 
                 if isinstance(self.items(event.position().toPoint())[0], Polygon):
                     added = False
-                    x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
-                    y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                    x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                    y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
                     
                     polygon_item = self._polygons[self.items(event.position().toPoint())[0].polygon_idx]
                     polygon = polygon_item["polygon"].polygon()
@@ -362,8 +364,9 @@ class Canvas(QGraphicsView):
                         rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_item["polygon"].polygon_idx, k, QColor(0, 255, 0))
                         polygon_item["corners"].insert(k, rect)
 
-                        pol = Polygon(QPolygonF([x.position for x in polygon_item["corners"]]), polygon_item["polygon"].polygon_idx)
-                        self.scene().addItem(pol)
+                        label_idx = self.get_label_idx(polygon_item["polygon"].polygon_class)
+                        polygon_copy = Polygon(QPolygonF([x.position for x in polygon_item["corners"]]), polygon_item["polygon"].polygon_idx, polygon_item["polygon"].polygon_class, [*POLY_COLORS[label_idx], 200])
+                        self.scene().addItem(polygon_copy)
                         polygon_item["polygon"] = self.scene().items()[0]
 
                         for j, item in enumerate(polygon_item["corners"]):
@@ -380,27 +383,30 @@ class Canvas(QGraphicsView):
                             if self.items(event.position().toPoint())[0] not in self.selected_polygons:
                                 self.selected_polygons.append(self.items(event.position().toPoint())[0])
                                 self.items(event.position().toPoint())[0]._selected = True
-                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 200)))
+
+                                label_idx = self.get_label_idx(self.items(event.position().toPoint())[0].polygon_class)
+                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 200)))
                                 self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
                                 self.adding_polygon_to_list = True
                         else:
                             self.selected_polygons = []
                             self.selected_polygons.append(self.items(event.position().toPoint())[0])
                             self.items(event.position().toPoint())[0]._selected = True
-                            self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 200)))
-                            self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
+
+                            label_idx = self.get_label_idx(self.items(event.position().toPoint())[0].polygon_class)
+                            self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 200)))
+                            self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
                             self.adding_polygon_to_list = True
                         self.prev_pos = event.position()
                 else:
-                    print(self.selected_polygons)
                     for i in self.selected_polygons:
                         for j in self.scene().items():
                             if i == j:
+                                label_idx = self.get_label_idx(i.polygon_class)
                                 j._selected = False
-                                j.setBrush(QBrush(QColor(255, 0, 0, 120)))
-                                j.setPen(QPen(QColor(255, 0, 0)))
+                                j.setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
+                                j.setPen(QPen(QColor(*POLY_COLORS[label_idx])))
                     self.selected_polygons = []
-
             self.mouse_pressed = True
         self.mouse_moved = False
         super().mousePressEvent(event)
@@ -414,32 +420,33 @@ class Canvas(QGraphicsView):
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
         elif event.button() == Qt.MouseButton.LeftButton:
+            if len(self.items(event.position().toPoint())) == 0:
+                    return
             if isinstance(self.items(event.position().toPoint())[0], Polygon):
                 if not self.mouse_moved:
                     if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                         if self.items(event.position().toPoint())[0] in self.selected_polygons:
                             if self.adding_polygon_to_list == False:
-                                #self.adding_polygon_to_list == True
                                 self.items(event.position().toPoint())[0]._selected = False
-                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 120)))
+
+                                label_idx = self.get_label_idx(self.items(event.position().toPoint())[0].polygon_class)
+                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
                                 self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
-                                #del self.selected_polygons[self.items(event.position().toPoint())[0]]
                                 self.selected_polygons.remove(self.items(event.position().toPoint())[0])
-                                #self.selected_polygons.remove(self.items(event.position().toPoint())[0])
                                 
                     else:
                         if self.items(event.position().toPoint())[0] in self.selected_polygons:
                             if self.adding_polygon_to_list == False:
                                 self.selected_polygons.remove(self.items(event.position().toPoint())[0])
                                 self.items(event.position().toPoint())[0]._selected = False
-                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 0, 0, 120)))
+
+                                label_idx = self.get_label_idx(self.items(event.position().toPoint())[0].polygon_class)
+                                self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
                                 self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
-                                #del self.selected_polygons[self.items(event.position().toPoint())[0]]
-            
+
             self.adding_polygon_to_list = False
             self.mouse_pressed = False
         self.mouse_moved = False
-        
         self.selected_corner = None
         super().mouseReleaseEvent(event)
 
@@ -464,8 +471,8 @@ class Canvas(QGraphicsView):
                 if self.line != None:
                     self.scene().removeItem(self.line)
                 
-                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
-                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
 
                 self.line = Line(self.active_draw["points"][-1], QPointF(x_point, y_point))
                 self.line.setPen(QPen(QColor(0, 255, 0), 0))
@@ -474,8 +481,8 @@ class Canvas(QGraphicsView):
         elif self.selected_corner != None:
             if self.mouse_pressed:
                 # Calculate new coordinates
-                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
-                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
 
                 # Get index of the polygon to which point belongs and its own index in that polygon
                 ellipse_idx = self.selected_corner.ellipse_idx
@@ -489,27 +496,25 @@ class Canvas(QGraphicsView):
                 polygon = self._polygons[polygon_idx]["polygon"]
                 self.scene().removeItem(polygon)
 
-                pol = polygon.polygon()
+                polygon_copy = polygon.polygon()
                 points = [x for x in polygon.polygon()]
 
                 if ellipse_idx == len(points) - 1:
                     points[0] = QPointF(x_point, y_point)
                     points[len(points) - 1] = QPointF(x_point, y_point)
-                    pol[0] = QPointF(x_point, y_point)
-                    pol[len(points) - 1] = QPointF(x_point, y_point)
+                    polygon_copy[0] = QPointF(x_point, y_point)
+                    polygon_copy[len(points) - 1] = QPointF(x_point, y_point)
                 else:
                     points[ellipse_idx] = QPointF(x_point, y_point)
-                    pol[ellipse_idx] = QPointF(x_point, y_point)
-                
-                new_polygon = Polygon(QPolygonF(points), polygon_idx)
+                    polygon_copy[ellipse_idx] = QPointF(x_point, y_point)
 
-                rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_idx, ellipse_idx, QColor(255, 0, 0))
+                label_idx = self.get_label_idx(polygon.polygon_class)
+                new_polygon = Polygon(QPolygonF(points), polygon_idx, polygon.polygon_class, [*POLY_COLORS[label_idx], 200])
+                rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_idx, ellipse_idx, POLY_COLORS[label_idx])
                 
                 self.scene().addItem(new_polygon)
-
                 self._polygons[polygon_idx]["polygon"] = new_polygon
 
-                #detect just last element and move first with it!!!!!!
                 # Create and draw ellipse using new coordinates
                 rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                 
@@ -517,7 +522,7 @@ class Canvas(QGraphicsView):
                     if i == ellipse_idx:
                         if i == len(points) - 1:
                             self.scene().removeItem(self._polygons[polygon_idx]["corners"][0])
-                            rect1 = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_idx, 0, QColor(255, 0, 0))
+                            rect1 = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_idx, 0, POLY_COLORS[label_idx])
                             self.scene().addItem(rect1)
                             self._polygons[polygon_idx]["corners"][0] = self.scene().items()[0]
                         
@@ -530,43 +535,40 @@ class Canvas(QGraphicsView):
                     
         elif len(self.selected_polygons) > 0:
             if self.mouse_pressed == True:
-                for pooo in self.selected_polygons:
-                    # Calculate new coordinates
-                    x_point = (self.prev_pos.x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
-                    y_point = (self.prev_pos.y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
-                    new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8**self._zoom)
-                    new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8**self._zoom)
-                    #print(x_point, y_point, new_x_point, new_y_point)
+                # Calculate mouse movement
+                x_point = (self.prev_pos.x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (self.prev_pos.y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
 
-                    x_change = new_x_point - x_point
-                    y_change = new_y_point - y_point
-
+                x_change = new_x_point - x_point
+                y_change = new_y_point - y_point
+                
+                new_selected_polygons = []
+                for polygon in self.selected_polygons:
+                    # Get new coords for each point of the polygon
+                    polygon_copy = polygon.polygon()
+                    for i, item in enumerate(polygon_copy):
+                        polygon_copy[i] = QPointF(item.x() + x_change, item.y() + y_change)
                     
-                    pol = pooo.polygon()
-                    
-                    #print(self.scene().items())
+                    # Create new polygon
+                    label_idx = self.get_label_idx(polygon.polygon_class)
+                    new_polygon = Polygon(polygon_copy, polygon._polygon_idx, polygon.polygon_class, [*POLY_COLORS[label_idx], 200])
+                    new_polygon.setPen(QPen(QColor(255, 255, 255)))
+                    self.scene().addItem(new_polygon)
+                    self._polygons[polygon._polygon_idx]["polygon"] = self.scene().items()[0]
 
-                    for i, item in enumerate(pol):
-                        pol[i] = QPointF(item.x() + x_change, item.y() + y_change)
-                        #print(pol[i])
-
-                    polygon = Polygon(pol, pooo._polygon_idx)
-                    self.scene().addItem(polygon)
-                    self._polygons[pooo._polygon_idx]["polygon"] = self.scene().items()[0]
-
-                    #print(pooo._polygon_corners, self._polygons[pooo._polygon_idx]["corners"])
-                    for i, item in enumerate(self._polygons[pooo._polygon_idx]["corners"]):
+                    # Create new points
+                    for i, item in enumerate(self._polygons[polygon._polygon_idx]["corners"]):
                         self.scene().removeItem(item)
-                        rect = Ellipse(QRectF(QPointF(pooo._polygon_corners[i][0] + x_change, pooo._polygon_corners[i][1] + y_change), self.ellipse_size), self.ellipse_shift, pooo._polygon_idx, i, QColor(255, 0, 0))
+                        rect = Ellipse(QRectF(QPointF(polygon._polygon_corners[i][0] + x_change, polygon._polygon_corners[i][1] + y_change), self.ellipse_size), self.ellipse_shift, polygon._polygon_idx, i, POLY_COLORS[label_idx])
                         rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                         self.scene().addItem(rect)
-                        self._polygons[pooo._polygon_idx]["corners"][i] = self.scene().items()[0]
+                        self._polygons[polygon._polygon_idx]["corners"][i] = self.scene().items()[0]
                     
-                    self.scene().removeItem(pooo)
-
-                    self.selected_polygons.remove(pooo)
-                    self.selected_polygons.append(polygon)
-
+                    self.scene().removeItem(polygon)
+                    new_selected_polygons.append(new_polygon)
+                self.selected_polygons = new_selected_polygons
             self.prev_pos = event.position()
         if self.mouse_pressed:
             self.mouse_moved = True
@@ -619,7 +621,10 @@ class Canvas(QGraphicsView):
         pass
 
     def distance(self, x1, y1, x2, y2):
-        return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-    def dot(self, a, b, c):
-        return (c[0]-a[0])*(c[0]-b[0]) + (c[1]-a[1])*(c[1]-b[1])
+    def get_label_idx(self, label):
+        for j, value in self.classes.items():
+            if value == label:
+                return j
+        
