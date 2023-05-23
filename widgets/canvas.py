@@ -3,6 +3,8 @@ from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QRectF
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsItem, QMenu, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
 import copy
+import numpy as np
+from pyproj import Proj
 
 from widgets.draw_shapes import *
 
@@ -18,6 +20,7 @@ class Canvas(QGraphicsView):
 
     def __init__(self, parent):
         super(Canvas, self).__init__(parent)
+        self.par = parent
         self._zoom = 0
         self._empty = True
         self._scene = QGraphicsScene(self)
@@ -45,6 +48,9 @@ class Canvas(QGraphicsView):
         self.prev_pos = None
         self.prev_polygon = None
         self.ellipses_drawn = []
+
+        self.x_padding = None
+        self.y_padding = None
 
         self.selected_class = None
         self.classes = {}
@@ -361,10 +367,10 @@ class Canvas(QGraphicsView):
                         for j in polygon_item["corners"]:
                             self.scene().removeItem(j)
 
-                        rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_item["polygon"].polygon_idx, k, QColor(0, 255, 0))
+                        label_idx = self.get_label_idx(polygon_item["polygon"].polygon_class)
+                        rect = Ellipse(QRectF(QPointF(x_point, y_point), self.ellipse_size), self.ellipse_shift, polygon_item["polygon"].polygon_idx, k, [*POLY_COLORS[label_idx]])
                         polygon_item["corners"].insert(k, rect)
 
-                        label_idx = self.get_label_idx(polygon_item["polygon"].polygon_class)
                         polygon_copy = Polygon(QPolygonF([x.position for x in polygon_item["corners"]]), polygon_item["polygon"].polygon_idx, polygon_item["polygon"].polygon_class, [*POLY_COLORS[label_idx], 200])
                         self.scene().addItem(polygon_copy)
                         polygon_item["polygon"] = self.scene().items()[0]
@@ -456,6 +462,46 @@ class Canvas(QGraphicsView):
     def mouseMoveEvent(self, event) -> None:
         super(Canvas, self).mouseMoveEvent(event)
         global X_POS, Y_POS
+
+        if self.x_padding != None:
+            self.par.mouse_coords = event.position()
+            
+            # Get position of the cursor and calculate its position on a full size data
+            x = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom) * self.par.decimation
+            y = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom) / self.par.stretch
+            self.par.location_label3.setText(f"X: {round(x, 2)}, Y: {round(y, 2)}")
+
+            # Get vertical middle point of the image in reference to a cursor current position
+            middle_point = ((self.scene().sceneRect().width() * self.par.decimation) / 2, event.position().y() / self.par.stretch)
+            
+            # Get gyro angle of the currently highlighted ping
+            angle_rad = math.radians(self.par.coords[math.floor(y)]["gyro"])
+            
+            # Calculate cursor coordinate in reference to a middle point
+            diff_x = x - middle_point[0]
+            diff_y = y - middle_point[1]
+
+            # Rotate the cursor point 
+            rotated_x = diff_x * math.cos(angle_rad) - diff_y * math.sin(angle_rad)
+            rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
+            
+            # Convert cursor position from pixels to UTM system and add it to the middle point (also UTM)
+            converted_x = self.par.coords[math.floor(y)]['x'] + (rotated_x * self.par.accross_interval / self.par.decimation)
+            converted_y = self.par.coords[math.floor(y)]['y'] + (rotated_y * self.par.along_interval)
+            self.par.location_label.setText(f"N: {round(converted_x, 4): .4f}, E: {round(converted_y, 4): .4f}")
+            
+            print(x,y , diff_x, diff_y, rotated_x, rotated_y,converted_x , converted_y, middle_point, angle_rad, self.par.coords[math.floor(y)]["gyro"])
+            # Convert UTM to longitude and latitude coordinates
+            try:
+                zone_letter = self.par.utm_zone[-1]
+                p = Proj(proj='utm', zone=int(self.par.utm_zone[:-1]), ellps=self.par.crs, south=False)
+                lon, lat = p(converted_x, converted_y, inverse=True)
+                if zone_letter < 'N':
+                    lat = -lat
+                self.par.location_label2.setText(f"Lat: {lat: .6f}, Lon: {lon: .6f}")
+            except:
+                print("Wrong coordinate system")
+                self.par.location_label2.setText(f"Lat: 0, Lon: 0")
 
         if self._panning:
             delta = event.position() - self._last_pos
@@ -627,4 +673,3 @@ class Canvas(QGraphicsView):
         for j, value in self.classes.items():
             if value == label:
                 return j
-        
