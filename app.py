@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 from math import floor, ceil
 import time
-from PIL import Image
+from PIL import Image, ImageDraw
 from PIL.ImageQt import toqpixmap
 import json
 
@@ -45,6 +45,13 @@ class MyWindow(QMainWindow):
         self._stretch = 1
         self._stretch_max = 10
         self.stretch_auto = 1
+        self.coords = []
+        self.mouse_coords = []
+        self.accross_interval = 0
+        self.along_interval = 0
+
+        self.crs = ""
+        self.utm_zone = ""
 
         self.selected_split = 1
         self.selected_split_auto = 1
@@ -56,7 +63,6 @@ class MyWindow(QMainWindow):
         self.polygon_data = {}
         #self.selected_class = None
         #self.classes = []
-
         
         # Image display params
         self._port_channel_min = 0
@@ -905,6 +911,22 @@ class MyWindow(QMainWindow):
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
 
+        self.crs_label = QLabel(self.side_toolbar_groupbox)
+        self.crs_label.setGeometry(10, 180, 35, 20)
+        self.crs_label.setText("CRS")
+
+        self.crs_textbox = QLineEdit(self.side_toolbar_groupbox)
+        self.crs_textbox.setGeometry(45, 180, 80, 20)
+        self.crs_textbox.editingFinished.connect(self.update_crs)
+
+        self.utm_zone_label = QLabel(self.side_toolbar_groupbox)
+        self.utm_zone_label.setGeometry(150, 180, 60, 20)
+        self.utm_zone_label.setText("UTM zone")
+
+        self.utm_zone_textbox = QLineEdit(self.side_toolbar_groupbox)
+        self.utm_zone_textbox.setGeometry(220, 180, 80, 20)
+        self.utm_zone_textbox.editingFinished.connect(self.update_utm_zone)
+
         ################################################
         # Labels group box
         ################################################
@@ -969,9 +991,9 @@ class MyWindow(QMainWindow):
         # Load port and starboarrd data
         start = time.perf_counter()
         if self.auto_stretch:
-            self.port_data, self.starboard_data, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.shift, self.packet_size, self.splits, self.selected_split)
+            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(self.filepath, self.decimation, self.stretch_auto, self.shift, self.packet_size, self.splits, self.selected_split)
         else:
-            self.port_data, self.starboard_data, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(self.filepath, self.decimation, self.stretch, self.shift, self.packet_size, self.splits, self.selected_split)
+            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(self.filepath, self.decimation, self.stretch, self.shift, self.packet_size, self.splits, self.selected_split)
         end = time.perf_counter()
         
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -1015,6 +1037,12 @@ class MyWindow(QMainWindow):
 
     def delete_polygons(self):
         self.canvas.delete_polygons()
+
+    def update_crs(self):
+        self.crs = self.sender().text()
+    
+    def update_utm_zone(self):
+        self.utm_zone = self.sender().text()
 
     @pyqtSlot()
     def load_labels(self):
@@ -1064,7 +1092,12 @@ class MyWindow(QMainWindow):
             self.canvas.classes[label_idx] = self.add_label_textbox.text()
 
     def remove_label(self):
-        labels_used = set([x["polygon"].polygon_class for x in self.canvas._polygons])
+        labels_used = []
+        for polygon in self.canvas._polygons:
+            if polygon == "del":
+                continue
+            labels_used.append(polygon["polygon"].polygon_class)
+        
         idx = self.label_list_widget.currentRow()
         if idx < 0:
             return
@@ -1075,10 +1108,27 @@ class MyWindow(QMainWindow):
 
         self.label_list_widget.takeItem(idx)
         self.canvas.classes[label_idx] = None
+    
+    def init_bottom_bar(self):
+        self.bottom_bar_groupbox = QGroupBox(self)
+        self.bottom_bar_groupbox.setMinimumHeight(20)
+        self.bottom_bar_groupbox.setMaximumHeight(50)
+        self.bottom_bar_groupbox.setMinimumWidth(200)
+        #self.bottom_bar_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+
+        self.location_label = QLabel(self.bottom_bar_groupbox)
+        self.location_label.setGeometry(550, 1, 200, 20)
+
+        self.location_label2 = QLabel(self.bottom_bar_groupbox)
+        self.location_label2.setGeometry(780, 1, 200, 20)
+
+        self.location_label3 = QLabel(self.bottom_bar_groupbox)
+        self.location_label3.setGeometry(1000, 1, 200, 20)
 
     def initUI(self):
         self.init_toolbox()
         self.init_side_toolbox()
+        self.init_bottom_bar()
 
         self.canvas = Canvas(self)
 
@@ -1091,6 +1141,7 @@ class MyWindow(QMainWindow):
         main_layout.addWidget(self.toolbox_widget, 0 , Qt.AlignmentFlag.AlignTop)
         main_layout.setSpacing(0)
         main_layout.addLayout(bottom_layout)
+        main_layout.addWidget(self.bottom_bar_groupbox)
 
         main_widget = QWidget()
         main_widget.setLayout(main_layout)
@@ -2000,7 +2051,7 @@ class MyWindow(QMainWindow):
         if self.filepath is None:
             return
         
-        self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
+        self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
         
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -2024,7 +2075,7 @@ class MyWindow(QMainWindow):
             self.filename = self.filepath.rsplit(os.sep, 1)[1]
             self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
 
-            self.port_data, self.starboard_data, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
+            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
             
             self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
             self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
