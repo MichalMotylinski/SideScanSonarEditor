@@ -120,9 +120,9 @@ class ListWidgetItem(QListWidgetItem):
         self.color = color
         
         circle_size = 16
-        circle_color = QColor(*color)  # red
+        circle_color = QColor(*color)
         circle_pixmap = QPixmap(circle_size, circle_size)
-        circle_pixmap.fill(Qt.GlobalColor.transparent)#QColor(255, 255, 255))
+        circle_pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(circle_pixmap)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(circle_color)
