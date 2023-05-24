@@ -96,11 +96,21 @@ class Canvas(QGraphicsView):
         self.show()
 
     def delete_polygons(self):
+        print(self._polygons)
         for polygon in self.selected_polygons:
+            k = 0
+            for j, item in enumerate(self._polygons):
+                if item != "del":
+                    k += 1
+                    if item["polygon"] == polygon:
+                        break
+            
             for i in self._polygons[polygon._polygon_idx]["corners"]:
                 self.scene().removeItem(i)
             self.scene().removeItem(polygon)
             self._polygons[polygon._polygon_idx] = "del"
+            self.par.polygons_list_widget.takeItem(k - 1)
+            
         self.selected_polygons = []
 
     def clear_canvas(self):
@@ -120,8 +130,16 @@ class Canvas(QGraphicsView):
                     polygon["polygon"].setVisible(False)
                     for point in polygon["corners"]:
                         point.setVisible(False)
-        
-
+    
+    def hide_polygon(self, idx, state):
+        if state == Qt.CheckState.Checked:
+            self._polygons[idx]["polygon"].setVisible(True)
+            for point in self._polygons[idx]["corners"]:
+                point.setVisible(True)
+        else:
+            self._polygons[idx]["polygon"].setVisible(False)
+            for point in self._polygons[idx]["corners"]:
+                point.setVisible(False)
 
     def update_hor_val(self):
         global X_POS
@@ -321,6 +339,7 @@ class Canvas(QGraphicsView):
                         polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons), self.selected_class, [*POLY_COLORS[label_idx], 120])
                         polygon.setPolygon(QPolygonF([QPointF(x[0], x[1]) for x in polygon._polygon_corners]))
                         self.scene().addItem(polygon)
+                        self.par.polygons_list_widget.addItem(ListWidgetItem(self.selected_class, POLY_COLORS[label_idx], checked=True))
 
                         # Add items to the global list of drawn figures. Corners are added just to created indexes for future objects!
                         self._polygons.append({"polygon": polygon, "corners": [x for x in range(len(polygon._polygon_corners))]})
