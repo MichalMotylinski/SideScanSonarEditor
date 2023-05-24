@@ -962,7 +962,9 @@ class MyWindow(QMainWindow):
         self.label_list_widget.itemChanged.connect(self.on_label_item_changed)
 
         self.polygons_list_widget = QListWidget(self.side_toolbar_groupbox)
-        self.polygons_list_widget.setGeometry(0, 600, 200, 115)
+        self.polygons_list_widget.setGeometry(60, 400, 200, 115)
+        self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
+        
 
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):
@@ -1077,6 +1079,9 @@ class MyWindow(QMainWindow):
     
     def on_label_item_changed(self, item):
         self.canvas.hide_polygons(item.text(), item.checkState())
+        for i in range(self.polygons_list_widget.count()):
+            if self.polygons_list_widget.item(i).text() == item.text():
+                self.polygons_list_widget.item(i).setCheckState(Qt.CheckState.Checked if item.checkState() == Qt.CheckState.Checked else Qt.CheckState.Unchecked)
 
     def update_add_label_textbox(self):
         return
@@ -1108,6 +1113,16 @@ class MyWindow(QMainWindow):
 
         self.label_list_widget.takeItem(idx)
         self.canvas.classes[label_idx] = None
+
+    def clear_labels(self):
+        for i in range(self.polygons_list_widget.count()):
+            self.polygons_list_widget.takeItem(0)
+        for i in range(self.label_list_widget.count()):
+            self.label_list_widget.takeItem(0)
+        self.canvas.classes = {}
+
+    def on_polygon_item_changed(self, item):
+        self.canvas.hide_polygon(self.polygons_list_widget.row(item), item.checkState())
     
     def init_bottom_bar(self):
         self.bottom_bar_groupbox = QGroupBox(self)
@@ -2005,6 +2020,7 @@ class MyWindow(QMainWindow):
         return False
 
     def load_data(self):
+        self.clear_labels()
         with open(f"{self.image_filename}.json", "r") as f:
             data = json.load(f)
 
@@ -2031,11 +2047,12 @@ class MyWindow(QMainWindow):
                 
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
-
+                
                 if polygons[key]["label"] not in set(self.canvas.classes.keys()):
                     self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], POLY_COLORS[label_idx], checked=True))
+                    self.polygons_list_widget.addItem(ListWidgetItem(polygons[key]["label"], POLY_COLORS[label_idx], checked=True))
                     self.canvas.classes[label_idx] = polygons[key]["label"]
-                
+                    
             self.polygons_data = polygons
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
