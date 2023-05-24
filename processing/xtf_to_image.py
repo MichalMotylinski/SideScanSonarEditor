@@ -28,10 +28,10 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
     # Sample interval in metres
     across_track_sample_interval = (max_slant_range / max_samples_port) * decimation
-
+    
     # To make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
     distance = mean_speed * (time_last - time_first)
-    along_track_sample_interval = (distance / ping_count) 
+    along_track_sample_interval = (distance / ping_count)
 
     # Automatic calculation of stretch that needs to be applied to the data
     if auto_stretch:
@@ -53,6 +53,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
         
         port_data = []
         starboard_data = []
+        coords = []
 
         splits = math.ceil(req_size / data_limit)  
         pos = first_pos
@@ -68,6 +69,9 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
             if ping == -999:
                 continue
+
+            coords.insert(0, {"x": ping.ShipXcoordinate, "y": ping.ShipYcoordinate, "gyro": ping.ShipGyro})
+            
             pos = pos + packet_size
             
             channel = np.array(ping.pingChannel[0].data[::decimation])
@@ -89,11 +93,12 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
         image_height = (data.fileSize - 1024) / packet_size
 
-        return np.array(port_data), np.array(starboard_data), splits, stretch, packet_size, image_height, image_width
+        return np.array(port_data), np.array(starboard_data), coords, splits, stretch, packet_size, image_height, image_width, across_track_sample_interval, along_track_sample_interval
 
     data = xtf_reader.XTFReader(filepath)
     port_data = []
     starboard_data = []
+    coords = []
 
     while data.moreData():
         ping = data.readPacket()
@@ -101,6 +106,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
         if ping == -999:
             continue
 
+        coords.insert(0, {"x": ping.ShipXcoordinate, "y": ping.ShipYcoordinate, "gyro": ping.ShipGyro})
         image_width = len(ping.pingChannel[0].data) * 2
 
         channel = np.array(ping.pingChannel[0].data[::decimation])
@@ -119,7 +125,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
     image_height = (data.fileSize - 1024) / packet_size
 
-    return np.array(port_data), np.array(starboard_data), 1, stretch, packet_size, image_height, image_width
+    return np.array(port_data), np.array(starboard_data), coords, 1, stretch, packet_size, image_height, image_width, across_track_sample_interval, along_track_sample_interval
 
 def load_selected_split(filepath, decimation, stretch, shift, packet_size, splits, selected_split):
     start = time.perf_counter()
@@ -128,6 +134,7 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
     print("Load data", end-start)
     port_data = []
     starboard_data = []
+    coords = []
 
     pos = 1024
     
@@ -155,6 +162,8 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
         if ping == -999:
             continue
 
+        coords.insert(0, {"x": ping.ShipXcoordinate, "y": ping.ShipYcoordinate, "gyro": ping.ShipGyro})
+
         image_width = len(ping.pingChannel[0].data) * 2
 
         pos = pos + packet_size
@@ -176,7 +185,7 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
     end = time.perf_counter()
     print("Calc data", end-start)
     image_height = (data.fileSize -1024) / packet_size
-    return np.array(port_data), np.array(starboard_data), splits, stretch, image_height, image_width
+    return np.array(port_data), np.array(starboard_data), coords, splits, stretch, image_height, image_width
 
 
 def get_sample_range(filepath, channel_num, load_navigation):
