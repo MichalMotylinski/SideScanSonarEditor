@@ -4,7 +4,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsItem, QMenu, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
 import copy
 import numpy as np
-from pyproj import Proj
+from pyproj import Proj, transform
 
 from widgets.draw_shapes import *
 
@@ -515,7 +515,7 @@ class Canvas(QGraphicsView):
                 zone_letter = self.par.utm_zone[-1]
                 p = Proj(proj='utm', zone=int(self.par.utm_zone[:-1]), ellps=self.par.crs, south=False)
                 lon, lat = p(converted_x, converted_y, inverse=True)
-                if zone_letter < 'N':
+                if zone_letter != 'N':
                     lat = -lat
                 self.par.location_label2.setText(f"Lat: {lat: .6f}, Lon: {lon: .6f}")
             except:
