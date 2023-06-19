@@ -937,24 +937,19 @@ class MyWindow(QMainWindow):
         self.labels_list_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
 
         self.load_labels_btn = QPushButton(self.labels_list_groupbox)
-        self.load_labels_btn.setGeometry(10, 30, 60, 30)
-        self.load_labels_btn.setText("Load\nlabels")
+        self.load_labels_btn.setGeometry(10, 30, 80, 20)
+        self.load_labels_btn.setText("Load labels")
         self.load_labels_btn.clicked.connect(self.load_labels)
 
         self.remove_label_btn = QPushButton(self.labels_list_groupbox)
-        self.remove_label_btn.setGeometry(80, 30, 60, 30)
-        self.remove_label_btn.setText("Remove\nlabel")
+        self.remove_label_btn.setGeometry(100, 30, 80, 20)
+        self.remove_label_btn.setText("Remove label")
         self.remove_label_btn.clicked.connect(self.remove_label)
 
         self.add_label_btn = QPushButton(self.labels_list_groupbox)
-        self.add_label_btn.setGeometry(150, 30, 60, 30)
-        self.add_label_btn.setText("Add\nlabel")
+        self.add_label_btn.setGeometry(190, 30, 80, 20)
+        self.add_label_btn.setText("Add label")
         self.add_label_btn.clicked.connect(self.add_label)
-
-        self.add_label_textbox = QLineEdit(self.labels_list_groupbox)
-        self.add_label_textbox.setGeometry(220, 35, 90, 20)
-        self.add_label_textbox.setText("")
-        self.add_label_textbox.editingFinished.connect(self.update_add_label_textbox)
 
         self.label_list_widget = QListWidget(self.labels_list_groupbox)
         self.label_list_widget.setGeometry(60, 70, 200, 115)
@@ -1087,14 +1082,16 @@ class MyWindow(QMainWindow):
         return
     
     def add_label(self):
-        if self.add_label_textbox.text() not in self.canvas.classes.values():
-            label_idx = self.canvas.get_label_idx(None)
+        dialog = DialogWindow(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if dialog.textbox.text() not in self.canvas.classes.values():
+                label_idx = self.canvas.get_label_idx(None)
 
-            if label_idx == None:
-                label_idx = len(self.canvas.classes.items())
+                if label_idx == None:
+                    label_idx = len(self.canvas.classes.items())
 
-            self.label_list_widget.addItem(ListWidgetItem(self.add_label_textbox.text(), POLY_COLORS[label_idx], checked=True))
-            self.canvas.classes[label_idx] = self.add_label_textbox.text()
+                self.label_list_widget.addItem(ListWidgetItem(dialog.textbox.text(), POLY_COLORS[label_idx], checked=True))
+                self.canvas.classes[label_idx] = dialog.textbox.text()
 
     def remove_label(self):
         labels_used = []
@@ -2089,8 +2086,8 @@ class MyWindow(QMainWindow):
         if self.filepath:
             arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
             pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
-            self.filename = self.filepath.rsplit(os.sep, 1)[1]
-            self.image_filename = f"{self.filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}"
+            self.filename = self.filepath.rsplit("/", 1)[1]
+            self.image_filename = f"{self.filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}"
 
             self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
             

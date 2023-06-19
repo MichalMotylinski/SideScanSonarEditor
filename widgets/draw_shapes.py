@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QLineF, QPointF,  Qt
 from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygonF, QPainterPath, QVector2D
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QDialog, QLineEdit, QVBoxLayout, QPushButton, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
     def __init__(self, rect, shift, polygon_idx, ellipse_idx, color):
@@ -136,3 +136,22 @@ class ListWidgetItem(QListWidgetItem):
         self.setIcon(QIcon(circle_pixmap))
         
         self.setToolTip(text)
+
+class DialogWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Add label")
+        self.setMinimumSize(200, 80)
+        self.setMaximumSize(200, 80)
+
+        self.textbox = QLineEdit(self)
+        self.textbox.setGeometry(10, 10, 180, 25)
+
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.setGeometry(10, 45, 70, 25)
+        self.ok_button.clicked.connect(self.accept)
+
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.setGeometry(120, 45, 70, 25)
+        self.cancel_button.clicked.connect(self.reject)
