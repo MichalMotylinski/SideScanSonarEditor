@@ -885,6 +885,10 @@ class MyWindow(QMainWindow):
         self.selected_split_spinbox.setValue(self.selected_split)
         self.selected_split_spinbox.valueChanged.connect(self.update_selected_split)
 
+        self.shift_label = QLabel(self.side_toolbar_groupbox)
+        self.shift_label.setGeometry(220, 30, 50, 20)
+        self.shift_label.setText("Shift")
+
         self.shift_textbox = QLineEdit(self.side_toolbar_groupbox)
         self.shift_textbox.setGeometry(220, 50, 50, 20)
         self.shift_textbox.setValidator(zero_int_validator)
@@ -900,6 +904,7 @@ class MyWindow(QMainWindow):
         self.draw_polygons_btn.setGeometry(0, 150, 100, 20)
         self.draw_polygons_btn.setText("Draw polygons")
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
+        self.draw_polygons_btn.setEnabled(False)
 
         self.edit_polygons_btn = QPushButton(self.side_toolbar_groupbox)
         self.edit_polygons_btn.setGeometry(100, 150, 100, 20)
@@ -910,6 +915,7 @@ class MyWindow(QMainWindow):
         self.delete_polygons_btn.setGeometry(200, 150, 100, 20)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
+        self.delete_polygons_btn.setEnabled(False)
 
         self.crs_label = QLabel(self.side_toolbar_groupbox)
         self.crs_label.setGeometry(10, 180, 35, 20)
@@ -1028,12 +1034,15 @@ class MyWindow(QMainWindow):
 
     def draw_polygons(self):
         self.canvas._draw_mode = True
+        self.delete_polygons_btn.setEnabled(False)
 
     def edit_polygons(self):
         self.canvas._draw_mode = False
+        self.delete_polygons_btn.setEnabled(True)
 
     def delete_polygons(self):
         self.canvas.delete_polygons()
+        self.delete_polygons_btn.setEnabled(False)
 
     def update_crs(self):
         self.crs = self.sender().text()
@@ -1069,9 +1078,11 @@ class MyWindow(QMainWindow):
     def on_label_list_selection(self):
         if self.label_list_widget.currentItem() == None:
             self.canvas.selected_class = None
+            self.draw_polygons_btn.setEnabled(False)
         else:
             self.canvas.selected_class = self.label_list_widget.currentItem().text()
-    
+            self.draw_polygons_btn.setEnabled(True)
+
     def on_label_item_changed(self, item):
         self.canvas.hide_polygons(item.text(), item.checkState())
         for i in range(self.polygons_list_widget.count()):
@@ -2004,6 +2015,88 @@ class MyWindow(QMainWindow):
 
             data["shapes"] = new_polygons
             json.dump(data, f, indent=4)
+
+            """print(self.port_data)
+            for i in range(len(self.port_data)):
+                self.port_data[i] = self.port_data[i][::-1]
+            print(self.port_data)
+            arr = []
+            for i in range(len(self.port_data)):
+                if i % 2 == 0:
+                    arr.append(self.port_data[i])
+            am = convert_to_image(np.array(arr), True, False, channel_min=2, auto_scale=False, scale=34, color_scheme="greylog", cmap=None)
+            
+
+            print(self.port_image.size, self.port_data.shape)
+            #print(np.array(data["shapes"][2]["points"]))
+            print(np.array(data["shapes"][2]["points"]).T)
+            print(min(np.array(data["shapes"][2]["points"]).T[0]), max(np.array(data["shapes"][2]["points"]).T[0]))
+            print(min(np.array(data["shapes"][2]["points"]).T[1]), max(np.array(data["shapes"][2]["points"]).T[1]))
+            x_min = int(min(np.array(data["shapes"][2]["points"]).T[0]) / self.decimation)
+            x_max = int(max(np.array(data["shapes"][2]["points"]).T[0]) / self.decimation)
+            y_min = int(min(np.array(data["shapes"][2]["points"]).T[1]) * self.stretch)
+            y_max = int(max(np.array(data["shapes"][2]["points"]).T[1]) * self.stretch)
+            print(x_min, x_max, y_min, y_max)
+            print(self.port_data[y_min:y_max, x_min:x_max], self.port_data[y_min:y_max, x_min:x_max].shape)
+            print(self.port_data[x_min:x_max], self.port_data[x_min:x_max].shape)
+            print(self.port_data.shape[0] - (y_min),self.port_data.shape[0] - (y_max))
+            data_y_min = self.port_data.shape[0] - y_max
+            data_y_max = self.port_data.shape[0] - y_min
+            data_x_min = x_min#self.port_data.shape[1] - x_max
+            data_x_max = x_max#self.port_data.shape[1] - x_min
+            print(data_y_min, data_y_max, data_x_min, data_x_max)
+
+            mask = Image.new('L', am.size, 0)
+            draw = ImageDraw.Draw(mask)
+            polygon_points = [(int(am.size[0] - point[0]/4), int(am.size[1] - point[1])) for point in data["shapes"][2]["points"]]
+            print("AAAAAAAAAAAAAAAAAAAAAAAAAAA", polygon_points)
+            draw.polygon(polygon_points, fill=255)
+
+            rgbimg = Image.new("RGBA", am.size, (0, 255, 0, 255))
+            rgbimg.paste(am)
+            print(rgbimg.size)
+            rgbimg.paste('red', mask=mask)
+            rgbimg.save('a_full.png')
+            
+
+            am = convert_to_image(self.port_data[data_y_min:data_y_max, data_x_min:data_x_max], True, False, channel_min=2, auto_scale=False, scale=34, color_scheme="greylog", cmap=None)
+            
+            mask = Image.new('L', am.size, 0)
+
+            # Create a draw object for the mask
+            draw = ImageDraw.Draw(mask)
+
+            # Define the points of the polygon
+            polygon_points = [(data_y_max - (self.port_data.shape[0] - int(point[1] * self.stretch)), (data_x_max - data_x_min) - (data_x_max - (int(point[0] / self.decimation)))) for point in data["shapes"][2]["points"]]
+            polygon_points = [((data_x_max - data_x_min) - (data_x_max - (int(point[0] / self.decimation))), (data_y_max - data_y_min) - (data_y_max - (self.port_data.shape[0] - int(point[1] * self.stretch)))) for point in data["shapes"][2]["points"]]
+            
+            #polygon_points = [(x1, y1), (x2, y2), (x3, y3), ...]
+            polygon_points = [((data_x_max - data_x_min) - (data_x_max - (int(point[0] / self.decimation))), (data_y_max - data_y_min) - (data_y_max - (self.port_data.shape[0] - int(point[1] * self.stretch)))) for point in data["shapes"][2]["points"]]
+            
+            print(polygon_points)
+            # Draw the polygon on the mask
+            draw.polygon(polygon_points, fill=255)
+
+            rgbimg = Image.new("RGBA", am.size, (0, 255, 0, 255))
+            rgbimg.paste(am)
+            print(rgbimg.size)
+
+            # Apply the mask to the original image  
+            rgbimg.paste('red', mask=mask)
+
+            # Save the modified image
+            rgbimg.save('bbbb.png')
+            am.save("aaa.png")"""
+
+            
+            """dat = []
+            for i in range(10):
+                dat.append(np.array([0,1,2,3,4,5,6,7,8,9])[::-1])
+            print(dat)
+            for i in range(10):
+                dat[i] = dat[i][::-1]
+            print(dat)"""
+
 
     def is_point_in_rectangle(self, point, rectangle):
         x, y = point
