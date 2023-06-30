@@ -20,7 +20,6 @@ class Canvas(QGraphicsView):
 
     def __init__(self, parent):
         super(Canvas, self).__init__(parent)
-        self.par = parent
         self._zoom = 0
         self._empty = True
         self._scene = QGraphicsScene(self)
@@ -100,6 +99,8 @@ class Canvas(QGraphicsView):
         for polygon in self.selected_polygons:
             k = 0
             for j, item in enumerate(self._polygons):
+                if item == None:
+                    continue
                 if item != "del":
                     k += 1
                     if item["polygon"] == polygon:
@@ -109,7 +110,7 @@ class Canvas(QGraphicsView):
                 self.scene().removeItem(i)
             self.scene().removeItem(polygon)
             self._polygons[polygon._polygon_idx] = "del"
-            self.par.polygons_list_widget.takeItem(k - 1)
+            self.parent().parent().polygons_list_widget.takeItem(k - 1)
             
         self.selected_polygons = []
 
@@ -339,7 +340,7 @@ class Canvas(QGraphicsView):
                         polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons), self.selected_class, [*POLY_COLORS[label_idx], 120])
                         polygon.setPolygon(QPolygonF([QPointF(x[0], x[1]) for x in polygon._polygon_corners]))
                         self.scene().addItem(polygon)
-                        self.par.polygons_list_widget.addItem(ListWidgetItem(self.selected_class, POLY_COLORS[label_idx], checked=True))
+                        self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(self.selected_class, POLY_COLORS[label_idx], checked=True))
 
                         # Add items to the global list of drawn figures. Corners are added just to created indexes for future objects!
                         self._polygons.append({"polygon": polygon, "corners": [x for x in range(len(polygon._polygon_corners))]})
@@ -363,6 +364,7 @@ class Canvas(QGraphicsView):
                     self.selected_polygons = []
                 
                 if isinstance(self.items(event.position().toPoint())[0], Polygon):
+                    self.parent().parent().delete_polygons_btn.setEnabled(True)
                     added = False
                     x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
                     y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
@@ -434,6 +436,7 @@ class Canvas(QGraphicsView):
                     self.selected_polygons = []
             self.mouse_pressed = True
         self.mouse_moved = False
+        print(self.selected_polygons)
         super().mousePressEvent(event)
 
     ################################################
@@ -483,18 +486,19 @@ class Canvas(QGraphicsView):
         global X_POS, Y_POS
 
         if self.x_padding != None:
-            self.par.mouse_coords = event.position()
+            self.parent().parent().mouse_coords = event.position()
             
             # Get position of the cursor and calculate its position on a full size data
-            x = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom) * self.par.decimation
-            y = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom) / self.par.stretch
-            self.par.location_label3.setText(f"X: {round(x, 2)}, Y: {round(y, 2)}")
+            x = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom) * self.parent().parent().decimation
+            y = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom) / self.parent().parent().stretch
+            self.parent().parent().location_label3.setText(f"X: {round(x, 2)}, Y: {round(y, 2)}")
 
             # Get vertical middle point of the image in reference to a cursor current position
-            middle_point = ((self.scene().sceneRect().width() * self.par.decimation) / 2, event.position().y() / self.par.stretch)
+            middle_point = ((self.scene().sceneRect().width() * self.parent().parent().decimation) / 2, event.position().y() / self.parent().parent().stretch)
             
             # Get gyro angle of the currently highlighted ping
-            angle_rad = math.radians(self.par.coords[math.floor(y)]["gyro"])
+            #print(self.parent().parent().stretch, y, len(self.parent().parent().coords))
+            angle_rad = math.radians(self.parent().parent().coords[math.floor(y)]["gyro"])
             
             # Calculate cursor coordinate in reference to a middle point
             diff_x = x - middle_point[0]
@@ -505,22 +509,22 @@ class Canvas(QGraphicsView):
             rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
             
             # Convert cursor position from pixels to UTM system and add it to the middle point (also UTM)
-            converted_x = self.par.coords[math.floor(y)]['x'] + (rotated_x * self.par.accross_interval / self.par.decimation)
-            converted_y = self.par.coords[math.floor(y)]['y'] + (rotated_y * self.par.along_interval)
-            self.par.location_label.setText(f"N: {round(converted_x, 4): .4f}, E: {round(converted_y, 4): .4f}")
+            converted_x = self.parent().parent().coords[math.floor(y)]['x'] + (rotated_x * self.parent().parent().accross_interval / self.parent().parent().decimation)
+            converted_y = self.parent().parent().coords[math.floor(y)]['y'] + (rotated_y * self.parent().parent().along_interval)
+            self.parent().parent().location_label.setText(f"N: {round(converted_x, 4): .4f}, E: {round(converted_y, 4): .4f}")
             
-            print(x,y , diff_x, diff_y, rotated_x, rotated_y,converted_x , converted_y, middle_point, angle_rad, self.par.coords[math.floor(y)]["gyro"])
+            #print(x,y , diff_x, diff_y, rotated_x, rotated_y,converted_x , converted_y, middle_point, angle_rad, self.parent().parent().coords[math.floor(y)]["gyro"])
             # Convert UTM to longitude and latitude coordinates
             try:
-                zone_letter = self.par.utm_zone[-1]
-                p = Proj(proj='utm', zone=int(self.par.utm_zone[:-1]), ellps=self.par.crs, south=False)
+                zone_letter = self.parent().parent().utm_zone[-1]
+                p = Proj(proj='utm', zone=int(self.parent().parent().utm_zone[:-1]), ellps=self.parent().parent().crs, south=False)
                 lon, lat = p(converted_x, converted_y, inverse=True)
                 if zone_letter != 'N':
                     lat = -lat
-                self.par.location_label2.setText(f"Lat: {lat: .6f}, Lon: {lon: .6f}")
+                self.parent().parent().location_label2.setText(f"Lat: {lat: .6f}, Lon: {lon: .6f}")
             except:
-                print("Wrong coordinate system")
-                self.par.location_label2.setText(f"Lat: 0, Lon: 0")
+                #print("Wrong coordinate system")
+                self.parent().parent().location_label2.setText(f"Lat: 0, Lon: 0")
 
         if self._panning:
             delta = event.position() - self._last_pos

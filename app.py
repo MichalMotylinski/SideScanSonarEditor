@@ -1179,7 +1179,7 @@ class MyWindow(QMainWindow):
     def update_stretch(self):
         if "QSlider" not in str(type(self.sender())):
             return
-        self.stretch = self.sender().value()
+        
         self.stretch_label.setText(f"Stretch: {str(self.sender().value())}")
         self.stretch_label.adjustSize()
 
@@ -2111,6 +2111,10 @@ class MyWindow(QMainWindow):
 
     def load_data(self):
         self.clear_labels()
+
+        self.stretch_slider.setValue(self.stretch)
+        self.stretch = int(self.stretch_slider.value())
+
         with open(f"{self.image_filename}.json", "r") as f:
             data = json.load(f)
 
