@@ -63,6 +63,7 @@ class MyWindow(QMainWindow):
         self.polygon_data = {}
         #self.selected_class = None
         #self.classes = []
+        self.old_classes = {}
         
         # Image display params
         self._port_channel_min = 0
@@ -957,6 +958,11 @@ class MyWindow(QMainWindow):
         self.add_label_btn.setText("Add label")
         self.add_label_btn.clicked.connect(self.add_label)
 
+        self.edit_label_btn = QPushButton(self.labels_list_groupbox)
+        self.edit_label_btn.setGeometry(280, 30, 80, 20)
+        self.edit_label_btn.setText("Edit label")
+        self.edit_label_btn.clicked.connect(self.edit_label)
+
         self.label_list_widget = QListWidget(self.labels_list_groupbox)
         self.label_list_widget.setGeometry(60, 70, 200, 115)
         self.label_list_widget.itemSelectionChanged.connect(self.on_label_list_selection)
@@ -990,6 +996,10 @@ class MyWindow(QMainWindow):
     def load_split(self):
         if self.port_data is None and self.starboard_data is None:
             return
+
+        # Clear list of polygons
+        for i in range(self.polygons_list_widget.count()):
+            self.polygons_list_widget.takeItem(0)
 
         # Load port and starboarrd data
         start = time.perf_counter()
@@ -1072,7 +1082,7 @@ class MyWindow(QMainWindow):
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
 
-                self.label_list_widget.addItem(ListWidgetItem(item, POLY_COLORS[label_idx], checked=True))
+                self.label_list_widget.addItem(ListWidgetItem(item, label_idx, POLY_COLORS[label_idx], checked=True))
                 self.canvas.classes[label_idx] = item
 
     def on_label_list_selection(self):
@@ -1093,15 +1103,16 @@ class MyWindow(QMainWindow):
         return
     
     def add_label(self):
-        dialog = DialogWindow(self)
+        # Open dialog label to add a new label to the list
+        dialog = AddLabelDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             if dialog.textbox.text() not in self.canvas.classes.values():
                 label_idx = self.canvas.get_label_idx(None)
 
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
-
-                self.label_list_widget.addItem(ListWidgetItem(dialog.textbox.text(), POLY_COLORS[label_idx], checked=True))
+                
+                self.label_list_widget.addItem(ListWidgetItem(dialog.textbox.text(), label_idx, POLY_COLORS[label_idx], checked=True))
                 self.canvas.classes[label_idx] = dialog.textbox.text()
 
     def remove_label(self):
@@ -1122,7 +1133,51 @@ class MyWindow(QMainWindow):
         self.label_list_widget.takeItem(idx)
         self.canvas.classes[label_idx] = None
 
+    def edit_label(self):
+        old_label = self.label_list_widget.currentItem().text()
+        label_idx = self.canvas.get_label_idx(old_label)
+
+        # Open AddLabelDialog for user to provide a new label name
+        dialog = AddLabelDialog(self)
+        dialog.textbox.setText(self.label_list_widget.currentItem().text())
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_label = dialog.textbox.text()
+
+            # Get all labels used
+            labels_used = []
+            for polygon in self.canvas._polygons:
+                if polygon == None:
+                    continue
+                if polygon == "del":
+                    continue
+                labels_used.append(polygon["polygon"].polygon_class)
+
+            idx = self.label_list_widget.currentRow()
+            if idx < 0:
+                return
+
+            # If label is used then find and change every polygon's label using it.
+            if old_label in labels_used:
+                for polygon in self.canvas._polygons:
+                    if polygon == None:
+                        continue
+                    if polygon == "del":
+                        continue
+                    if polygon["polygon"].polygon_class == old_label:
+                        polygon["polygon"].polygon_class = self.label_list_widget.currentItem().text()
+            
+            # Change label name in other lists that use it
+            self.label_list_widget.currentItem().setText(new_label)
+            self.canvas.selected_class = new_label
+            self.canvas.classes[label_idx] = new_label
+
+            for i in range(self.polygons_list_widget.count()):
+                item = self.polygons_list_widget.item(i)
+                if item.text() == old_label:
+                    item.setText(new_label)
+            
     def clear_labels(self):
+        # Clear label list widgets from all labels.
         for i in range(self.polygons_list_widget.count()):
             self.polygons_list_widget.takeItem(0)
         for i in range(self.label_list_widget.count()):
@@ -1130,7 +1185,11 @@ class MyWindow(QMainWindow):
         self.canvas.classes = {}
 
     def on_polygon_item_changed(self, item):
-        self.canvas.hide_polygon(self.polygons_list_widget.row(item), item.checkState())
+        print(self.polygons_list_widget.row(item))
+        print("AAAAAAAAAAAAAAAAAA", item.text(), self.polygons_list_widget.item(0))
+        print(self.canvas._polygons)
+        if self.polygons_list_widget.currentItem() != None:
+            self.canvas.hide_polygon(self.polygons_list_widget.currentItem().label_idx, item.checkState())
     
     def init_bottom_bar(self):
         self.bottom_bar_groupbox = QGroupBox(self)
@@ -1978,6 +2037,7 @@ class MyWindow(QMainWindow):
             polygons = {}
             j = 0
             split_size = floor(self.full_image_height / self.splits)
+            old_classes = {}
 
             for polygon_data in new_polygons:
                 # If polygon not on the slice load it from file
@@ -1986,6 +2046,9 @@ class MyWindow(QMainWindow):
                 if polygon_data == None:
                     if str(j) in old_polygons["shapes"].keys():
                         polygons[j] = old_polygons["shapes"][str(j)]
+
+                        if polygons[j]["label"] not in old_classes.values():
+                            old_classes[len(old_classes)] = polygons[j]["label"]
                         j += 1
                 elif polygon_data == "del":
                     polygons[j] = "del"
@@ -2000,11 +2063,22 @@ class MyWindow(QMainWindow):
                     polygons[j] = {"label": polygon_data["polygon"].polygon_class,
                                    "points": corners}
                     j += 1
-            
+                
             # Remove polygons from dict 
             for key in list(polygons.keys()):
                 if polygons[key] == "del":
                     del polygons[key]
+
+            # Update list of labels used
+            new_classes = {}
+            for key in list(polygons.keys()):
+                old_class = polygons[key]["label"]
+                if old_class not in new_classes.keys():
+                    lab = self.canvas.classes[self.old_classes[polygons[key]["label"]]]
+                    polygons[key]["label"] = lab
+                    new_classes[polygons[key]["label"]] = self.old_classes[old_class]
+                
+            self.old_classes = new_classes
 
             # Reorder dict
             new_polygons = {}
@@ -2142,12 +2216,14 @@ class MyWindow(QMainWindow):
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
                 
-                if polygons[key]["label"] not in set(self.canvas.classes.keys()):
-                    self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], POLY_COLORS[label_idx], checked=True))
-                    self.polygons_list_widget.addItem(ListWidgetItem(polygons[key]["label"], POLY_COLORS[label_idx], checked=True))
+                # Add labels to the list
+                if polygons[key]["label"] not in set(self.canvas.classes.values()):
+                    self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True))
                     self.canvas.classes[label_idx] = polygons[key]["label"]
-                    
+                    self.old_classes[polygons[key]["label"]] = label_idx
             self.polygons_data = polygons
+            # Clear list of selected polygons
+            self.canvas.selected_polygons = []
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
         old_range = old_max - old_min
