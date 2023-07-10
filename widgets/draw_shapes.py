@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QLineF, QPointF,  Qt
 from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygonF, QPainterPath, QVector2D
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QDialog, QLineEdit, QVBoxLayout, QPushButton, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QComboBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
     def __init__(self, rect, shift, polygon_idx, ellipse_idx, color):
@@ -103,7 +103,6 @@ class Polygon(QGraphicsPolygonItem):
         return self._polygon_corners
 
     def hoverEnterEvent(self, event):
-        #color = [255 if x != 0 else x for x in self.color]
         self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
         self.setPen(QPen(QColor(255, 255, 255)))
     
@@ -114,30 +113,37 @@ class Polygon(QGraphicsPolygonItem):
         self.setPen(QPen(QColor(*self.color[:-1])))
 
 class ListWidgetItem(QListWidgetItem):
-    def __init__(self, text, color, checked=False, parent=None):
+    """
+    Create ListWidgetItem with a checkbox, circle icon and a label name.
+    """
+    def __init__(self, text, idx, color, checked=False, parent=None):
         super().__init__(parent)
 
-        self.color = color
-        
-        circle_size = 16
-        circle_color = QColor(*color)
-        circle_pixmap = QPixmap(circle_size, circle_size)
-        circle_pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(circle_pixmap)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(circle_color)
-        painter.drawEllipse(0, 0, circle_size, circle_size)
-        painter.end()
+        self.label_idx = idx        
+        self.circle_size = 16
+        self.circle_pixmap = QPixmap(self.circle_size, self.circle_size)
+        self.circle_pixmap.fill(Qt.GlobalColor.transparent)
  
         self.setText(text)
         self.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
-        
         self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-        self.setIcon(QIcon(circle_pixmap))
-        
+        self.set_color(color)
         self.setToolTip(text)
 
-class DialogWindow(QDialog):
+    def set_color(self, color):
+        # Set color of the ListWidgetItem circle
+        self.color = color
+        painter = QPainter(self.circle_pixmap)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(*self.color))
+        painter.drawEllipse(0, 0, self.circle_size, self.circle_size)
+        painter.end()
+        self.setIcon(QIcon(self.circle_pixmap))
+
+class AddLabelDialog(QDialog):
+    """
+    Context dialog used for adding a new class label.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -145,8 +151,39 @@ class DialogWindow(QDialog):
         self.setMinimumSize(200, 80)
         self.setMaximumSize(200, 80)
 
+        # Textbox for new label name input
         self.textbox = QLineEdit(self)
         self.textbox.setGeometry(10, 10, 180, 25)
+
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.setGeometry(10, 45, 70, 25)
+        self.ok_button.clicked.connect(self.accept)
+
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.setGeometry(120, 45, 70, 25)
+        self.cancel_button.clicked.connect(self.reject)
+
+class EditPolygonLabelDialog(QDialog):
+    """
+    Context dialog used for selection of a new label for the polygons.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Edit label")
+        self.setMinimumSize(200, 80)
+        self.setMaximumSize(200, 80)
+
+        # Get labels used
+        items = []
+        for i in range(self.parent().parent().parent().label_list_widget.count()):
+            items.append(self.parent().parent().parent().label_list_widget.item(i).text())
+
+        # Label selection box
+        self.combobox = QComboBox(self)
+        self.combobox.addItems(items)
+        self.combobox.setGeometry(10, 10, 180, 25)
+        self.combobox.setCurrentText(self.parent().selected_polygons[-1].polygon_class)
 
         self.ok_button = QPushButton("OK", self)
         self.ok_button.setGeometry(10, 45, 70, 25)
