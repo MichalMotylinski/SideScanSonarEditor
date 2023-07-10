@@ -71,26 +71,16 @@ class Canvas(QGraphicsView):
 
         # Create context menu
         self.menu = QMenu(self)
-        context_menu_action_1 = self.menu.addAction("Draw Polygons")
-        context_menu_action_2 = self.menu.addAction("Edit Polygons")
-        context_menu_action_3 = self.menu.addAction("Remove Polygons")
-        context_menu_action_4 = self.menu.addAction("Duplicate Polygons")
-        context_menu_action_5 = self.menu.addAction("Copy Polygons")
-        context_menu_action_6 = self.menu.addAction("Remove Selected Point")
-        context_menu_action_7 = self.menu.addAction("Edit Label")
-        context_menu_action_8 = self.menu.addAction("Undo")
-        context_menu_action_9 = self.menu.addAction("Redo")
+        self.delete_polygons_action = self.menu.addAction("Remove Polygons")
+        self.duplicate_polygons_action = self.menu.addAction("Duplicate Polygons")
+        self.remove_point_action = self.menu.addAction("Remove Selected Point")
+        self.edit_polygon_label_action = self.menu.addAction("Edit Polygon Label")
 
         # Connect the actions to slots
-        context_menu_action_1.triggered.connect(self.on_context_menu_action_1)
-        context_menu_action_2.triggered.connect(self.on_context_menu_action_2)
-        context_menu_action_3.triggered.connect(self.on_context_menu_action_3)
-        context_menu_action_4.triggered.connect(self.on_context_menu_action_4)
-        context_menu_action_5.triggered.connect(self.on_context_menu_action_5)
-        context_menu_action_6.triggered.connect(self.on_context_menu_action_6)
-        context_menu_action_7.triggered.connect(self.on_context_menu_action_7)
-        context_menu_action_8.triggered.connect(self.on_context_menu_action_8)
-        context_menu_action_9.triggered.connect(self.on_context_menu_action_9)
+        self.delete_polygons_action.triggered.connect(self.on_delete_polygons_action)
+        self.duplicate_polygons_action.triggered.connect(self.on_duplicate_polygons_action)
+        self.remove_point_action.triggered.connect(self.on_remove_point_action)
+        self.edit_polygon_label_action.triggered.connect(self.on_edit_polygon_label_action)
 
         self.show()
 
@@ -121,7 +111,11 @@ class Canvas(QGraphicsView):
         self._polygons = []
 
     def hide_polygons(self, label, state):
+        # Loop over polygons of selected label and hide them from user's view
         for polygon in self._polygons:
+            # Ignore if not in current split
+            if polygon == None:
+                continue
             if polygon["polygon"].polygon_class == label:
                 if state == Qt.CheckState.Checked:
                     polygon["polygon"].setVisible(True)
@@ -133,6 +127,7 @@ class Canvas(QGraphicsView):
                         point.setVisible(False)
     
     def hide_polygon(self, idx, state):
+        # Hide a singular polygon
         if state == Qt.CheckState.Checked:
             self._polygons[idx]["polygon"].setVisible(True)
             for point in self._polygons[idx]["corners"]:
@@ -223,6 +218,9 @@ class Canvas(QGraphicsView):
                     rect = Ellipse(QRectF(QPointF(item[0] / decimation, (top - item[1]) * stretch), self.ellipse_size), self.ellipse_shift, idx, i, POLY_COLORS[label_idx])
                     self.scene().addItem(rect)
                     self._polygons[-1]["corners"].append(self.scene().items()[0])
+                
+                # When loading polygons add labels to the labels list
+                self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True))
             else:
                 # If not in range append None to create space for items from other splits
                 self._polygons.append(None)
@@ -340,7 +338,7 @@ class Canvas(QGraphicsView):
                         polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons), self.selected_class, [*POLY_COLORS[label_idx], 120])
                         polygon.setPolygon(QPolygonF([QPointF(x[0], x[1]) for x in polygon._polygon_corners]))
                         self.scene().addItem(polygon)
-                        self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(self.selected_class, POLY_COLORS[label_idx], checked=True))
+                        self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(self.selected_class, label_idx, POLY_COLORS[label_idx], checked=True))
 
                         # Add items to the global list of drawn figures. Corners are added just to created indexes for future objects!
                         self._polygons.append({"polygon": polygon, "corners": [x for x in range(len(polygon._polygon_corners))]})
@@ -359,12 +357,14 @@ class Canvas(QGraphicsView):
                 # If not in drawing mode select item that was clicked
                 if len(self.items(event.position().toPoint())) == 0:
                     return
+                
                 if isinstance(self.items(event.position().toPoint())[0], Ellipse):
                     self.selected_corner = self.items(event.position().toPoint())[0]
                     self.selected_polygons = []
                 
                 if isinstance(self.items(event.position().toPoint())[0], Polygon):
                     self.parent().parent().delete_polygons_btn.setEnabled(True)
+
                     added = False
                     x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
                     y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
@@ -466,12 +466,11 @@ class Canvas(QGraphicsView):
                         if self.items(event.position().toPoint())[0] in self.selected_polygons:
                             if self.adding_polygon_to_list == False:
                                 self.selected_polygons.remove(self.items(event.position().toPoint())[0])
-                                self.items(event.position().toPoint())[0]._selected = False
-
+                                
                                 label_idx = self.get_label_idx(self.items(event.position().toPoint())[0].polygon_class)
                                 self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
                                 self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 0, 0)))
-
+                        
             self.adding_polygon_to_list = False
             self.mouse_pressed = False
         self.mouse_moved = False
@@ -647,47 +646,134 @@ class Canvas(QGraphicsView):
     # Right mouse click Context Menu actions
     ################################################
     def contextMenuEvent(self, event):
-        # Create a scene position from the view's mouse position
+        # Convert window view mouse position to a canvas scene position
         pos = self.mapToScene(event.pos())
+
+        if self.items(event.pos()) == []:
+            return
+
+        # Activate/Deactivate context menu options depending on a clicked object
+        if isinstance(self.items(event.pos())[0], Polygon):
+            self.delete_polygons_action.setEnabled(True)
+            self.edit_polygon_label_action.setEnabled(True)
+            self.duplicate_polygons_action.setEnabled(True)
+            self.remove_point_action.setEnabled(False)
+
+            if self.items(event.pos())[0] not in self.selected_polygons:
+                self.selected_polygons.append(self.items(event.pos())[0])
+        elif isinstance(self.items(event.pos())[0], Ellipse):
+            self.remove_point_action.setEnabled(True)
+            self.edit_polygon_label_action.setEnabled(False)
+            self.delete_polygons_action.setEnabled(False)
+            self.duplicate_polygons_action.setEnabled(False)
+
+            self.selected_corner = self.items(event.pos())[0]
+        else:
+            self.edit_polygon_label_action.setEnabled(False)
+            self.delete_polygons_action.setEnabled(False)
+            self.duplicate_polygons_action.setEnabled(False)
+            self.remove_point_action.setEnabled(False)
 
         # Show the menu at the mouse position
         self.menu.exec(event.globalPos())
 
-    def on_context_menu_action_1(self):
-        # Draw polygons
-        pass
+    def on_delete_polygons_action(self):
+        # Delete polygons
+        self.delete_polygons()
 
-    def on_context_menu_action_2(self):
-        # Edit polygons
-        pass
-
-    def on_context_menu_action_3(self):
-        # Remove polygons
-        pass
-
-    def on_context_menu_action_4(self):
+    def on_duplicate_polygons_action(self):
         # Duplicate polygons
-        pass
+        new_selected_polygons = []
+        for polygon in self.selected_polygons:
+            # Get new coords for each point of the polygon
+            polygon_copy = polygon.polygon()
+            for i, item in enumerate(polygon_copy):
+                polygon_copy[i] = QPointF(item.x() + 1, item.y() + 1)
+            
+            # Create new polygon
+            label_idx = self.get_label_idx(polygon.polygon_class)
+            new_polygon = Polygon(polygon_copy, len(self._polygons), polygon.polygon_class, [*POLY_COLORS[label_idx], 200])
+            new_polygon.setPen(QPen(QColor(255, 255, 255)))
+            self.scene().addItem(new_polygon)
 
-    def on_context_menu_action_5(self):
-        # Copy polygons
-        pass
+            self._polygons.append({"polygon": None, "corners": []})
+            self.scene().items()[0]._selected = True
+            self._polygons[-1]["polygon"] = self.scene().items()[0]
+            self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(polygon.polygon_class, label_idx, POLY_COLORS[label_idx], checked=True))
+            new_selected_polygons.append(self.scene().items()[0])
 
-    def on_context_menu_action_6(self):
-        # Remove Selected Point
-        pass
+            # Create new corners
+            for i, item in enumerate(self._polygons[polygon.polygon_idx]["corners"]):
+                rect = Ellipse(QRectF(QPointF(polygon._polygon_corners[i][0] + 1, polygon._polygon_corners[i][1] + 1), self.ellipse_size), self.ellipse_shift, polygon.polygon_idx, i, POLY_COLORS[label_idx])
+                rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                self.scene().addItem(rect)
+                self._polygons[-1]["corners"].append(self.scene().items()[0])
+            polygon._selected = False
+            polygon.hoverLeaveEvent(None)
+        # Select newly created polygons
+        self.selected_polygons = new_selected_polygons
 
-    def on_context_menu_action_7(self):
-        # Edit polygon label
-        pass
+    def on_remove_point_action(self):
+        # Remove a single polygon corner
+        polygon_item = self._polygons[self.selected_corner.polygon_idx]
+        label_idx = self.get_label_idx(polygon_item["polygon"].polygon_class)
+        
 
-    def on_context_menu_action_8(self):
-        # Undo
-        pass
+        # Remove polygon and all corners from the scene
+        self.scene().removeItem(polygon_item["polygon"])
+        for j in polygon_item["corners"]:
+            self.scene().removeItem(j)
+        
+        # Remove corner from the list of corners
+        if self.selected_corner.ellipse_idx == 0 or self.selected_corner.ellipse_idx == len(polygon_item["corners"]) - 1:
+            rect = Ellipse(QRectF(polygon_item["corners"][1].position, self.ellipse_size), self.ellipse_shift, polygon_item["polygon"].polygon_idx, len(polygon_item["corners"]) - 2, [*POLY_COLORS[label_idx]])
+            polygon_item["corners"].pop(len(polygon_item["corners"]) - 1)
+            polygon_item["corners"].pop(0)
+            polygon_item["corners"].append(rect)
+        else:
+            polygon_item["corners"].remove(self.selected_corner)
 
-    def on_context_menu_action_9(self):
-        # Redo
-        pass
+        # Create a new polygon and corners
+        polygon_copy = Polygon(QPolygonF([x.position for x in polygon_item["corners"]]), polygon_item["polygon"].polygon_idx, polygon_item["polygon"].polygon_class, [*POLY_COLORS[label_idx], 200])
+        self.scene().addItem(polygon_copy)
+        polygon_item["polygon"] = self.scene().items()[0]
+
+        for j, item in enumerate(polygon_item["corners"]):
+            item.ellipse_idx = j
+            self.scene().addItem(item)
+            polygon_item["corners"][j] = self.scene().items()[0]
+        
+    def on_edit_polygon_label_action(self):
+        # Edit polygon's label
+        dialog = EditPolygonLabelDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_label = dialog.combobox.currentText()
+            
+            # Loop over all selected polygons
+            for polygon in self.selected_polygons:
+                # Modify polygon's class and color
+                polygon.polygon_class = new_label
+                label_idx = self.get_label_idx(new_label)
+                polygon.color =  [*POLY_COLORS[label_idx], 200]
+                polygon.setBrush(QBrush(QColor(*polygon.color)))
+                polygon.setPen(QPen(QColor(*polygon.color[:-1]), 1))
+
+                # Modify corners accordingly
+                for corner in self._polygons[polygon.polygon_idx]["corners"]:
+                    corner.color = [*POLY_COLORS[label_idx], 200]
+                    corner.setBrush(QBrush(QColor(*corner.color)))
+                    corner.setPen(QPen(QColor(*corner.color), 1))
+                
+                # Find index of the polygon in the polygons list and modify its entry
+                none_index = 0
+                for i in range(polygon.polygon_idx, -1, -1):
+                    if self._polygons[i] is None:
+                        none_index = i + 1
+                        break
+
+                self.parent().parent().polygons_list_widget.item(polygon.polygon_idx - none_index).set_color([*POLY_COLORS[label_idx], 255])
+                self.parent().parent().polygons_list_widget.item(polygon.polygon_idx - none_index).label_idx = label_idx
+                self.parent().parent().polygons_list_widget.item(polygon.polygon_idx - none_index).setText(polygon.polygon_class)
 
     def distance(self, x1, y1, x2, y2):
         return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
