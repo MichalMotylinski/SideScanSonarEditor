@@ -23,7 +23,7 @@ class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
         
-        self.setGeometry(200, 0, 1220, 1000)
+        self.setGeometry(200, 40, 1220, 780)
         self.setMinimumWidth(1220)
         self.setWindowTitle("SSS")
         
@@ -862,115 +862,132 @@ class MyWindow(QMainWindow):
 
         self.side_toolbar_groupbox = QGroupBox(self)
         self.side_toolbar_groupbox.setMinimumWidth(330)
-        #self.side_toolbar_groupbox.setTitle('Group Box Example')
         self.side_toolbar_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+        
+        ################################################
+        # Splits group box
+        ################################################
+        self.splits_groupbox = QGroupBox(self.side_toolbar_groupbox)
+        self.splits_groupbox.setGeometry(0, 0, 320, 120)
+        self.splits_groupbox.setMinimumWidth(330)
+        #self.splits_groupbox.setTitle('Splits')
+        self.splits_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
 
-        self.splits_label = QLabel(self.side_toolbar_groupbox)
-        self.splits_label.setGeometry(20, 30, 100, 20)
+        self.splits_label = QLabel(self.splits_groupbox)
+        self.splits_label.setGeometry(10, 10, 80, 22)
         self.splits_label.setText("Max splits")
 
-        self.splits_textbox = QLineEdit(self.side_toolbar_groupbox)
-        self.splits_textbox.setGeometry(20, 50, 50, 20)
+        self.splits_textbox = QLineEdit(self.splits_groupbox)
+        self.splits_textbox.setGeometry(90, 10, 50, 22)
         self.splits_textbox.setValidator(zero_int_validator)
         self.splits_textbox.setText("1")
         self.splits_textbox.editingFinished.connect(self.update_splits_textbox)
 
-        self.selected_split_label = QLabel(self.side_toolbar_groupbox)
-        self.selected_split_label.setGeometry(120, 30, 100, 20)
+        self.selected_split_label = QLabel(self.splits_groupbox)
+        self.selected_split_label.setGeometry(10, 35, 80, 22)
         self.selected_split_label.setText("Selected split")
 
-        self.selected_split_spinbox = QSpinBox(self.side_toolbar_groupbox)
-        self.selected_split_spinbox.setGeometry(120, 50, 50, 20)
+        self.selected_split_spinbox = QSpinBox(self.splits_groupbox)
+        self.selected_split_spinbox.setGeometry(90, 35, 50, 22)
         self.selected_split_spinbox.setMinimum(1)
         self.selected_split_spinbox.setMaximum(1)
         self.selected_split_spinbox.setValue(self.selected_split)
         self.selected_split_spinbox.valueChanged.connect(self.update_selected_split)
 
-        self.shift_label = QLabel(self.side_toolbar_groupbox)
-        self.shift_label.setGeometry(220, 30, 50, 20)
+        self.shift_label = QLabel(self.splits_groupbox)
+        self.shift_label.setGeometry(10, 60, 80, 22)
         self.shift_label.setText("Shift")
 
-        self.shift_textbox = QLineEdit(self.side_toolbar_groupbox)
-        self.shift_textbox.setGeometry(220, 50, 50, 20)
+        self.shift_textbox = QLineEdit(self.splits_groupbox)
+        self.shift_textbox.setGeometry(90, 60, 50, 22)
         self.shift_textbox.setValidator(zero_int_validator)
         self.shift_textbox.setText("0")
         self.shift_textbox.editingFinished.connect(self.update_shift_textbox)
         
-        self.load_split_btn = QPushButton(self.side_toolbar_groupbox)
-        self.load_split_btn.setGeometry(220, 90, 80, 20)
+        self.load_split_btn = QPushButton(self.splits_groupbox)
+        self.load_split_btn.setGeometry(30, 85, 80, 22)
         self.load_split_btn.setText("Show split")
         self.load_split_btn.clicked.connect(self.load_split)
 
-        self.draw_polygons_btn = QPushButton(self.side_toolbar_groupbox)
-        self.draw_polygons_btn.setGeometry(0, 150, 100, 20)
+        self.draw_polygons_btn = QPushButton(self.splits_groupbox)
+        self.draw_polygons_btn.setGeometry(210, 10, 100, 22)
         self.draw_polygons_btn.setText("Draw polygons")
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
         self.draw_polygons_btn.setEnabled(False)
 
-        self.edit_polygons_btn = QPushButton(self.side_toolbar_groupbox)
-        self.edit_polygons_btn.setGeometry(100, 150, 100, 20)
+        self.edit_polygons_btn = QPushButton(self.splits_groupbox)
+        self.edit_polygons_btn.setGeometry(210, 45, 100, 22)
         self.edit_polygons_btn.setText("Edit polygons")
         self.edit_polygons_btn.clicked.connect(self.edit_polygons)
 
-        self.delete_polygons_btn = QPushButton(self.side_toolbar_groupbox)
-        self.delete_polygons_btn.setGeometry(200, 150, 100, 20)
+        self.delete_polygons_btn = QPushButton(self.splits_groupbox)
+        self.delete_polygons_btn.setGeometry(210, 85, 100, 22)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
         self.delete_polygons_btn.setEnabled(False)
 
-        self.crs_label = QLabel(self.side_toolbar_groupbox)
-        self.crs_label.setGeometry(10, 180, 35, 20)
-        self.crs_label.setText("CRS")
-
-        self.crs_textbox = QLineEdit(self.side_toolbar_groupbox)
-        self.crs_textbox.setGeometry(45, 180, 80, 20)
-        self.crs_textbox.editingFinished.connect(self.update_crs)
-
-        self.utm_zone_label = QLabel(self.side_toolbar_groupbox)
-        self.utm_zone_label.setGeometry(150, 180, 60, 20)
-        self.utm_zone_label.setText("UTM zone")
-
-        self.utm_zone_textbox = QLineEdit(self.side_toolbar_groupbox)
-        self.utm_zone_textbox.setGeometry(220, 180, 80, 20)
-        self.utm_zone_textbox.editingFinished.connect(self.update_utm_zone)
-
         ################################################
         # Labels group box
         ################################################
-        self.labels_list_groupbox = QGroupBox(self.side_toolbar_groupbox)
-        self.labels_list_groupbox.setGeometry(0, 200, 320, 190)
-        self.labels_list_groupbox.setMinimumWidth(330)
-        self.labels_list_groupbox.setTitle('Labels')
-        self.labels_list_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+        self.labels_groupbox = QGroupBox(self.side_toolbar_groupbox)
+        self.labels_groupbox.setGeometry(0, 120, 320, 380)
+        self.labels_groupbox.setMinimumWidth(330)
+        #self.labels_groupbox.setTitle('Labels')
+        #self.labels_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
 
-        self.load_labels_btn = QPushButton(self.labels_list_groupbox)
-        self.load_labels_btn.setGeometry(10, 30, 80, 20)
+        self.load_labels_btn = QPushButton(self.labels_groupbox)
+        self.load_labels_btn.setGeometry(50, 10, 100, 22)
         self.load_labels_btn.setText("Load labels")
         self.load_labels_btn.clicked.connect(self.load_labels)
 
-        self.remove_label_btn = QPushButton(self.labels_list_groupbox)
-        self.remove_label_btn.setGeometry(100, 30, 80, 20)
+        self.remove_label_btn = QPushButton(self.labels_groupbox)
+        self.remove_label_btn.setGeometry(170, 10, 100, 22)
         self.remove_label_btn.setText("Remove label")
         self.remove_label_btn.clicked.connect(self.remove_label)
 
-        self.add_label_btn = QPushButton(self.labels_list_groupbox)
-        self.add_label_btn.setGeometry(190, 30, 80, 20)
+        self.add_label_btn = QPushButton(self.labels_groupbox)
+        self.add_label_btn.setGeometry(50, 35, 100, 22)
         self.add_label_btn.setText("Add label")
         self.add_label_btn.clicked.connect(self.add_label)
 
-        self.edit_label_btn = QPushButton(self.labels_list_groupbox)
-        self.edit_label_btn.setGeometry(280, 30, 80, 20)
+        self.edit_label_btn = QPushButton(self.labels_groupbox)
+        self.edit_label_btn.setGeometry(170, 35, 100, 22)
         self.edit_label_btn.setText("Edit label")
         self.edit_label_btn.clicked.connect(self.edit_label)
 
-        self.label_list_widget = QListWidget(self.labels_list_groupbox)
-        self.label_list_widget.setGeometry(60, 70, 200, 115)
+        self.label_list_widget = QListWidget(self.labels_groupbox)
+        self.label_list_widget.setGeometry(60, 70, 200, 140)
         self.label_list_widget.itemSelectionChanged.connect(self.on_label_list_selection)
         self.label_list_widget.itemChanged.connect(self.on_label_item_changed)
 
-        self.polygons_list_widget = QListWidget(self.side_toolbar_groupbox)
-        self.polygons_list_widget.setGeometry(60, 400, 200, 115)
+        self.polygons_list_widget = QListWidget(self.labels_groupbox)
+        self.polygons_list_widget.setGeometry(60, 230, 200, 140)
         self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
+
+        ################################################
+        # Coords group box
+        ################################################
+        self.coords_groupbox = QGroupBox(self.side_toolbar_groupbox)
+        self.coords_groupbox.setGeometry(0, 500, 200, 40)
+        self.coords_groupbox.setMinimumWidth(330)
+        #self.splits_groupbox.setTitle('Splits')
+        self.coords_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+
+        self.crs_label = QLabel(self.coords_groupbox)
+        self.crs_label.setGeometry(10, 10, 35, 20)
+        self.crs_label.setText("CRS")
+
+        self.crs_textbox = QLineEdit(self.coords_groupbox)
+        self.crs_textbox.setGeometry(45, 10, 80, 20)
+        self.crs_textbox.editingFinished.connect(self.update_crs)
+
+        self.utm_zone_label = QLabel(self.coords_groupbox)
+        self.utm_zone_label.setGeometry(150, 10, 60, 20)
+        self.utm_zone_label.setText("UTM zone")
+
+        self.utm_zone_textbox = QLineEdit(self.coords_groupbox)
+        self.utm_zone_textbox.setGeometry(220, 10, 80, 20)
+        self.utm_zone_textbox.editingFinished.connect(self.update_utm_zone)
 
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):

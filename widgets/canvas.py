@@ -127,6 +127,8 @@ class Canvas(QGraphicsView):
     
     def hide_polygon(self, idx, state):
         # Hide a singular polygon
+        if  idx >= len(self._polygons):
+            return
         if state == Qt.CheckState.Checked:
             self._polygons[idx]["polygon"].setVisible(True)
             for point in self._polygons[idx]["corners"]:
