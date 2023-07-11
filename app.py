@@ -971,7 +971,6 @@ class MyWindow(QMainWindow):
         self.polygons_list_widget = QListWidget(self.side_toolbar_groupbox)
         self.polygons_list_widget.setGeometry(60, 400, 200, 115)
         self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
-        
 
     def update_selected_split(self):
         if "QSpinBox" not in str(type(self.sender())):
@@ -1037,8 +1036,6 @@ class MyWindow(QMainWindow):
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
             self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
-        
-
         end = time.perf_counter()
         print("draw data", end-start)
 
@@ -1082,7 +1079,7 @@ class MyWindow(QMainWindow):
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
 
-                self.label_list_widget.addItem(ListWidgetItem(item, label_idx, POLY_COLORS[label_idx], checked=True))
+                self.label_list_widget.addItem(ListWidgetItem(item, label_idx, POLY_COLORS[label_idx], checked=True, parent=self.label_list_widget))
                 self.canvas.classes[label_idx] = item
 
     def on_label_list_selection(self):
@@ -1112,7 +1109,7 @@ class MyWindow(QMainWindow):
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
                 
-                self.label_list_widget.addItem(ListWidgetItem(dialog.textbox.text(), label_idx, POLY_COLORS[label_idx], checked=True))
+                self.label_list_widget.addItem(ListWidgetItem(dialog.textbox.text(), label_idx, POLY_COLORS[label_idx], checked=True, parent=self.label_list_widget))
                 self.canvas.classes[label_idx] = dialog.textbox.text()
 
     def remove_label(self):
@@ -1185,11 +1182,9 @@ class MyWindow(QMainWindow):
         self.canvas.classes = {}
 
     def on_polygon_item_changed(self, item):
-        print(self.polygons_list_widget.row(item))
-        print("AAAAAAAAAAAAAAAAAA", item.text(), self.polygons_list_widget.item(0))
-        print(self.canvas._polygons)
+        self.polygons_list_widget.setCurrentItem(item)
         if self.polygons_list_widget.currentItem() != None:
-            self.canvas.hide_polygon(self.polygons_list_widget.currentItem().label_idx, item.checkState())
+            self.canvas.hide_polygon(self.polygons_list_widget.currentItem().polygon_idx, item.checkState())
     
     def init_bottom_bar(self):
         self.bottom_bar_groupbox = QGroupBox(self)
@@ -2216,9 +2211,10 @@ class MyWindow(QMainWindow):
                 if label_idx == None:
                     label_idx = len(self.canvas.classes.items())
                 
+                #self.polygons_list_widget.setCurrentRow(0)
                 # Add labels to the list
                 if polygons[key]["label"] not in set(self.canvas.classes.values()):
-                    self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True))
+                    self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True, parent=self.label_list_widget))
                     self.canvas.classes[label_idx] = polygons[key]["label"]
                     self.old_classes[polygons[key]["label"]] = label_idx
             self.polygons_data = polygons

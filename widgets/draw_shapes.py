@@ -116,10 +116,11 @@ class ListWidgetItem(QListWidgetItem):
     """
     Create ListWidgetItem with a checkbox, circle icon and a label name.
     """
-    def __init__(self, text, idx, color, checked=False, parent=None):
+    def __init__(self, text, label_idx, color, polygon_idx=None, checked=False, parent=None):
         super().__init__(parent)
-
-        self.label_idx = idx        
+        self.checked = checked
+        self.label_idx = label_idx
+        self.polygon_idx = polygon_idx   
         self.circle_size = 16
         self.circle_pixmap = QPixmap(self.circle_size, self.circle_size)
         self.circle_pixmap.fill(Qt.GlobalColor.transparent)
@@ -139,7 +140,7 @@ class ListWidgetItem(QListWidgetItem):
         painter.drawEllipse(0, 0, self.circle_size, self.circle_size)
         painter.end()
         self.setIcon(QIcon(self.circle_pixmap))
-
+        
 class AddLabelDialog(QDialog):
     """
     Context dialog used for adding a new class label.

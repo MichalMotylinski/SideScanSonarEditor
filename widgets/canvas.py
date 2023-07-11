@@ -85,7 +85,6 @@ class Canvas(QGraphicsView):
         self.show()
 
     def delete_polygons(self):
-        print(self._polygons)
         for polygon in self.selected_polygons:
             k = 0
             for j, item in enumerate(self._polygons):
@@ -220,7 +219,8 @@ class Canvas(QGraphicsView):
                     self._polygons[-1]["corners"].append(self.scene().items()[0])
                 
                 # When loading polygons add labels to the labels list
-                self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True))
+                self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], polygon_idx=idx, checked=True, parent=self.parent().parent().polygons_list_widget))
+                self.parent().parent().polygons_list_widget.setCurrentRow(0)
             else:
                 # If not in range append None to create space for items from other splits
                 self._polygons.append(None)
@@ -338,7 +338,7 @@ class Canvas(QGraphicsView):
                         polygon = Polygon(QPolygonF([x.position for x in self.active_draw["corners"]]), len(self._polygons), self.selected_class, [*POLY_COLORS[label_idx], 120])
                         polygon.setPolygon(QPolygonF([QPointF(x[0], x[1]) for x in polygon._polygon_corners]))
                         self.scene().addItem(polygon)
-                        self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(self.selected_class, label_idx, POLY_COLORS[label_idx], checked=True))
+                        self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(self.selected_class, label_idx, POLY_COLORS[label_idx], polygon_idx=polygon.polygon_idx, checked=True, parent=self.parent().parent().polygons_list_widget))
 
                         # Add items to the global list of drawn figures. Corners are added just to created indexes for future objects!
                         self._polygons.append({"polygon": polygon, "corners": [x for x in range(len(polygon._polygon_corners))]})
@@ -436,7 +436,6 @@ class Canvas(QGraphicsView):
                     self.selected_polygons = []
             self.mouse_pressed = True
         self.mouse_moved = False
-        print(self.selected_polygons)
         super().mousePressEvent(event)
 
     ################################################
@@ -496,7 +495,6 @@ class Canvas(QGraphicsView):
             middle_point = ((self.scene().sceneRect().width() * self.parent().parent().decimation) / 2, event.position().y() / self.parent().parent().stretch)
             
             # Get gyro angle of the currently highlighted ping
-            #print(self.parent().parent().stretch, y, len(self.parent().parent().coords))
             angle_rad = math.radians(self.parent().parent().coords[math.floor(y)]["gyro"])
             
             # Calculate cursor coordinate in reference to a middle point
@@ -597,7 +595,6 @@ class Canvas(QGraphicsView):
                         self.scene().addItem(rect)
                         self.selected_corner = self.scene().items()[0]
                     else:
-                        #print("point not", i)
                         self.scene().addItem(item)
                     self._polygons[polygon_idx]["corners"][i] = self.scene().items()[0]
                     
@@ -699,7 +696,7 @@ class Canvas(QGraphicsView):
             self._polygons.append({"polygon": None, "corners": []})
             self.scene().items()[0]._selected = True
             self._polygons[-1]["polygon"] = self.scene().items()[0]
-            self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(polygon.polygon_class, label_idx, POLY_COLORS[label_idx], checked=True))
+            self.parent().parent().polygons_list_widget.addItem(ListWidgetItem(polygon.polygon_class, label_idx, POLY_COLORS[label_idx], polygon_idx=polygon.polygon_idx, checked=True, parent=self.parent().parent().polygons_list_widget))
             new_selected_polygons.append(self.scene().items()[0])
 
             # Create new corners
