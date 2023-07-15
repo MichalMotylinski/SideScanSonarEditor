@@ -23,8 +23,7 @@ class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
         
-        self.setGeometry(200, 40, 1220, 780)
-        self.setMinimumWidth(1220)
+        self.setGeometry(200, 40, 1180, 780)
         self.setWindowTitle("SSS")
         
         # File info
@@ -326,552 +325,388 @@ class MyWindow(QMainWindow):
     def starboard_cmap(self, val):
         self._starboard_cmap = val
 
-    def init_toolbox(self):
+    def init_top_toolbar(self):
         non_zero_double_validator = QDoubleValidator(0.0001, float("inf"), 10)
         zero_double_validator = QDoubleValidator(0, float("inf"), 10)
         non_zero_int_validator = QIntValidator(1, 2**31 - 1)
         font = QFont()
         font.setBold(True)
 
-        # Create main toolbox widget
-        self.toolbox_widget = QWidget(self)
-        self.toolbox_widget.setContentsMargins(0, 0, 0, 0)
-        self.toolbox_widget.setFixedSize(1190, 200)
+        self.top_toolbar_groupbox = QGroupBox(self)
+        self.top_toolbar_groupbox.setGeometry(0, 0, 320, 300)
+        self.top_toolbar_groupbox.setMinimumWidth(320)
+        self.top_toolbar_groupbox.setMinimumHeight(210)
+        self.top_toolbar_groupbox.setMaximumWidth(1180)
 
-        # Create toolbox inner layout
-        self.toolbox_layout = QHBoxLayout()
-        self.toolbox_layout.setContentsMargins(14, 14, 0, 0)
-        self.toolbox_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-        # Load data frame
-        self.load_data_frame = QFrame(self)
-        self.load_data_frame.setGeometry(9, 9, 329, 199)
-        self.load_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.load_data_frame.setLineWidth(1)
+        self.load_data_groupbox = QGroupBox(self.top_toolbar_groupbox)
+        self.load_data_groupbox.setGeometry(0, 0, 320, 300)
 
         # Open file button
-        self.open_file_btn = QPushButton(self)
-        self.open_file_btn.setFixedSize(100, 23)
+        self.open_file_btn = QPushButton(self.load_data_groupbox)
+        self.open_file_btn.setGeometry(50, 10, 100, 22)
         self.open_file_btn.setText("Open file")
         self.open_file_btn.clicked.connect(self.open_dialog)
 
         # Reload file button
-        self.reload_file_btn = QtWidgets.QPushButton(self)
-        self.reload_file_btn.setFixedSize(100, 23)
+        self.reload_file_btn = QtWidgets.QPushButton(self.load_data_groupbox)
+        self.reload_file_btn.setGeometry(180, 10, 100, 22)
         self.reload_file_btn.setText("Reload")
         self.reload_file_btn.clicked.connect(self.reload)
 
         # Save image button
-        self.save_btn = QtWidgets.QPushButton(self)
-        self.save_btn.setFixedSize(100, 23)
+        self.save_btn = QtWidgets.QPushButton(self.load_data_groupbox)
+        self.save_btn.setGeometry(115, 50, 100, 22)
         self.save_btn.setText("Save image")
         self.save_btn.clicked.connect(self.save_image)
 
-        self.load_file_layout = QHBoxLayout(self)
-        self.load_file_layout.addWidget(self.open_file_btn)
-        self.load_file_layout.addWidget(self.reload_file_btn)
-
-        self.data_buttons_layout = QVBoxLayout(self)
-        self.data_buttons_layout.addLayout(self.load_file_layout)
-        self.data_buttons_layout.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignCenter)
-
         # Loading data parameters
-        self.decimation_label = QLabel(self)
-        self.decimation_label.setFixedSize(200, 10)
+        self.decimation_label = QLabel(self.load_data_groupbox)
+        self.decimation_label.setGeometry(10, 90, 200, 10)
         self.decimation_label.setText(f"Decimation: {self.decimation}")
         self.decimation_label.adjustSize()
 
-        self.decimation_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.decimation_slider = QSlider(Qt.Orientation.Horizontal, self.load_data_groupbox)
+        self.decimation_slider.setGeometry(10, 110, 300, 15)
         self.decimation_slider.setMinimum(1)
         self.decimation_slider.setMaximum(10)
-        self.decimation_slider.setFixedSize(300, 15)
         self.decimation_slider.setValue(self.decimation)
         self.decimation_slider.setTickInterval(1)
         self.decimation_slider.valueChanged.connect(self.update_decimation)
 
-        self.decimation_layout = QVBoxLayout(self)
-        self.decimation_layout.addWidget(self.decimation_label)
-        self.decimation_layout.addWidget(self.decimation_slider)
-
         # Strech slider
-        self.stretch_label = QLabel(self)
-        self.stretch_label.setFixedSize(200, 15)
+        self.stretch_label = QLabel(self.load_data_groupbox)
+        self.stretch_label.setGeometry(10, 140, 200, 15)
         self.stretch_label.setText(f"Stretch: {self.stretch}")
         self.stretch_label.adjustSize()
 
-        self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.stretch_slider.setGeometry(100, 15, 100, 40)
+        self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self.load_data_groupbox)
+        self.stretch_slider.setGeometry(10, 160, 300, 15)
         self.stretch_slider.setMinimum(1)
         self.stretch_slider.setMaximum(10)
-        self.stretch_slider.setFixedSize(300, 15)
         self.stretch_slider.setValue(self.stretch)
         self.stretch_slider.valueChanged.connect(self.update_stretch)
 
-        self.stretch_max_textbox = QLineEdit(self)
-        self.stretch_max_textbox.setFixedSize(50, 22)
+        self.stretch_max_textbox = QLineEdit(self.load_data_groupbox)
+        self.stretch_max_textbox.setGeometry(260, 180, 50, 22)
         self.stretch_max_textbox.setValidator(non_zero_int_validator)
         self.stretch_max_textbox.setEnabled(False)
         self.stretch_max_textbox.editingFinished.connect(self.update_stretch_max_textbox)
         self.stretch_max_textbox.setText(str(self.stretch_max))
 
-        self.stretch_checkbox = QCheckBox(self)
+        self.stretch_checkbox = QCheckBox(self.load_data_groupbox)
+        self.stretch_checkbox.setGeometry(10, 180, 100, 22)
         self.stretch_checkbox.setText(f"auto stretch")
         self.stretch_checkbox.stateChanged.connect(self.update_auto_stretch)
         self.stretch_checkbox.setChecked(True)
         
-        self.stretch_params_layout = QHBoxLayout()
-        self.stretch_params_layout.addWidget(self.stretch_checkbox)
-        self.stretch_params_layout.addWidget(self.stretch_max_textbox)
-        self.stretch_params_layout.addSpacing(18)
-
-        self.stretch_layout = QVBoxLayout(self)
-        self.stretch_layout.addWidget(self.stretch_label)
-        self.stretch_layout.addWidget(self.stretch_slider)
-        self.stretch_layout.addLayout(self.stretch_params_layout)
-
-        self.load_params_layout = QVBoxLayout(self)
-        self.load_params_layout.addLayout(self.data_buttons_layout)
-        self.load_params_layout.addLayout(self.decimation_layout)
-        self.load_params_layout.addLayout(self.stretch_layout)
-
         ########################################################
         # Port channel layout
         ########################################################
-        self.port_frame_title = QLabel(self)
-        self.port_frame_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.port_frame_title.setText(f"PORT SIDE")
-        self.port_frame_title.setFont(font)
-        self.port_frame_title.adjustSize()
+        self.port_channel_groupbox = QGroupBox(self.top_toolbar_groupbox)
+        self.port_channel_groupbox.setGeometry(320, 0, 430, 300)
+        self.port_channel_groupbox.setProperty("border", "none")
+        self.port_channel_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
 
-        self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(337, 9, 439, 199)
-        self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.process_data_frame.setLineWidth(1)
 
-        self.port_channel_min_label = QLabel(self)
+        self.port_channel_title_label = QLabel(self.port_channel_groupbox)
+        self.port_channel_title_label.setGeometry(165, 10, 100, 22)
+        self.port_channel_title_label.setText(f"PORT SIDE")
+        self.port_channel_title_label.setFont(font)
+
+        self.port_channel_min_label = QLabel(self.port_channel_groupbox)
+        self.port_channel_min_label.setGeometry(10, 40, 100, 22)
         self.port_channel_min_label.setText(f"Channel min")
         self.port_channel_min_label.adjustSize()
 
-        self.port_channel_min_step_label = QLabel(self)
+        self.port_channel_min_step_label = QLabel(self.port_channel_groupbox)
+        self.port_channel_min_step_label.setGeometry(220, 40, 100, 22)
         self.port_channel_min_step_label.setText(f"step")
         self.port_channel_min_step_label.adjustSize()
         
-        self.port_channel_min_step_textbox = QLineEdit(self)
-        self.port_channel_min_step_textbox.setFixedSize(60, 22)
+        self.port_channel_min_step_textbox = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_min_step_textbox.setGeometry(250, 40, 60, 22)
         self.port_channel_min_step_textbox.setValidator(non_zero_double_validator)
         self.port_channel_min_step_textbox.setEnabled(False)
         self.port_channel_min_step_textbox.editingFinished.connect(self.update_port_channel_min_step_textbox)
         self.port_channel_min_step_textbox.setText(str(float(self._port_channel_min_step)))
 
-        self.port_channel_min_step_layout_sub = QHBoxLayout()
-        self.port_channel_min_step_layout_sub.addSpacing(20)
-        self.port_channel_min_step_layout_sub.addWidget(self.port_channel_min_step_label)
-        self.port_channel_min_step_layout_sub.addWidget(self.port_channel_min_step_textbox)
-        self.port_channel_min_step_layout_sub.addSpacing(2)
-
-        self.port_channel_min_step_layout = QHBoxLayout()
-        self.port_channel_min_step_layout.addWidget(self.port_channel_min_label, 5)
-        self.port_channel_min_step_layout.addLayout(self.port_channel_min_step_layout_sub, 3)
-
-        self.port_channel_min_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.port_channel_min_slider = QSlider(Qt.Orientation.Horizontal, self.port_channel_groupbox)
+        self.port_channel_min_slider.setGeometry(10, 70, 300, 15)
         self.port_channel_min_slider.setMinimum(0)
         self.port_channel_min_slider.setMaximum(100)
-        self.port_channel_min_slider.setFixedSize(300, 15)
         self.port_channel_min_slider.setValue(self.port_channel_min)
         self.port_channel_min_slider.setTickInterval(1)
         self.port_channel_min_slider.valueChanged.connect(self.update_port_channel_min)
         self.port_channel_min_slider.setEnabled(False)
 
-        self.port_channel_min_slider_bottom = QLineEdit(self)
-        self.port_channel_min_slider_bottom.setFixedSize(60, 22)
+        self.port_channel_min_slider_bottom = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_min_slider_bottom.setGeometry(10, 90, 60, 22)
         self.port_channel_min_slider_bottom.setPlaceholderText("min")
         self.port_channel_min_slider_bottom.setValidator(zero_double_validator)
         self.port_channel_min_slider_bottom.setText("0.0")
         self.port_channel_min_slider_bottom.setEnabled(False)
         self.port_channel_min_slider_bottom.editingFinished.connect(self.update_port_channel_min_slider_bottom)
-        self.port_channel_min_slider_current = QLineEdit(self)
-        self.port_channel_min_slider_current.setFixedSize(60, 22)
+        self.port_channel_min_slider_current = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_min_slider_current.setGeometry(130, 90, 60, 22)
         self.port_channel_min_slider_current.setPlaceholderText("current")
         self.port_channel_min_slider_current.setValidator(zero_double_validator)
         self.port_channel_min_slider_current.setEnabled(False)
         self.port_channel_min_slider_current.editingFinished.connect(self.update_port_channel_min_slider_current)
-        self.port_channel_min_slider_top = QLineEdit(self)
-        self.port_channel_min_slider_top.setFixedSize(60, 22)
+        self.port_channel_min_slider_top = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_min_slider_top.setGeometry(250, 90, 60, 22)
         self.port_channel_min_slider_top.setPlaceholderText("max")
         self.port_channel_min_slider_top.setValidator(zero_double_validator)
         self.port_channel_min_slider_top.setText("100.0")
         self.port_channel_min_slider_top.setEnabled(False)
         self.port_channel_min_slider_top.editingFinished.connect(self.update_port_channel_min_slider_top)
 
-        self.port_channel_min_slider_params_layout = QHBoxLayout()
-        self.port_channel_min_slider_params_layout.addWidget(self.port_channel_min_slider_bottom)
-        self.port_channel_min_slider_params_layout.addSpacing(50)
-        self.port_channel_min_slider_params_layout.addWidget(self.port_channel_min_slider_current)
-        self.port_channel_min_slider_params_layout.addSpacing(50)
-        self.port_channel_min_slider_params_layout.addWidget(self.port_channel_min_slider_top)
-
-        self.port_channel_min_slider_layout = QVBoxLayout()
-        self.port_channel_min_slider_layout.addLayout(self.port_channel_min_step_layout)
-        self.port_channel_min_slider_layout.addWidget(self.port_channel_min_slider)
-        self.port_channel_min_slider_layout.addLayout(self.port_channel_min_slider_params_layout)
-
         # Channel scale value slider
-        self.port_channel_scale_label = QLabel(self)
+        self.port_channel_scale_label = QLabel(self.port_channel_groupbox)
+        self.port_channel_scale_label.setGeometry(10, 130, 60, 22)
         self.port_channel_scale_label.setText(f"Grey scale")
         self.port_channel_scale_label.adjustSize()
 
-        self.port_channel_scale_step_label = QLabel(self)
+        self.port_channel_scale_step_label = QLabel(self.port_channel_groupbox)
+        self.port_channel_scale_step_label.setGeometry(220, 130, 60, 22)
         self.port_channel_scale_step_label.setText(f"step")
         self.port_channel_scale_step_label.adjustSize()
 
-        self.port_channel_scale_step_textbox = QLineEdit(self)
-        self.port_channel_scale_step_textbox.setFixedSize(60, 22)
+        self.port_channel_scale_step_textbox = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_scale_step_textbox.setGeometry(250, 130, 60, 22)
         self.port_channel_scale_step_textbox.setValidator(non_zero_double_validator)
         self.port_channel_scale_step_textbox.setEnabled(False)
         self.port_channel_scale_step_textbox.editingFinished.connect(self.update_port_channel_scale_step_textbox)
         self.port_channel_scale_step_textbox.setText(str(float(self._port_channel_scale_step)))
 
-        self.port_channel_scale_step_layout_sub = QHBoxLayout()
-        self.port_channel_scale_step_layout_sub.addSpacing(20)
-        self.port_channel_scale_step_layout_sub.addWidget(self.port_channel_scale_step_label)
-        self.port_channel_scale_step_layout_sub.addWidget(self.port_channel_scale_step_textbox)
-        self.port_channel_scale_step_layout_sub.addSpacing(2)
-
-        self.port_channel_scale_step_layout = QHBoxLayout()
-        self.port_channel_scale_step_layout.addWidget(self.port_channel_scale_label, 5)
-        self.port_channel_scale_step_layout.addLayout(self.port_channel_scale_step_layout_sub, 3)
-
-        self.port_channel_scale_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.port_channel_scale_slider = QSlider(Qt.Orientation.Horizontal, self.port_channel_groupbox)
+        self.port_channel_scale_slider.setGeometry(10, 160, 300, 15)
         self.port_channel_scale_slider.setMinimum(0)
         self.port_channel_scale_slider.setMaximum(100)
-        self.port_channel_scale_slider.setFixedSize(300, 15)
         self.port_channel_scale_slider.setValue(self.port_channel_scale)
         self.port_channel_scale_slider.setTickInterval(1)
         self.port_channel_scale_slider.valueChanged.connect(self.update_port_channel_scale)
         self.port_channel_scale_slider.setEnabled(False)
 
-        self.port_channel_scale_slider_bottom = QLineEdit(self)
-        self.port_channel_scale_slider_bottom.setFixedSize(60, 22)
+        self.port_channel_scale_slider_bottom = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_scale_slider_bottom.setGeometry(10, 180, 60, 22)
         self.port_channel_scale_slider_bottom.setPlaceholderText("min")
         self.port_channel_scale_slider_bottom.setValidator(zero_double_validator)
         self.port_channel_scale_slider_bottom.setText("0.0")
         self.port_channel_scale_slider_bottom.setEnabled(False)
         self.port_channel_scale_slider_bottom.editingFinished.connect(self.update_port_channel_scale_slider_bottom)
-        self.port_channel_scale_slider_current = QLineEdit(self)
-        self.port_channel_scale_slider_current.setFixedSize(60, 22)
+        self.port_channel_scale_slider_current = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_scale_slider_current.setGeometry(130, 180, 60, 22)
         self.port_channel_scale_slider_current.setPlaceholderText("current")
         self.port_channel_scale_slider_current.setValidator(zero_double_validator)
         self.port_channel_scale_slider_current.setEnabled(False)
         self.port_channel_scale_slider_current.editingFinished.connect(self.update_port_channel_scale_slider_current)
-        self.port_channel_scale_slider_top = QLineEdit(self)
-        self.port_channel_scale_slider_top.setFixedSize(60, 22)
+        self.port_channel_scale_slider_top = QLineEdit(self.port_channel_groupbox)
+        self.port_channel_scale_slider_top.setGeometry(250, 180, 60, 22)
         self.port_channel_scale_slider_top.setPlaceholderText("max")
         self.port_channel_scale_slider_top.setValidator(zero_double_validator)
         self.port_channel_scale_slider_top.setText("100.0")
         self.port_channel_scale_slider_top.setEnabled(False)
         self.port_channel_scale_slider_top.editingFinished.connect(self.update_port_channel_scale_slider_top)
 
-        self.port_channel_scale_slider_params_layout = QHBoxLayout()
-        self.port_channel_scale_slider_params_layout.addWidget(self.port_channel_scale_slider_bottom)
-        self.port_channel_scale_slider_params_layout.addSpacing(50)
-        self.port_channel_scale_slider_params_layout.addWidget(self.port_channel_scale_slider_current)
-        self.port_channel_scale_slider_params_layout.addSpacing(50)
-        self.port_channel_scale_slider_params_layout.addWidget(self.port_channel_scale_slider_top)
-
-        self.port_channel_scale_slider_layout = QVBoxLayout()
-        self.port_channel_scale_slider_layout.addLayout(self.port_channel_scale_step_layout)
-        self.port_channel_scale_slider_layout.addWidget(self.port_channel_scale_slider)
-        self.port_channel_scale_slider_layout.addLayout(self.port_channel_scale_slider_params_layout)
-
-        self.port_grey_display_params_layout = QVBoxLayout()
-        self.port_grey_display_params_layout.addLayout(self.port_channel_min_slider_layout)
-        self.port_grey_display_params_layout.addLayout(self.port_channel_scale_slider_layout)
-
         # Auto min checkbox
-        self.port_auto_min_checkbox = QCheckBox(self)
-        self.port_auto_min_checkbox.setFixedSize(100, 20)
+        self.port_auto_min_checkbox = QCheckBox(self.port_channel_groupbox)
+        self.port_auto_min_checkbox.setGeometry(320, 40, 100, 20)
         self.port_auto_min_checkbox.setText(f"auto min")
         self.port_auto_min_checkbox.stateChanged.connect(self.update_port_auto_min)
         self.port_auto_min_checkbox.setChecked(True)
 
         # Auto scale checkbox
-        self.port_auto_scale_checkbox = QCheckBox(self)
-        self.port_auto_scale_checkbox.setFixedSize(100, 20)
+        self.port_auto_scale_checkbox = QCheckBox(self.port_channel_groupbox)
+        self.port_auto_scale_checkbox.setGeometry(320, 65, 100, 20)
         self.port_auto_scale_checkbox.setText(f"auto scale")
         self.port_auto_scale_checkbox.stateChanged.connect(self.update_port_auto_scale)
         self.port_auto_scale_checkbox.setChecked(True)
 
         # port_invert colors checkbox
-        self.port_invert_checkbox = QCheckBox(self)
-        self.port_invert_checkbox.setFixedSize(100, 20)
+        self.port_invert_checkbox = QCheckBox(self.port_channel_groupbox)
+        self.port_invert_checkbox.setGeometry(320, 90, 100, 20)
         self.port_invert_checkbox.setText(f"invert")
         self.port_invert_checkbox.stateChanged.connect(self.update_port_invert)
 
         # Color scheme selection box
-        self.port_color_scheme_combobox = QComboBox(self)
+        self.port_color_scheme_combobox = QComboBox(self.port_channel_groupbox)
+        self.port_color_scheme_combobox.setGeometry(320, 120, 100, 22)
         self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.port_color_scheme_combobox.currentIndexChanged.connect(self.update_port_color_scheme)
 
-        self.upload_port_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.upload_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
+        self.upload_port_color_scheme_btn.setGeometry(320, 150, 100, 22)
         self.upload_port_color_scheme_btn.setText("Upload cmap")
         self.upload_port_color_scheme_btn.clicked.connect(self.upload_port_color_scheme)
 
         # Apply selected display parameter values
-        self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
+        self.apply_port_color_scheme_btn.setGeometry(320, 180, 100, 22)
         self.apply_port_color_scheme_btn.setText("Apply")
         self.apply_port_color_scheme_btn.clicked.connect(self.apply_port_color_scheme)
-
-        self.port_color_selection_layout = QVBoxLayout()
-        self.port_color_selection_layout.addWidget(self.port_auto_min_checkbox)
-        self.port_color_selection_layout.addWidget(self.port_auto_scale_checkbox)
-        self.port_color_selection_layout.addWidget(self.port_invert_checkbox)
-        self.port_color_selection_layout.addWidget(self.port_color_scheme_combobox)
-        self.port_color_selection_layout.addWidget(self.upload_port_color_scheme_btn)
-        self.port_color_selection_layout.addWidget(self.apply_port_color_scheme_btn)
-
-        self.port_params_layout = QHBoxLayout()
-        self.port_params_layout.addLayout(self.port_grey_display_params_layout)
-        self.port_params_layout.addSpacing(5)
-        self.port_params_layout.addLayout(self.port_color_selection_layout)
-
-        self.port_frame_layout = QVBoxLayout()
-        self.port_frame_layout.addWidget(self.port_frame_title)
-        self.port_frame_layout.addLayout(self.port_params_layout)
-
+        
         ########################################################
         # Starboard channel layout
         ########################################################
-        self.starboard_frame_title = QLabel(self)
-        self.starboard_frame_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.starboard_frame_title.setText(f"STARBOARD SIDE")
-        self.starboard_frame_title.setFont(font)
-        self.starboard_frame_title.adjustSize()
+        self.starboard_channel_groupbox = QGroupBox(self.top_toolbar_groupbox)
+        self.starboard_channel_groupbox.setGeometry(750, 0, 430, 300)
+        self.starboard_channel_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
 
-        self.process_data_frame = QFrame(self)
-        self.process_data_frame.setGeometry(775, 9, 435, 199)
-        self.process_data_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.process_data_frame.setLineWidth(1)
+        self.starboard_channel_title_label = QLabel(self.starboard_channel_groupbox)
+        self.starboard_channel_title_label.setGeometry(165, 10, 100, 22)
+        self.starboard_channel_title_label.setText(f"STARBOARD SIDE")
+        self.starboard_channel_title_label.setFont(font)
 
-        self.starboard_channel_min_label = QLabel(self)
+        self.starboard_channel_min_label = QLabel(self.starboard_channel_groupbox)
+        self.starboard_channel_min_label.setGeometry(10, 40, 100, 22)
         self.starboard_channel_min_label.setText(f"Channel min")
         self.starboard_channel_min_label.adjustSize()
 
-        self.starboard_channel_min_step_label = QLabel(self)
+        self.starboard_channel_min_step_label = QLabel(self.starboard_channel_groupbox)
+        self.starboard_channel_min_step_label.setGeometry(220, 40, 100, 22)
         self.starboard_channel_min_step_label.setText(f"step")
         self.starboard_channel_min_step_label.adjustSize()
 
-        self.starboard_channel_min_step_textbox = QLineEdit(self)
-        self.starboard_channel_min_step_textbox.setFixedSize(60, 22)
+        self.starboard_channel_min_step_textbox = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_min_step_textbox.setGeometry(250, 40, 60, 22)
         self.starboard_channel_min_step_textbox.setValidator(non_zero_double_validator)
         self.starboard_channel_min_step_textbox.setEnabled(False)
         self.starboard_channel_min_step_textbox.editingFinished.connect(self.update_starboard_channel_min_step_textbox)
         self.starboard_channel_min_step_textbox.setText(str(float(self._starboard_channel_min_step)))
 
-        self.starboard_channel_min_step_layout_sub = QHBoxLayout()
-        self.starboard_channel_min_step_layout_sub.addSpacing(20)
-        self.starboard_channel_min_step_layout_sub.addWidget(self.starboard_channel_min_step_label)
-        self.starboard_channel_min_step_layout_sub.addWidget(self.starboard_channel_min_step_textbox)
-        self.starboard_channel_min_step_layout_sub.addSpacing(2)
-
-        self.starboard_channel_min_step_layout = QHBoxLayout()
-        self.starboard_channel_min_step_layout.addWidget(self.starboard_channel_min_label, 5)
-        self.starboard_channel_min_step_layout.addLayout(self.starboard_channel_min_step_layout_sub, 3)
-
-        self.starboard_channel_min_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.starboard_channel_min_slider = QSlider(Qt.Orientation.Horizontal, self.starboard_channel_groupbox)
+        self.starboard_channel_min_slider.setGeometry(10, 70, 300, 15)
         self.starboard_channel_min_slider.setMinimum(0)
         self.starboard_channel_min_slider.setMaximum(100)
-        self.starboard_channel_min_slider.setFixedSize(300, 15)
         self.starboard_channel_min_slider.setValue(self.starboard_channel_min)
         self.starboard_channel_min_slider.setTickInterval(1)
         self.starboard_channel_min_slider.valueChanged.connect(self.update_starboard_channel_min)
         self.starboard_channel_min_slider.setEnabled(False)
 
-        self.starboard_channel_min_slider_bottom = QLineEdit(self)
-        self.starboard_channel_min_slider_bottom.setFixedSize(60, 22)
+        self.starboard_channel_min_slider_bottom = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_min_slider_bottom.setGeometry(10, 90, 60, 22)
         self.starboard_channel_min_slider_bottom.setPlaceholderText("min")
         self.starboard_channel_min_slider_bottom.setValidator(zero_double_validator)
         self.starboard_channel_min_slider_bottom.setText("0.0")
         self.starboard_channel_min_slider_bottom.setEnabled(False)
         self.starboard_channel_min_slider_bottom.editingFinished.connect(self.update_starboard_channel_min_slider_bottom)
-        self.starboard_channel_min_slider_current = QLineEdit(self)
-        self.starboard_channel_min_slider_current.setFixedSize(60, 22)
+        self.starboard_channel_min_slider_current = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_min_slider_current.setGeometry(130, 90, 60, 22)
         self.starboard_channel_min_slider_current.setPlaceholderText("current")
         self.starboard_channel_min_slider_current.setValidator(zero_double_validator)
         self.starboard_channel_min_slider_current.setEnabled(False)
         self.starboard_channel_min_slider_current.editingFinished.connect(self.update_starboard_channel_min_slider_current)
-        self.starboard_channel_min_slider_top = QLineEdit(self)
-        self.starboard_channel_min_slider_top.setFixedSize(60, 22)
+        self.starboard_channel_min_slider_top = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_min_slider_top.setGeometry(250, 90, 60, 22)
         self.starboard_channel_min_slider_top.setPlaceholderText("max")
         self.starboard_channel_min_slider_top.setValidator(zero_double_validator)
         self.starboard_channel_min_slider_top.setText("100.0")
         self.starboard_channel_min_slider_top.setEnabled(False)
         self.starboard_channel_min_slider_top.editingFinished.connect(self.update_starboard_channel_min_slider_top)
 
-        self.starboard_channel_min_slider_params_layout = QHBoxLayout()
-        self.starboard_channel_min_slider_params_layout.addWidget(self.starboard_channel_min_slider_bottom)
-        self.starboard_channel_min_slider_params_layout.addSpacing(50)
-        self.starboard_channel_min_slider_params_layout.addWidget(self.starboard_channel_min_slider_current)
-        self.starboard_channel_min_slider_params_layout.addSpacing(50)
-        self.starboard_channel_min_slider_params_layout.addWidget(self.starboard_channel_min_slider_top)
-
-        self.starboard_channel_min_slider_layout = QVBoxLayout()
-        self.starboard_channel_min_slider_layout.addLayout(self.starboard_channel_min_step_layout)
-        self.starboard_channel_min_slider_layout.addWidget(self.starboard_channel_min_slider)
-        self.starboard_channel_min_slider_layout.addLayout(self.starboard_channel_min_slider_params_layout)
-
         # Channel scale value slider
-        self.starboard_channel_scale_label = QLabel(self)
+        self.starboard_channel_scale_label = QLabel(self.starboard_channel_groupbox)
+        self.starboard_channel_scale_label.setGeometry(10, 130, 60, 22)
         self.starboard_channel_scale_label.setText(f"Channel scale")
         self.starboard_channel_scale_label.adjustSize()
 
-        self.starboard_channel_scale_step_label = QLabel(self)
+        self.starboard_channel_scale_step_label = QLabel(self.starboard_channel_groupbox)
+        self.starboard_channel_scale_step_label.setGeometry(220, 130, 60, 22)
         self.starboard_channel_scale_step_label.setText(f"step")
         self.starboard_channel_scale_step_label.adjustSize()
 
-        self.starboard_channel_scale_step_textbox = QLineEdit(self)
-        self.starboard_channel_scale_step_textbox.setFixedSize(60, 22)
+        self.starboard_channel_scale_step_textbox = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_scale_step_textbox.setGeometry(250, 130, 60, 22)
         self.starboard_channel_scale_step_textbox.setValidator(non_zero_double_validator)
         self.starboard_channel_scale_step_textbox.setEnabled(False)
         self.starboard_channel_scale_step_textbox.editingFinished.connect(self.update_starboard_channel_scale_step_textbox)
         self.starboard_channel_scale_step_textbox.setText(str(float(self._starboard_channel_scale_step)))
 
-        self.starboard_channel_scale_step_layout_sub = QHBoxLayout()
-        self.starboard_channel_scale_step_layout_sub.addSpacing(20)
-        self.starboard_channel_scale_step_layout_sub.addWidget(self.starboard_channel_scale_step_label)
-        self.starboard_channel_scale_step_layout_sub.addWidget(self.starboard_channel_scale_step_textbox)
-        self.starboard_channel_scale_step_layout_sub.addSpacing(2)
-
-        self.starboard_channel_scale_step_layout = QHBoxLayout()
-        self.starboard_channel_scale_step_layout.addWidget(self.starboard_channel_scale_label, 5)
-        self.starboard_channel_scale_step_layout.addLayout(self.starboard_channel_scale_step_layout_sub, 3)
-
-        self.starboard_channel_scale_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.starboard_channel_scale_slider = QSlider(Qt.Orientation.Horizontal, self.starboard_channel_groupbox)
+        self.starboard_channel_scale_slider.setGeometry(10, 160, 300, 15)
         self.starboard_channel_scale_slider.setMinimum(0)
         self.starboard_channel_scale_slider.setMaximum(100)
-        self.starboard_channel_scale_slider.setFixedSize(300, 15)
         self.starboard_channel_scale_slider.setValue(self.starboard_channel_scale)
         self.starboard_channel_scale_slider.setTickInterval(1)
         self.starboard_channel_scale_slider.valueChanged.connect(self.update_starboard_channel_scale)
         self.starboard_channel_scale_slider.setEnabled(False)
 
-        self.starboard_channel_scale_slider_bottom = QLineEdit(self)
-        self.starboard_channel_scale_slider_bottom.setFixedSize(60, 22)
+        self.starboard_channel_scale_slider_bottom = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_scale_slider_bottom.setGeometry(10, 180, 60, 22)
         self.starboard_channel_scale_slider_bottom.setPlaceholderText("min")
         self.starboard_channel_scale_slider_bottom.setValidator(zero_double_validator)
         self.starboard_channel_scale_slider_bottom.setText("0.0")
         self.starboard_channel_scale_slider_bottom.setEnabled(False)
         self.starboard_channel_scale_slider_bottom.editingFinished.connect(self.update_starboard_channel_scale_slider_bottom)
-        self.starboard_channel_scale_slider_current = QLineEdit(self)
-        self.starboard_channel_scale_slider_current.setFixedSize(60, 22)
+        self.starboard_channel_scale_slider_current = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_scale_slider_current.setGeometry(130, 180, 60, 22)
         self.starboard_channel_scale_slider_current.setPlaceholderText("current")
         self.starboard_channel_scale_slider_current.setValidator(zero_double_validator)
         self.starboard_channel_scale_slider_current.setEnabled(False)
         self.starboard_channel_scale_slider_current.editingFinished.connect(self.update_starboard_channel_scale_slider_current)
-        self.starboard_channel_scale_slider_top = QLineEdit(self)
-        self.starboard_channel_scale_slider_top.setFixedSize(60, 22)
+        self.starboard_channel_scale_slider_top = QLineEdit(self.starboard_channel_groupbox)
+        self.starboard_channel_scale_slider_top.setGeometry(250, 180, 60, 22)
         self.starboard_channel_scale_slider_top.setPlaceholderText("max")
         self.starboard_channel_scale_slider_top.setValidator(zero_double_validator)
         self.starboard_channel_scale_slider_top.setText("100.0")
         self.starboard_channel_scale_slider_top.setEnabled(False)
         self.starboard_channel_scale_slider_top.editingFinished.connect(self.update_starboard_channel_scale_slider_top)
 
-        self.starboard_channel_scale_slider_params_layout = QHBoxLayout()
-        self.starboard_channel_scale_slider_params_layout.addWidget(self.starboard_channel_scale_slider_bottom)
-        self.starboard_channel_scale_slider_params_layout.addSpacing(50)
-        self.starboard_channel_scale_slider_params_layout.addWidget(self.starboard_channel_scale_slider_current)
-        self.starboard_channel_scale_slider_params_layout.addSpacing(50)
-        self.starboard_channel_scale_slider_params_layout.addWidget(self.starboard_channel_scale_slider_top)
-
-        self.starboard_channel_scale_slider_layout = QVBoxLayout()
-        self.starboard_channel_scale_slider_layout.addLayout(self.starboard_channel_scale_step_layout)
-        self.starboard_channel_scale_slider_layout.addWidget(self.starboard_channel_scale_slider)
-        self.starboard_channel_scale_slider_layout.addLayout(self.starboard_channel_scale_slider_params_layout)
-
-        self.starboard_grey_display_params_layout = QVBoxLayout()
-        self.starboard_grey_display_params_layout.addLayout(self.starboard_channel_min_slider_layout)
-        self.starboard_grey_display_params_layout.addLayout(self.starboard_channel_scale_slider_layout)
-
         # Auto min checkbox
-        self.starboard_auto_min_checkbox = QCheckBox(self)
-        self.starboard_auto_min_checkbox.setFixedSize(100, 20)
+        self.starboard_auto_min_checkbox = QCheckBox(self.starboard_channel_groupbox)
+        self.starboard_auto_min_checkbox.setGeometry(320, 40, 100, 20)
         self.starboard_auto_min_checkbox.setText(f"auto min")
         self.starboard_auto_min_checkbox.stateChanged.connect(self.update_starboard_auto_min)
         self.starboard_auto_min_checkbox.setChecked(True)
 
         # Auto scale checkbox
-        self.starboard_auto_scale_checkbox = QCheckBox(self)
-        self.starboard_auto_scale_checkbox.setFixedSize(100, 20)
+        self.starboard_auto_scale_checkbox = QCheckBox(self.starboard_channel_groupbox)
+        self.starboard_auto_scale_checkbox.setGeometry(320, 65, 100, 20)
         self.starboard_auto_scale_checkbox.setText(f"auto scale")
         self.starboard_auto_scale_checkbox.stateChanged.connect(self.update_starboard_auto_scale)
         self.starboard_auto_scale_checkbox.setChecked(True)
 
         # starboard_invert colors checkbox
-        self.starboard_invert_checkbox = QCheckBox(self)
-        self.starboard_invert_checkbox.setFixedSize(100, 20)
+        self.starboard_invert_checkbox = QCheckBox(self.starboard_channel_groupbox)
+        self.starboard_invert_checkbox.setGeometry(320, 90, 100, 20)
         self.starboard_invert_checkbox.setText(f"invert")
         self.starboard_invert_checkbox.stateChanged.connect(self.update_starboard_invert)
 
         # Color scheme selection box
-        self.starboard_color_scheme_combobox = QComboBox(self)
+        self.starboard_color_scheme_combobox = QComboBox(self.starboard_channel_groupbox)
+        self.starboard_color_scheme_combobox.setGeometry(320, 120, 100, 22)
         self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
-        self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)
+        self.upload_starboard_color_scheme_btn.setGeometry(320, 150, 100, 22)
         self.upload_starboard_color_scheme_btn.setText("Upload cmap")
         self.upload_starboard_color_scheme_btn.clicked.connect(self.upload_starboard_color_scheme)
 
         # Apply selected display parameter values
-        self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self)
+        self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)
+        self.apply_starboard_color_scheme_btn.setGeometry(320, 180, 100, 22)
         self.apply_starboard_color_scheme_btn.setText("Apply")
         self.apply_starboard_color_scheme_btn.clicked.connect(self.apply_starboard_color_scheme)
 
-        self.starboard_color_selection_layout = QVBoxLayout()
-        self.starboard_color_selection_layout.addWidget(self.starboard_auto_min_checkbox)
-        self.starboard_color_selection_layout.addWidget(self.starboard_auto_scale_checkbox)
-        self.starboard_color_selection_layout.addWidget(self.starboard_invert_checkbox)
-        self.starboard_color_selection_layout.addWidget(self.starboard_color_scheme_combobox)
-        self.starboard_color_selection_layout.addWidget(self.upload_starboard_color_scheme_btn)
-        self.starboard_color_selection_layout.addWidget(self.apply_starboard_color_scheme_btn)
-
-        self.starboard_params_layout = QHBoxLayout()
-        self.starboard_params_layout.addLayout(self.starboard_grey_display_params_layout)
-        self.starboard_params_layout.addSpacing(5)
-        self.starboard_params_layout.addLayout(self.starboard_color_selection_layout)
-
-        self.starboard_frame_layout = QVBoxLayout()
-        self.starboard_frame_layout.addWidget(self.starboard_frame_title)
-        self.starboard_frame_layout.addLayout(self.starboard_params_layout)
-
-        # Add widgets to the toolbox layout
-        self.toolbox_layout.addLayout(self.load_params_layout)
-        self.toolbox_layout.addSpacing(20)
-        self.toolbox_layout.addLayout(self.port_frame_layout)
-        self.toolbox_layout.addSpacing(20)
-        self.toolbox_layout.addLayout(self.starboard_frame_layout)
-
-        self.toolbox_widget.setLayout(self.toolbox_layout)
-
-    def init_side_toolbox(self):
-        non_zero_double_validator = QDoubleValidator(0.0001, float("inf"), 10)
-        zero_double_validator = QDoubleValidator(0, float("inf"), 10)
-        non_zero_int_validator = QIntValidator(1, 2**31 - 1)
+    def init_side_toolbox_and_canvas(self):
         zero_int_validator = QIntValidator(0, 2**31 - 1)
 
         font = QFont()
         font.setBold(True)
 
-        self.side_toolbar_groupbox = QGroupBox(self)
-        self.side_toolbar_groupbox.setMinimumWidth(330)
-        self.side_toolbar_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+        self.side_toolbox_groupbox = QGroupBox(self)
+        self.side_toolbox_groupbox.setGeometry(0, 0, 320, 540)
+        self.side_toolbox_groupbox.setMinimumWidth(320)
+        self.side_toolbox_groupbox.setMinimumHeight(540)
+        self.side_toolbox_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 0px 1px 1px 1px; }")
         
         ################################################
         # Splits group box
         ################################################
-        self.splits_groupbox = QGroupBox(self.side_toolbar_groupbox)
+        self.splits_groupbox = QGroupBox(self.side_toolbox_groupbox)
         self.splits_groupbox.setGeometry(0, 0, 320, 120)
-        self.splits_groupbox.setMinimumWidth(330)
-        #self.splits_groupbox.setTitle('Splits')
-        self.splits_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+        self.splits_groupbox.setMinimumWidth(320)
 
         self.splits_label = QLabel(self.splits_groupbox)
         self.splits_label.setGeometry(10, 10, 80, 22)
@@ -905,7 +740,7 @@ class MyWindow(QMainWindow):
         self.shift_textbox.editingFinished.connect(self.update_shift_textbox)
         
         self.load_split_btn = QPushButton(self.splits_groupbox)
-        self.load_split_btn.setGeometry(30, 85, 80, 22)
+        self.load_split_btn.setGeometry(30, 85, 100, 22)
         self.load_split_btn.setText("Show split")
         self.load_split_btn.clicked.connect(self.load_split)
 
@@ -929,11 +764,9 @@ class MyWindow(QMainWindow):
         ################################################
         # Labels group box
         ################################################
-        self.labels_groupbox = QGroupBox(self.side_toolbar_groupbox)
+        self.labels_groupbox = QGroupBox(self.side_toolbox_groupbox)
         self.labels_groupbox.setGeometry(0, 120, 320, 380)
         self.labels_groupbox.setMinimumWidth(330)
-        #self.labels_groupbox.setTitle('Labels')
-        #self.labels_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
 
         self.load_labels_btn = QPushButton(self.labels_groupbox)
         self.load_labels_btn.setGeometry(50, 10, 100, 22)
@@ -967,25 +800,23 @@ class MyWindow(QMainWindow):
         ################################################
         # Coords group box
         ################################################
-        self.coords_groupbox = QGroupBox(self.side_toolbar_groupbox)
-        self.coords_groupbox.setGeometry(0, 500, 200, 40)
-        self.coords_groupbox.setMinimumWidth(330)
-        #self.splits_groupbox.setTitle('Splits')
-        self.coords_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
+        self.coords_zone_groupbox = QGroupBox(self.side_toolbox_groupbox)
+        self.coords_zone_groupbox.setGeometry(0, 500, 200, 40)
+        self.coords_zone_groupbox.setMinimumWidth(330)
 
-        self.crs_label = QLabel(self.coords_groupbox)
+        self.crs_label = QLabel(self.coords_zone_groupbox)
         self.crs_label.setGeometry(10, 10, 35, 20)
         self.crs_label.setText("CRS")
 
-        self.crs_textbox = QLineEdit(self.coords_groupbox)
+        self.crs_textbox = QLineEdit(self.coords_zone_groupbox)
         self.crs_textbox.setGeometry(45, 10, 80, 20)
         self.crs_textbox.editingFinished.connect(self.update_crs)
 
-        self.utm_zone_label = QLabel(self.coords_groupbox)
+        self.utm_zone_label = QLabel(self.coords_zone_groupbox)
         self.utm_zone_label.setGeometry(150, 10, 60, 20)
         self.utm_zone_label.setText("UTM zone")
 
-        self.utm_zone_textbox = QLineEdit(self.coords_groupbox)
+        self.utm_zone_textbox = QLineEdit(self.coords_zone_groupbox)
         self.utm_zone_textbox.setGeometry(220, 10, 80, 20)
         self.utm_zone_textbox.editingFinished.connect(self.update_utm_zone)
 
@@ -1203,39 +1034,38 @@ class MyWindow(QMainWindow):
         if self.polygons_list_widget.currentItem() != None:
             self.canvas.hide_polygon(self.polygons_list_widget.currentItem().polygon_idx, item.checkState())
     
-    def init_bottom_bar(self):
-        self.bottom_bar_groupbox = QGroupBox(self)
-        self.bottom_bar_groupbox.setMinimumHeight(20)
-        self.bottom_bar_groupbox.setMaximumHeight(50)
-        self.bottom_bar_groupbox.setMinimumWidth(200)
-        #self.bottom_bar_groupbox.setStyleSheet("QGroupBox::title { subcontrol-origin: content; subcontrol-position: top center; padding: 10px 3px; }")
-
-        self.location_label = QLabel(self.bottom_bar_groupbox)
+    def init_status_bar(self):
+        self.status_bar_groupbox = QGroupBox(self)
+        self.status_bar_groupbox.setMinimumHeight(20)
+        self.status_bar_groupbox.setMaximumHeight(50)
+        self.status_bar_groupbox.setMinimumWidth(200)
+        
+        self.location_label = QLabel(self.status_bar_groupbox)
         self.location_label.setGeometry(550, 1, 200, 20)
 
-        self.location_label2 = QLabel(self.bottom_bar_groupbox)
+        self.location_label2 = QLabel(self.status_bar_groupbox)
         self.location_label2.setGeometry(780, 1, 200, 20)
 
-        self.location_label3 = QLabel(self.bottom_bar_groupbox)
+        self.location_label3 = QLabel(self.status_bar_groupbox)
         self.location_label3.setGeometry(1000, 1, 200, 20)
 
     def initUI(self):
-        self.init_toolbox()
-        self.init_side_toolbox()
-        self.init_bottom_bar()
+        self.init_top_toolbar()
+        self.init_side_toolbox_and_canvas()
+        self.init_status_bar()
 
         self.canvas = Canvas(self)
 
-        bottom_layout = QHBoxLayout()
-        bottom_layout.addWidget(self.side_toolbar_groupbox)
-        
-        bottom_layout.addWidget(self.canvas)
+        side_toolbox_and_canvas = QHBoxLayout()
+        side_toolbox_and_canvas.addWidget(self.side_toolbox_groupbox)
+        side_toolbox_and_canvas.addWidget(self.canvas)
 
         main_layout = QVBoxLayout()
-        main_layout.addWidget(self.toolbox_widget, 0 , Qt.AlignmentFlag.AlignTop)
+        main_layout.addWidget(self.top_toolbar_groupbox)
         main_layout.setSpacing(0)
-        main_layout.addLayout(bottom_layout)
-        main_layout.addWidget(self.bottom_bar_groupbox)
+        main_layout.addLayout(side_toolbox_and_canvas)
+        main_layout.addWidget(self.status_bar_groupbox)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
         main_widget = QWidget()
         main_widget.setLayout(main_layout)
