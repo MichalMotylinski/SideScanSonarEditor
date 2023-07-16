@@ -1024,7 +1024,7 @@ class MyWindow(QMainWindow):
     def clear_labels(self):
         # Clear label list widgets from all labels.
         for i in range(self.polygons_list_widget.count()):
-            self.polygons_list_widget.takeItem(0)
+            a = self.polygons_list_widget.takeItem(0)
         for i in range(self.label_list_widget.count()):
             self.label_list_widget.takeItem(0)
         self.canvas.classes = {}
@@ -1864,10 +1864,11 @@ class MyWindow(QMainWindow):
     def save_image(self):
         if self.image is None:
             return
-        if os.path.exists(f"{self.image_filename}.json"):
+        
+        try:
             with open(f"{self.image_filename}.json", "r") as f:
                 old_polygons = json.load(f)
-        else:
+        except:
             old_polygons = {}
         
         with open(f"{self.image_filename}.json", "w") as f:
@@ -1913,12 +1914,15 @@ class MyWindow(QMainWindow):
 
             # Update list of labels used
             new_classes = {}
-            for key in list(polygons.keys()):
-                old_class = polygons[key]["label"]
-                if old_class not in new_classes.keys():
-                    lab = self.canvas.classes[self.old_classes[polygons[key]["label"]]]
-                    polygons[key]["label"] = lab
-                    new_classes[polygons[key]["label"]] = self.old_classes[old_class]
+            if len(self.old_classes) != 0:
+                for key in list(polygons.keys()):
+                    old_class = polygons[key]["label"]
+                    if old_class not in self.old_classes.keys():
+                        continue
+                    if old_class not in new_classes.keys():
+                        lab = self.canvas.classes[self.old_classes[polygons[key]["label"]]]
+                        polygons[key]["label"] = lab
+                        new_classes[polygons[key]["label"]] = self.old_classes[old_class]
                 
             self.old_classes = new_classes
 
@@ -2031,42 +2035,45 @@ class MyWindow(QMainWindow):
         self.stretch_slider.setValue(self.stretch)
         self.stretch = int(self.stretch_slider.value())
 
-        with open(f"{self.image_filename}.json", "r") as f:
-            data = json.load(f)
+        try:
+            with open(f"{self.image_filename}.json", "r") as f:
+                data = json.load(f)
+        except:
+            return
 
-            self.full_image_height = data["full_height"]
-            self.full_image_width = data["full_width"]
-            polygons = data["shapes"]
+        self.full_image_height = data["full_height"]
+        self.full_image_width = data["full_width"]
+        polygons = data["shapes"]
 
-            for key in polygons:
-                arr = []
-                inside = False
-                for point in polygons[key]["points"]:
-                    min_y = (floor(self.full_image_height / self.splits) * (self.selected_split - 1) / self.stretch) - self.shift
-                    max_y = (floor(self.full_image_height / self.splits) * self.selected_split) / self.stretch + self.shift
-                    
-                    # If at least one point of the polygon can be visible then display the polygon
-                    if self.is_point_in_rectangle(point, [0 , min_y, self.full_image_width, max_y]):
-                        inside = True
-                    p = [point[0], point[1]]#self.port_image.size[1] - point[1]# + (self.full_image_height * self.stretch) * (self.selected_split - 1) / self.stretch]
-                    arr.append(p)
-
-                polygons[key]["points"] = arr
-
-                label_idx = self.canvas.get_label_idx(polygons[key]["label"])
+        for key in polygons:
+            arr = []
+            inside = False
+            for point in polygons[key]["points"]:
+                min_y = (floor(self.full_image_height / self.splits) * (self.selected_split - 1) / self.stretch) - self.shift
+                max_y = (floor(self.full_image_height / self.splits) * self.selected_split) / self.stretch + self.shift
                 
-                if label_idx == None:
-                    label_idx = len(self.canvas.classes.items())
-                
-                #self.polygons_list_widget.setCurrentRow(0)
-                # Add labels to the list
-                if polygons[key]["label"] not in set(self.canvas.classes.values()):
-                    self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True, parent=self.label_list_widget))
-                    self.canvas.classes[label_idx] = polygons[key]["label"]
-                    self.old_classes[polygons[key]["label"]] = label_idx
-            self.polygons_data = polygons
-            # Clear list of selected polygons
-            self.canvas.selected_polygons = []
+                # If at least one point of the polygon can be visible then display the polygon
+                if self.is_point_in_rectangle(point, [0 , min_y, self.full_image_width, max_y]):
+                    inside = True
+                p = [point[0], point[1]]#self.port_image.size[1] - point[1]# + (self.full_image_height * self.stretch) * (self.selected_split - 1) / self.stretch]
+                arr.append(p)
+
+            polygons[key]["points"] = arr
+
+            label_idx = self.canvas.get_label_idx(polygons[key]["label"])
+            
+            if label_idx == None:
+                label_idx = len(self.canvas.classes.items())
+            
+            #self.polygons_list_widget.setCurrentRow(0)
+            # Add labels to the list
+            if polygons[key]["label"] not in set(self.canvas.classes.values()):
+                self.label_list_widget.addItem(ListWidgetItem(polygons[key]["label"], label_idx, POLY_COLORS[label_idx], checked=True, parent=self.label_list_widget))
+                self.canvas.classes[label_idx] = polygons[key]["label"]
+                self.old_classes[polygons[key]["label"]] = label_idx
+        self.polygons_data = polygons
+        # Clear list of selected polygons
+        self.canvas.selected_polygons = []
 
     def scale_range(self, old_value, old_min, old_max, new_min, new_max):
         old_range = old_max - old_min
@@ -2120,6 +2127,7 @@ class MyWindow(QMainWindow):
                 self.canvas.set_image(True, pixmap)
                 self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
             else:
+                self.clear_labels()
                 self.image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.image)
                 self.canvas.set_image(True, pixmap)
