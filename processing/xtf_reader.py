@@ -355,7 +355,7 @@ class XTFReader:
         
         d = datetime (ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000)
         r = XTFNAVIGATIONRECORD(d, ping.PingNumber, ping.SensorXcoordinate, ping.SensorYcoordinate, ping.SensorDepth, ping.SensorPrimaryAltitude, ping.SensorHeading, ping.SensorSpeed)
-        return max_samples_port, max_range, 1, r.dateTime.timestamp()
+        return max_samples_port, max_range, r.dateTime.timestamp()
 
     
     def computeSpeedFromPositions(self, navData):
@@ -366,7 +366,7 @@ class XTFReader:
                 navData[r].sensorSpeed = rng / (navData[r+1].dateTime.timestamp() - navData[r].dateTime.timestamp())             
         else:
             for r in range(len(navData) - 1):
-                rng, bearing12, bearing21 = geodetic.calculateRangeBearingFromGridPosition(navData[r].sensorX, navData[r].sensorY, navData[r+1].sensorX, navData[r+1].sensorY)               
+                rng, bearing12 = geodetic.calculateRangeBearingFromGridPosition(navData[r].sensorX, navData[r].sensorY, navData[r+1].sensorX, navData[r+1].sensorY)               
                 # now we have the range, comput the speed in metres/second. where speed = distance/time
                 navData[r].sensorSpeed = rng / (navData[r+1].dateTime.timestamp() - navData[r].dateTime.timestamp())             
                 
