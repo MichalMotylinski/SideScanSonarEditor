@@ -1,5 +1,6 @@
 
 import processing.xtf_reader as xtf_reader
+import processing.beam_correction as beam_correction
 import numpy as np
 import math
 import matplotlib as mpl
@@ -11,6 +12,8 @@ import sys
 import os
 import psutil
 import bisect
+from processing import geodetic
+from datetime import datetime
 
 def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
     data = xtf_reader.XTFReader(filepath)
@@ -23,12 +26,20 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
     # Read the last packet and get its size and time
     data.fileptr.seek(data.fileSize - packet_size, 0)
-    max_samples_port, max_slant_range, mean_speed, time_last = data.get_duration(channel_num)
+    max_samples_port, slant_range, time_last = data.get_duration(channel_num)
     data.fileptr.seek(first_pos, 0)
 
-    # Sample interval in metres
-    across_track_sample_interval = (max_slant_range / max_samples_port) * decimation
+    create_bc_table = True
+
+    if create_bc_table or (not os.path.exists(f"{filepath.rsplit('/', 2)[-2]}.csv")):
+        samples_port_avg, samples_stbd_avg = beam_correction.compute_beam_correction(filepath, 0, 1, slant_range, ping_count)
+
     
+
+    # Sample interval in metres
+    across_track_sample_interval = (slant_range / max_samples_port) * decimation
+    
+    mean_speed = compute_mean_speed(filepath)
     # To make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
     distance = mean_speed * (time_last - time_first)
     along_track_sample_interval = (distance / ping_count)
@@ -111,16 +122,24 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
 
         channel = np.array(ping.pingChannel[0].data[::decimation])
         channel = np.multiply(channel, math.pow(2, - ping.pingChannel[0].Weight))
+
+        samples_port_avg_at_40 = beam_correction.get_value_at_40_degree(samples_port_avg, ping.pingChannel[0].SlantRange, ping.SensorPrimaryAltitude)
+        channel = np.add(channel, samples_port_avg_at_40)
+
         filtered_port_data = channel.tolist()
         
-        for i in range(stretch):
+        for _ in range(stretch):
             port_data.insert(0, filtered_port_data[::-1])
         
         channel = np.array(ping.pingChannel[1].data[::decimation])
         channel = np.multiply(channel, math.pow(2, - ping.pingChannel[1].Weight))
+
+        samples_port_avg_at_40 = beam_correction.get_value_at_40_degree(samples_stbd_avg, ping.pingChannel[0].SlantRange, ping.SensorPrimaryAltitude)
+        channel = np.add(channel, samples_port_avg_at_40)
+
         raw_starboard_data = channel.tolist()
 
-        for i in range(stretch):
+        for _ in range(stretch):
             starboard_data.insert(0, raw_starboard_data)
 
     image_height = (data.fileSize - 1024) / packet_size
@@ -152,7 +171,6 @@ def load_selected_split(filepath, decimation, stretch, shift, packet_size, split
         stop_point = stop_point + 1024
     if selected_split == splits:
         stop_point = data.fileSize
-    print(math.floor(math.ceil(data.fileSize / splits) / packet_size), math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size)
     
     while pos < stop_point:
         #while pos < math.floor(math.ceil(data.fileSize / splits) / packet_size) * packet_size * selected_split:
@@ -326,3 +344,38 @@ def merge_images(image1, image2):
     result.paste(im=image1, box=(0, 0))
     result.paste(im=image2, box=(width1, 0))
     return result
+
+def compute_mean_speed(filename):
+    i = 0
+    geographicals = False
+    speeds = []
+    prev_x_coordinate = None
+    prev_y_coordinate = None
+    prev_datetime = None
+
+    data = xtf_reader.XTFReader(filename)
+    while data.moreData():
+        ping = data.readPacket()
+
+        # Check if data is in geographicals
+        if i == 0 and (ping.SensorXcoordinate <= 180) & (ping.SensorYcoordinate <= 90): 
+            geographicals = True
+
+        if i % 2 == 0:
+            prev_x_coordinate, prev_y_coordinate = ping.SensorXcoordinate, ping.SensorYcoordinate
+            prev_datetime = datetime(ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000).timestamp()
+        else:
+            current_x_coordinate, current_y_coordinate= ping.SensorXcoordinate, ping.SensorYcoordinate
+            current_datetime = datetime(ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000).timestamp()
+
+            if geographicals:
+                range, _, _ = geodetic.calculateRangeBearingFromGeographicals(prev_x_coordinate, prev_y_coordinate, current_x_coordinate, current_y_coordinate)
+                # now we have the range, comput the speed in metres/second. where speed = distance/time
+                speeds.append(range / (current_datetime - prev_datetime))
+            else:
+                range, _ = geodetic.calculateRangeBearingFromGridPosition(prev_x_coordinate, prev_y_coordinate, current_x_coordinate, current_y_coordinate)
+                # now we have the range, comput the speed in metres/second. where speed = distance/time
+                speeds.append(range / (current_datetime - prev_datetime))
+        mean_speed = float(np.mean(speeds))
+        i += 1
+    return mean_speed
