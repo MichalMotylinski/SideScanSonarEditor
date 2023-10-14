@@ -324,20 +324,6 @@ class XTFReader:
         bytesRemaining = self.fileSize - self.fileptr.tell()
         # print ("current file ptr position:", self.fileptr.tell())
         return bytesRemaining
-            
-    def loadNavigation(self):
-        navigation = []
-        start_time = time.time() # time the process
-        while self.moreData():
-            pingHdr = self.readPacket()
-            # we need to calculate the approximate speed, so need the ping interval
-            d = datetime (pingHdr.Year, pingHdr.Month, pingHdr.Day, pingHdr.Hour, pingHdr.Minute, pingHdr.Second, pingHdr.HSeconds * 10000)
-            r = XTFNAVIGATIONRECORD(d, pingHdr.PingNumber, pingHdr.SensorXcoordinate, pingHdr.SensorYcoordinate, pingHdr.SensorDepth, pingHdr.SensorPrimaryAltitude, pingHdr.SensorHeading, pingHdr.SensorSpeed)
-            navigation.append(r)
-            
-        self.rewind()
-        print("Get navigation Range Duration %.3fs" % (time.time() - start_time)) # print the processing time.
-        return (navigation)
 
     def get_packet_size(self):
         ping = self.readPacket()
@@ -356,31 +342,6 @@ class XTFReader:
         d = datetime (ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000)
         r = XTFNAVIGATIONRECORD(d, ping.PingNumber, ping.SensorXcoordinate, ping.SensorYcoordinate, ping.SensorDepth, ping.SensorPrimaryAltitude, ping.SensorHeading, ping.SensorSpeed)
         return max_samples_port, max_range, r.dateTime.timestamp()
-
-    
-    def computeSpeedFromPositions(self, navData):
-        if (navData[0].sensorX <= 180) & (navData[0].sensorY <= 90): #data is in geographicals
-            for r in range(len(navData) - 1):
-                rng, bearing12, bearing21 = geodetic.calculateRangeBearingFromGeographicals(navData[r].sensorX, navData[r].sensorY, navData[r+1].sensorX, navData[r+1].sensorY)               
-                # now we have the range, comput the speed in metres/second. where speed = distance/time
-                navData[r].sensorSpeed = rng / (navData[r+1].dateTime.timestamp() - navData[r].dateTime.timestamp())             
-        else:
-            for r in range(len(navData) - 1):
-                rng, bearing12 = geodetic.calculateRangeBearingFromGridPosition(navData[r].sensorX, navData[r].sensorY, navData[r+1].sensorX, navData[r+1].sensorY)               
-                # now we have the range, comput the speed in metres/second. where speed = distance/time
-                navData[r].sensorSpeed = rng / (navData[r+1].dateTime.timestamp() - navData[r].dateTime.timestamp())             
-                
-        # now smooth the sensorSpeed
-        speeds = [o.sensorSpeed for o in navData]
-        npspeeds=np.array(speeds)
-        
-        smoothSpeed = geodetic.medfilt(npspeeds, 5)
-        meanSpeed = float(np.mean(smoothSpeed))
-        
-        for r in range(len(navData) - 1):
-            navData[r].sensorSpeed = float (smoothSpeed[r])
-
-        return meanSpeed, navData
           
     def readPacketheader(self):
         data = self.fileptr.read(self.XTFPacketHeader_len)
@@ -415,26 +376,3 @@ class XTFReader:
             self.fileptr.seek(currentPacketPosition + NumBytesThisRecord, 0)
     
         return ping
-    
-    # def readChannel(self):        
-    #     return XTFPINGCHANHEADER()
-         
-if __name__ == "__main__":
-    #open the XTF file for reading by creating a new XTFReader class and passin in the filename to open.  The reader will read the initial header so we can get to grips with the file contents with ease.  
-    r = XTFReader("C:/development/python/ssl-0064-vsm3_17-20151122-175354_P_Rev2.xtf")
-    # r = XTFReader("C:/development/python/ssh-0065-vsm3_16-20151122-182327_P_Rev2.xtf")
-    
-    # print the XTF file header information.  This gives a brief summary of the file contents.
-    for ch in range(r.XTFFileHdr.NumberOfSonarChannels):
-        print(r.XTFFileHdr.XTFChanInfo[ch])
-
-    while r.moreData():
-        pingHdr = r.readPacket()
-        # print (pingHdr.PingNumber,  pingHdr.SensorXcoordinate, pingHdr.SensorYcoordinate)
-
-    r.rewind()
-    navigation = r.loadNavigation()
-    for n in navigation:
-        print ("X: %.3f Y: %.3f Hdg: %.3f Alt: %.3f Depth: %.3f" % (n.sensorX, n.sensorY, n.sensorHeading, n.sensorAltitude, n.sensorDepth))
-    print("Complete reading XTF file :-)")
-    r.close()    

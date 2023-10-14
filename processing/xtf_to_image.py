@@ -5,17 +5,16 @@ import numpy as np
 import math
 import matplotlib as mpl
 import time
-import pickle
 import pandas as pd
 from PIL import Image
-import sys
 import os
 import psutil
 import bisect
 from processing import geodetic
 from datetime import datetime
+import json
 
-def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
+def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, compute_bac):
     data = xtf_reader.XTFReader(filepath)
 
     first_pos = data.fileptr.tell()
@@ -29,12 +28,21 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
     max_samples_port, slant_range, time_last = data.get_duration(channel_num)
     data.fileptr.seek(first_pos, 0)
 
-    create_bc_table = True
+    bac_dir = os.path.join(filepath.rsplit("/", 1)[0], "BAC")
+    if compute_bac:
+        if not os.path.exists(bac_dir):
+            os.mkdir(bac_dir)
 
-    if create_bc_table or (not os.path.exists(f"{filepath.rsplit('/', 2)[-2]}.csv")):
-        samples_port_avg, samples_stbd_avg = beam_correction.compute_beam_correction(filepath, 0, 1, slant_range, ping_count)
+        if os.path.exists(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json")):
+            with open(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json"), "r") as json_file:
+                data = json.load(json_file)
+                samples_port_avg, samples_stbd_avg = data["port"], data["starboard"]
+        else:
+            samples_port_avg, samples_stbd_avg = beam_correction.compute_beam_correction(filepath, 0, 1, slant_range, ping_count)
+            data = {"port": samples_port_avg.tolist(), "starboard": samples_stbd_avg.tolist()}
+            with open(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json"), "w") as json_file:
+                json.dump(data, json_file)
 
-    
 
     # Sample interval in metres
     across_track_sample_interval = (slant_range / max_samples_port) * decimation
@@ -123,8 +131,9 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
         channel = np.array(ping.pingChannel[0].data[::decimation])
         channel = np.multiply(channel, math.pow(2, - ping.pingChannel[0].Weight))
 
-        samples_port_avg_at_40 = beam_correction.get_value_at_40_degree(samples_port_avg, ping.pingChannel[0].SlantRange, ping.SensorPrimaryAltitude)
-        channel = np.add(channel, samples_port_avg_at_40)
+        if compute_bac:
+            samples_port_avg_at_40 = beam_correction.get_value_at_40_degree(samples_port_avg, ping.pingChannel[0].SlantRange, ping.SensorPrimaryAltitude)
+            channel = np.add(channel, samples_port_avg_at_40)
 
         filtered_port_data = channel.tolist()
         
@@ -134,8 +143,9 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift):
         channel = np.array(ping.pingChannel[1].data[::decimation])
         channel = np.multiply(channel, math.pow(2, - ping.pingChannel[1].Weight))
 
-        samples_port_avg_at_40 = beam_correction.get_value_at_40_degree(samples_stbd_avg, ping.pingChannel[0].SlantRange, ping.SensorPrimaryAltitude)
-        channel = np.add(channel, samples_port_avg_at_40)
+        if compute_bac:
+            samples_port_avg_at_40 = beam_correction.get_value_at_40_degree(samples_stbd_avg, ping.pingChannel[0].SlantRange, ping.SensorPrimaryAltitude)
+            channel = np.add(channel, samples_port_avg_at_40)
 
         raw_starboard_data = channel.tolist()
 

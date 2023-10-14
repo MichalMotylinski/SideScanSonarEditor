@@ -48,6 +48,7 @@ class MyWindow(QMainWindow):
         self.mouse_coords = []
         self.accross_interval = 0
         self.along_interval = 0
+        self.compute_bac = True
 
         self.crs = ""
         self.utm_zone = ""
@@ -355,9 +356,16 @@ class MyWindow(QMainWindow):
 
         # Save image button
         self.save_btn = QtWidgets.QPushButton(self.load_data_groupbox)
-        self.save_btn.setGeometry(115, 50, 100, 22)
+        self.save_btn.setGeometry(50, 50, 100, 22)
         self.save_btn.setText("Save image")
         self.save_btn.clicked.connect(self.save_image)
+
+        # Compute BAC
+        self.compute_bac_checkbox = QCheckBox(self.load_data_groupbox)
+        self.compute_bac_checkbox.setGeometry(180, 50, 100, 22)
+        self.compute_bac_checkbox.setText(f"BAC")
+        self.compute_bac_checkbox.stateChanged.connect(self.update_compute_bac)
+        self.compute_bac_checkbox.setChecked(True)
 
         # Loading data parameters
         self.decimation_label = QLabel(self.load_data_groupbox)
@@ -1072,6 +1080,9 @@ class MyWindow(QMainWindow):
         
         self.setCentralWidget(main_widget)
 
+    def update_compute_bac(self):
+        self.compute_bac = self.sender().isChecked()
+
     def update_decimation(self):
         self.decimation = self.sender().value()
         self.decimation_label.setText(f"Decimation: {str(self.sender().value())}")
@@ -1083,6 +1094,7 @@ class MyWindow(QMainWindow):
         
         self.stretch_label.setText(f"Stretch: {str(self.sender().value())}")
         self.stretch_label.adjustSize()
+        self.stretch = self.sender().value()
 
     def update_auto_stretch(self):
         self.auto_stretch = self.sender().isChecked()
@@ -2088,7 +2100,7 @@ class MyWindow(QMainWindow):
         if self.filepath is None:
             return
         
-        self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
+        self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift, self.compute_bac)
         
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -2112,7 +2124,7 @@ class MyWindow(QMainWindow):
             self.filename = self.filepath.rsplit("/", 1)[1]
             self.image_filename = f"{self.filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}"
 
-            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift)
+            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(self.filepath, 0, self.decimation, self.auto_stretch, self.stretch, self.shift, self.compute_bac)
             
             self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
             self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
