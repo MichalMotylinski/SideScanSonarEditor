@@ -24,7 +24,8 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__()
         
         self.setGeometry(200, 40, 1180, 780)
-        self.setWindowTitle("SSS")
+        self.window_title = "Side Scan Sonar Editor"
+        self.setWindowTitle(self.window_title)
         
         # File info
         self.filepath = None
@@ -1878,12 +1879,12 @@ class MyWindow(QMainWindow):
             return
         
         try:
-            with open(f"{self.image_filename}.json", "r") as f:
+            with open(os.path.join(self.filepath.rsplit('/', 1)[0], f"{self.image_filename}.json"), "r") as f:
                 old_polygons = json.load(f)
         except:
             old_polygons = {}
         
-        with open(f"{self.image_filename}.json", "w") as f:
+        with open(os.path.join(self.filepath.rsplit('/', 1)[0], f"{self.image_filename}.json"), "w") as f:
             data = {}
             data["full_height"] = self.full_image_height
             data["full_width"] = self.full_image_width
@@ -2048,7 +2049,7 @@ class MyWindow(QMainWindow):
         self.stretch = int(self.stretch_slider.value())
 
         try:
-            with open(f"{self.image_filename}.json", "r") as f:
+            with open(os.path.join(self.filepath.rsplit('/', 1)[0], f"{self.image_filename}.json"), "r") as f:
                 data = json.load(f)
         except:
             return
@@ -2132,7 +2133,7 @@ class MyWindow(QMainWindow):
             bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
             top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
             self.polygons_data = []
-            if os.path.exists(f"{self.image_filename}.json"):
+            if os.path.exists(os.path.join(self.filepath.rsplit('/', 1)[0], f"{self.image_filename}.json")):
                 self.load_data()
                 self.image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.image)
@@ -2151,6 +2152,7 @@ class MyWindow(QMainWindow):
             self.stretch_auto = self.stretch
             self.stretch_slider.setValue(self.stretch)
             self.stretch_label.setText(f"Stretch: {self.stretch}")
+            self.setWindowTitle(f"{self.window_title} - {self.filepath.rsplit('/', 1)[1]}")
 
 def closest(lst, K):
         return lst[min(range(len(lst)), key = lambda i: abs(lst[i] - K))]
@@ -2158,7 +2160,7 @@ def closest(lst, K):
 def window():
     app = QApplication(sys.argv)
     win = MyWindow()
-    
+
     win.show()
 
     sys.exit(app.exec())
