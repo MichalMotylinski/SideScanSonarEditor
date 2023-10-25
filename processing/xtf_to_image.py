@@ -35,13 +35,13 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, co
 
         if os.path.exists(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json")):
             with open(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json"), "r") as json_file:
-                data = json.load(json_file)
-                samples_port_avg, samples_stbd_avg = data["port"], data["starboard"]
+                bac_data = json.load(json_file)
+                samples_port_avg, samples_stbd_avg = bac_data["port"], bac_data["starboard"]
         else:
             samples_port_avg, samples_stbd_avg = beam_correction.compute_beam_correction(filepath, 0, 1, slant_range, ping_count)
-            data = {"port": samples_port_avg.tolist(), "starboard": samples_stbd_avg.tolist()}
+            bac_data = {"port": samples_port_avg.tolist(), "starboard": samples_stbd_avg.tolist()}
             with open(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json"), "w") as json_file:
-                json.dump(data, json_file)
+                json.dump(bac_data, json_file)
 
 
     # Sample interval in metres
@@ -65,8 +65,6 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, co
     if available_size < data_limit:
         data_limit == available_size
     
-
-    print("Size", req_size, data_limit)
     if req_size > data_limit:
         print("Not enough memory, splitting the data.")
         
@@ -111,7 +109,6 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, co
                 print(pos)
 
         image_height = (data.fileSize - 1024) / packet_size
-
         return np.array(port_data), np.array(starboard_data), coords, splits, stretch, packet_size, image_height, image_width, across_track_sample_interval, along_track_sample_interval
 
     data = xtf_reader.XTFReader(filepath)
@@ -153,7 +150,6 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, co
             starboard_data.insert(0, raw_starboard_data)
 
     image_height = (data.fileSize - 1024) / packet_size
-
     return np.array(port_data), np.array(starboard_data), coords, 1, stretch, packet_size, image_height, image_width, across_track_sample_interval, along_track_sample_interval
 
 def load_selected_split(filepath, decimation, stretch, shift, packet_size, splits, selected_split):
