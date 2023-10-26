@@ -286,6 +286,7 @@ class Canvas(QGraphicsView):
     ################################################
     def mousePressEvent(self, event):
         global X_POS, Y_POS
+        
         if event.button() == Qt.MouseButton.MiddleButton:
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
             
@@ -494,43 +495,42 @@ class Canvas(QGraphicsView):
             self.parent().parent().location_label3.setText(f"X: {round(x, 2)}, Y: {round(y, 2)}")
 
             # Get vertical middle point of the image in reference to a cursor current position
-            middle_point = ((self.scene().sceneRect().width() * self.parent().parent().decimation) / 2, event.position().y() / self.parent().parent().stretch)
+            middle_point = ((self.scene().sceneRect().width() * self.parent().parent().decimation) / 2, y)
             
             # Get gyro angle of the currently highlighted ping
-            angle_rad = math.radians(self.parent().parent().coords[math.floor(y)]["gyro"])
+            if (math.floor(y) < len(self.parent().parent().coords)):
+                angle_rad = math.radians(self.parent().parent().coords[math.floor(y)]["gyro"])
             
-            # Calculate cursor coordinate in reference to a middle point
-            diff_x = x - middle_point[0]
-            diff_y = y - middle_point[1]
+                # Calculate cursor coordinate in reference to a middle point
+                diff_x = x - middle_point[0]
+                diff_y = y - middle_point[1]
 
-            # Rotate the cursor point 
-            rotated_x = diff_x * math.cos(angle_rad) - diff_y * math.sin(angle_rad)
-            rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
-            
-            # Convert cursor position from pixels to UTM system and add it to the middle point (also UTM)
-            converted_x = self.parent().parent().coords[math.floor(y)]['x'] + (rotated_x * self.parent().parent().accross_interval / self.parent().parent().decimation)
-            converted_y = self.parent().parent().coords[math.floor(y)]['y'] + (rotated_y * self.parent().parent().along_interval)
-            self.parent().parent().location_label.setText(f"N: {round(converted_x, 4): .4f}, E: {round(converted_y, 4): .4f}")
-            
-            #print(x,y , diff_x, diff_y, rotated_x, rotated_y,converted_x , converted_y, middle_point, angle_rad, self.parent().parent().coords[math.floor(y)]["gyro"])
+                # Rotate the cursor point 
+                rotated_x = diff_x * math.cos(angle_rad) - diff_y * math.sin(angle_rad)
+                rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
+
+                # Convert rotated pixel coordinate into UTM and add to to the center point
+                converted_northing = self.parent().parent().coords[math.floor(y)]['x'] + (self.parent().parent().accross_interval * rotated_x) / self.parent().parent().decimation
+                converted_easting = self.parent().parent().coords[math.floor(y)]['y'] - (self.parent().parent().accross_interval * rotated_y) / self.parent().parent().decimation
+                self.parent().parent().location_label.setText(f"N: {round(converted_northing, 4): .4f}, E: {round(converted_easting, 4): .4f}")
+                
             # Convert UTM to longitude and latitude coordinates
             try:
                 zone_letter = self.parent().parent().utm_zone[-1]
                 p = Proj(proj='utm', zone=int(self.parent().parent().utm_zone[:-1]), ellps=self.parent().parent().crs, south=False)
-                lon, lat = p(converted_x, converted_y, inverse=True)
+                lon, lat = p(converted_northing, converted_easting, inverse=True)
                 if zone_letter != 'N':
                     lat = -lat
                 self.parent().parent().location_label2.setText(f"Lat: {lat: .6f}, Lon: {lon: .6f}")
             except:
-                #print("Wrong coordinate system")
                 self.parent().parent().location_label2.setText(f"Lat: 0, Lon: 0")
 
         if self._panning:
             delta = event.position() - self._last_pos
             self._last_pos = event.position()
 
-            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
-            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            self.horizontalScrollBar().setValue(int(self.horizontalScrollBar().value() - delta.x()))
+            self.verticalScrollBar().setValue(int(self.verticalScrollBar().value() - delta.y()))
 
             X_POS = self.horizontalScrollBar().value()
             Y_POS = self.verticalScrollBar().value()
