@@ -1,10 +1,8 @@
 import math
-from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QRectF
+from pyproj import Proj
+from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsItem, QMenu, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
-import copy
-import numpy as np
-from pyproj import Proj, transform
 
 from widgets.draw_shapes import *
 
@@ -16,50 +14,45 @@ POLY_COLORS = [[255, 0, 0], [0, 0, 255], [255, 255, 0],
                 [0, 0, 128], [128, 128, 0], [128, 0, 128], [0, 128, 128]]
 
 class Canvas(QGraphicsView):
-    photo_clicked = pyqtSignal(QPointF)
-
     def __init__(self, parent):
         super(Canvas, self).__init__(parent)
-        self._zoom = 0
-        self._empty = True
+        
+        # Initialise canvas elements
         self._scene = QGraphicsScene(self)
-        self._photo = QGraphicsPixmapItem()
-        self._scene.addItem(self._photo)
-        self._panning = False
-        self._last_pos = QPointF()
+        self._pixmap_item = QGraphicsPixmapItem()
+        self._scene.addItem(self._pixmap_item)
 
         self.setScene(self._scene)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setInteractive(True)
         self.setMouseTracking(True)
+
+        # Canvas parameters
+        self._zoom = 0
+        self._canvas_empty = True
+        self._global_factor = 1
+        self._x_padding = None
+        self._y_padding = None
         
+        # Drawing parameters
         self._draw_mode = False
         self._drawing = False
-
-        self.global_factor = 1
-
+        self._line = None
+        self._selected_corner = None
+        self._selected_polygons = []
         self._polygons = []
-        self.line = None
-        self.selected_corner = None
-        self.selected_polygons = []
-        self.mouse_pressed = False
-        self.mouse_moved = False
-        self.prev_pos = None
-        self.prev_polygon = None
-        self.ellipses_drawn = []
+        self._selected_class = None
+        self._classes = {}
+        self._adding_polygon_to_list = False
+        self._ellipse_size = QPointF(2.0, 2.0)
+        self._ellipse_shift = self.ellipse_size.x() / 2
+        self._active_draw = {"points": [], "corners": [], "lines": []}
 
-        self.x_padding = None
-        self.y_padding = None
-
-        self.selected_class = None
-        self.classes = {}
-
-        self.adding_polygon_to_list = False
-
-        self.ellipse_size = QPointF(2.0, 2.0)
-        self.ellipse_shift = self.ellipse_size.x() / 2
-
-        self.active_draw = {"points": [], "corners": [], "lines": []}
+        # Mouse cursor related parameters
+        self._mouse_pressed = False
+        self._mouse_moved = False
+        self._panning = False
+        self._previous_cursor_position = None
 
         # Setting visibility and apperance of the scroll bars
         self.horizontalScrollBar().setStyleSheet("QScrollBar:horizontal { height: 14px; }")
@@ -83,6 +76,204 @@ class Canvas(QGraphicsView):
         self.edit_polygon_label_action.triggered.connect(self.on_edit_polygon_label_action)
 
         self.show()
+
+    ################################################
+    # Canvas parameters encapsulation
+    ################################################
+    @property
+    def zoom(self):
+        """The zoom property."""
+        return self._zoom
+    
+    @zoom.setter
+    def zoom(self, val):
+        self._zoom = val
+    
+    @property
+    def canvas_empty(self):
+        """The canvas_empty property."""
+        return self._canvas_empty
+    
+    @canvas_empty.setter
+    def canvas_empty(self, val):
+        self._canvas_empty = val
+
+    @property
+    def global_factor(self):
+        """The global_factor property."""
+        return self._global_factor
+    
+    @global_factor.setter
+    def global_factor(self, val):
+        self._global_factor = val
+
+    @property
+    def x_padding(self):
+        """The x_padding property."""
+        return self._x_padding
+    
+    @x_padding.setter
+    def x_padding(self, val):
+        self._x_padding = val
+
+    @property
+    def y_padding(self):
+        """The y_padding property."""
+        return self._y_padding
+    
+    @y_padding.setter
+    def y_padding(self, val):
+        self._y_padding = val
+    
+    ################################################
+    # Drawing parameters encapsulation
+    ################################################
+    @property
+    def draw_mode(self):
+        """The draw_mode property."""
+        return self._draw_mode
+    
+    @draw_mode.setter
+    def draw_mode(self, val):
+        self._draw_mode = val
+
+    @property
+    def drawing(self):
+        """The drawing property."""
+        return self._drawing
+    
+    @drawing.setter
+    def drawing(self, val):
+        self._drawing = val
+
+    @property
+    def line(self):
+        """The line property."""
+        return self._line
+    
+    @line.setter
+    def line(self, val):
+        self._line = val
+
+    @property
+    def selected_corner(self):
+        """The selected_corner property."""
+        return self._selected_corner
+    
+    @selected_corner.setter
+    def selected_corner(self, val):
+        self._selected_corner = val
+
+    @property
+    def selected_polygons(self):
+        """The selected_polygons property."""
+        return self._selected_polygons
+    
+    @selected_polygons.setter
+    def selected_polygons(self, val):
+        self._selected_polygons = val
+    
+    @property
+    def polygons(self):
+        """The polygons property."""
+        return self._polygons
+    
+    @polygons.setter
+    def polygons(self, val):
+        self._polygons = val
+
+    @property
+    def selected_class(self):
+        """The selected_class property."""
+        return self._selected_class
+    
+    @selected_class.setter
+    def selected_class(self, val):
+        self._selected_class = val
+
+    @property
+    def classes(self):
+        """The classes property."""
+        return self._classes
+    
+    @classes.setter
+    def classes(self, val):
+        self._classes = val
+
+    @property
+    def adding_polygon_to_list(self):
+        """The adding_polygon_to_list property."""
+        return self._adding_polygon_to_list
+    
+    @adding_polygon_to_list.setter
+    def adding_polygon_to_list(self, val):
+        self._adding_polygon_to_list = val
+
+    @property
+    def ellipse_size(self):
+        """The ellipse_size property."""
+        return self._ellipse_size
+    
+    @ellipse_size.setter
+    def ellipse_size(self, val):
+        self._ellipse_size = val
+
+    @property
+    def ellipse_shift(self):
+        """The ellipse_shift property."""
+        return self._ellipse_shift
+    
+    @ellipse_shift.setter
+    def ellipse_shift(self, val):
+        self._ellipse_shift = val
+
+    @property
+    def active_draw(self):
+        """The active_draw property."""
+        return self._active_draw
+    
+    @active_draw.setter
+    def active_draw(self, val):
+        self._active_draw = val
+
+    ################################################
+    # Mouse cursor related parameters encapsulation
+    ################################################
+    @property
+    def mouse_pressed(self):
+        """The mouse_pressed property."""
+        return self._mouse_pressed
+    
+    @mouse_pressed.setter
+    def mouse_pressed(self, val):
+        self._mouse_pressed = val
+
+    @property
+    def mouse_moved(self):
+        """The mouse_moved property."""
+        return self._mouse_moved
+    
+    @mouse_moved.setter
+    def mouse_moved(self, val):
+        self._mouse_moved = val
+
+    @property
+    def panning(self):
+        """The panning property."""
+        return self._panning
+    
+    @panning.setter
+    def panning(self, val):
+        self._panning = val
+
+    @property
+    def previous_cursor_position(self):
+        """The previous_cursor_position property."""
+        return self._previous_cursor_position
+    
+    @previous_cursor_position.setter
+    def previous_cursor_position(self, val):
+        self._previous_cursor_position = val
 
     def delete_polygons(self):
         for polygon in self.selected_polygons:
@@ -145,31 +336,27 @@ class Canvas(QGraphicsView):
     def update_ver_val(self):
         global Y_POS
         Y_POS = self.sender().value()
-
-    def hasPhoto(self):
-        return not self._empty
-
+    
     def fitInView(self):
-        rect = QRectF(self._photo.pixmap().rect())
+        rect = QRectF(self._pixmap_item.pixmap().rect())
         if not rect.isNull():
             self.setSceneRect(rect)
-            if self.hasPhoto():
+            if not self._canvas_empty:
                 unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
                 self.scale(1 / unity.width(), 1 / unity.height())
-            #self._zoom = 0
 
     def set_image(self, initial=False, pixmap=None):
         global ZOOM_NUM, X_POS, Y_POS
 
         if pixmap and not pixmap.isNull():
-            self._empty = False
+            self._canvas_empty = False
             
             self.scene().setSceneRect(QRectF(pixmap.rect()))
-            self._photo.setPixmap(pixmap)
+            self._pixmap_item.setPixmap(pixmap)
         else:
-            self._empty = True
+            self._canvas_empty = True
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
-            self._photo.setPixmap(QPixmap())
+            self._pixmap_item.setPixmap(QPixmap())
         
         if initial:
             self.fitInView()
@@ -189,7 +376,7 @@ class Canvas(QGraphicsView):
         if self.y_padding <= 0:
             self.y_padding = 0
 
-    def load_polygons(self, polygons, decimation, stretch, full_image_height, selected_split, shift, bottom, top):
+    def load_polygons(self, polygons, decimation, stretch, bottom, top):
         # Clean the canvas before drawing the polygons
         self.clear_canvas()
         
@@ -231,7 +418,7 @@ class Canvas(QGraphicsView):
     def wheelEvent(self, event):
         global ZOOM_NUM, X_POS, Y_POS
 
-        if self.hasPhoto():
+        if not self._canvas_empty:
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
                 if event.angleDelta().y() > 0:
                     factor = 1.25
@@ -249,8 +436,6 @@ class Canvas(QGraphicsView):
                     self.scale(factor, factor)
                     delta = self.mapToScene(view_pos.toPoint()) - self.mapToScene(self.viewport().rect().center())
                     self.centerOn(scene_pos - delta)
-                    
-
                 elif self._zoom == 0:
                     self.fitInView()
                 else:
@@ -278,7 +463,7 @@ class Canvas(QGraphicsView):
     def toggleDragMode(self):
         if self.dragMode() == QGraphicsView.DragMode.ScrollHandDrag:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
-        elif not self._photo.pixmap().isNull():
+        elif not self._pixmap_item.pixmap().isNull():
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
     ################################################
@@ -291,7 +476,7 @@ class Canvas(QGraphicsView):
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
             
             self._panning = True
-            self._last_pos = event.position()
+            self.previous_cursor_position = event.position()
             self.right_mouse_pressed = True
         elif event.button() == Qt.MouseButton.LeftButton:
             # Drawing polygons if in drawing mode
@@ -427,7 +612,7 @@ class Canvas(QGraphicsView):
                             self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 200)))
                             self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
                             self.adding_polygon_to_list = True
-                        self.prev_pos = event.position()
+                        self.previous_cursor_position = event.position()
                 else:
                     for i in self.selected_polygons:
                         for j in self.scene().items():
@@ -526,8 +711,8 @@ class Canvas(QGraphicsView):
                 self.parent().parent().location_label2.setText(f"Lat: 0, Lon: 0")
 
         if self._panning:
-            delta = event.position() - self._last_pos
-            self._last_pos = event.position()
+            delta = event.position() - self.previous_cursor_position
+            self.previous_cursor_position = event.position()
 
             self.horizontalScrollBar().setValue(int(self.horizontalScrollBar().value() - delta.x()))
             self.verticalScrollBar().setValue(int(self.verticalScrollBar().value() - delta.y()))
@@ -603,8 +788,8 @@ class Canvas(QGraphicsView):
         elif len(self.selected_polygons) > 0:
             if self.mouse_pressed == True:
                 # Calculate mouse movement
-                x_point = (self.prev_pos.x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                y_point = (self.prev_pos.y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                x_point = (self.previous_cursor_position.x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (self.previous_cursor_position.y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
                 new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
                 new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
 
@@ -636,7 +821,7 @@ class Canvas(QGraphicsView):
                     self.scene().removeItem(polygon)
                     new_selected_polygons.append(new_polygon)
                 self.selected_polygons = new_selected_polygons
-            self.prev_pos = event.position()
+            self.previous_cursor_position = event.position()
         if self.mouse_pressed:
             self.mouse_moved = True
         super().mouseMoveEvent(event)
