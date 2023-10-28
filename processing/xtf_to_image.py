@@ -28,19 +28,19 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, co
     max_samples_port, slant_range, time_last = data.get_duration(channel_num)
     data.fileptr.seek(first_pos, 0)
 
-    bac_dir = os.path.join(filepath.rsplit("/", 1)[0], "BAC")
+    bac_dir = os.path.join(filepath.rsplit(os.sep, 1)[0], "BAC")
     if compute_bac:
         if not os.path.exists(bac_dir):
             os.mkdir(bac_dir)
 
-        if os.path.exists(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json")):
-            with open(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json"), "r") as json_file:
+        if os.path.exists(os.path.join(bac_dir, f"{filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}_bac.json")):
+            with open(os.path.join(bac_dir, f"{filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}_bac.json"), "r") as json_file:
                 bac_data = json.load(json_file)
                 samples_port_avg, samples_stbd_avg = bac_data["port"], bac_data["starboard"]
         else:
             samples_port_avg, samples_stbd_avg = beam_correction.compute_beam_correction(filepath, 0, 1, slant_range, ping_count)
             bac_data = {"port": samples_port_avg.tolist(), "starboard": samples_stbd_avg.tolist()}
-            with open(os.path.join(bac_dir, f"{filepath.rsplit('/', 1)[1].rsplit('.', 1)[0]}.json"), "w") as json_file:
+            with open(os.path.join(bac_dir, f"{filepath.rsplit(os.sep, 1)[1].rsplit('.', 1)[0]}_bac.json"), "w") as json_file:
                 json.dump(bac_data, json_file)
 
 

@@ -946,13 +946,13 @@ class MyWindow(QMainWindow):
                 self.image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.image)
                 self.canvas.set_image(True, pixmap)
-                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
             else:
                 self.clear_labels()
                 self.image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.image)
                 self.canvas.set_image(True, pixmap)
-                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
 
             self.splits_textbox.setText(str(self.splits))
             self.selected_split_spinbox.setMaximum(self.splits)
@@ -982,13 +982,13 @@ class MyWindow(QMainWindow):
             self.image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
         else:
             self.clear_labels()
             self.image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
 
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -2104,12 +2104,12 @@ class MyWindow(QMainWindow):
             self.image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
         else:
             self.image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
         end = time.perf_counter()
         print("draw data", end-start)
 
