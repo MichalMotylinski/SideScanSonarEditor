@@ -1,18 +1,18 @@
-import sys
-import os
-import numpy as np
-import pickle
-from math import floor, ceil
-import time
-from PIL import Image, ImageDraw
-from PIL.ImageQt import toqpixmap
 import json
+from math import floor
+import numpy as np
+import os
+import pickle
+from PIL import Image
+from PIL.ImageQt import toqpixmap
 import platform
+import sys
+import time
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QSpinBox, QGroupBox, QApplication, QListWidget, QFrame, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QSpinBox, QGroupBox, QApplication, QListWidget, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont
 from PyQt6.QtCore import pyqtSlot, Qt
 
@@ -567,11 +567,11 @@ class MyWindow(QMainWindow):
         self.reload_file_btn.setText("Reload")
         self.reload_file_btn.clicked.connect(self.reload)
 
-        # Save image button
+        # Save labels button
         self.save_btn = QtWidgets.QPushButton(self.load_data_groupbox)
         self.save_btn.setGeometry(50, 50, 100, 22)
-        self.save_btn.setText("Save image")
-        self.save_btn.clicked.connect(self.save_image)
+        self.save_btn.setText("Save labels")
+        self.save_btn.clicked.connect(self.save_labels)
 
         # Compute BAC
         self.compute_bac_checkbox = QCheckBox(self.load_data_groupbox)
@@ -966,8 +966,30 @@ class MyWindow(QMainWindow):
         if self.input_filepath is None:
             return
         
+        arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
+        pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
+        
         self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), 0, self.decimation, self.auto_stretch, self.stretch, self.shift, self.compute_bac)
         
+        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
+        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
+
+        bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
+        top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
+        self.polygons_data = []
+        if os.path.exists(os.path.join(self.input_filepath, self.labels_filename)):
+            self.load_data()
+            self.image = merge_images(self.port_image, self.starboard_image)
+            pixmap = toqpixmap(self.image)
+            self.canvas.set_image(True, pixmap)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+        else:
+            self.clear_labels()
+            self.image = merge_images(self.port_image, self.starboard_image)
+            pixmap = toqpixmap(self.image)
+            self.canvas.set_image(True, pixmap)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height, self.selected_split, self.shift, bottom, top)
+
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
 
@@ -1014,7 +1036,7 @@ class MyWindow(QMainWindow):
         # Clear list of selected polygons
         self.canvas.selected_polygons = []
 
-    def save_image(self):
+    def save_labels(self):
         if self.image is None:
             return
         
@@ -2224,9 +2246,9 @@ class MyWindow(QMainWindow):
             
     def clear_labels(self):
         # Clear label list widgets from all labels.
-        for i in range(self.polygons_list_widget.count()):
-            a = self.polygons_list_widget.takeItem(0)
-        for i in range(self.label_list_widget.count()):
+        for _ in range(self.polygons_list_widget.count()):
+            self.polygons_list_widget.takeItem(0)
+        for _ in range(self.label_list_widget.count()):
             self.label_list_widget.takeItem(0)
         self.canvas.classes = {}
 
