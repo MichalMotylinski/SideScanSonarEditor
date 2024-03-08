@@ -8,6 +8,7 @@ from PIL.ImageQt import toqpixmap
 import platform
 import sys
 import time
+from shutil import rmtree
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
@@ -43,6 +44,7 @@ class MyWindow(QMainWindow):
         self._full_image_height = 0
         self._full_image_width = 0
         self._polygons_data = None
+        self._tiles_data = None
         self._old_classes = {}
         
         # Image load parameters
@@ -197,6 +199,15 @@ class MyWindow(QMainWindow):
     @polygons_data.setter
     def polygons_data(self, val):
         self._polygons_data = val
+
+    @property
+    def tiles_data(self):
+        """The tiles_data property."""
+        return self._tiles_data
+    
+    @tiles_data.setter
+    def tiles_data(self, val):
+        self._tiles_data = val
 
     @property
     def old_classes(self):
@@ -573,9 +584,15 @@ class MyWindow(QMainWindow):
         self.save_btn.setText("Save labels")
         self.save_btn.clicked.connect(self.save_labels)
 
+        # Crop tiles button
+        self.crop_tiles_btn = QtWidgets.QPushButton(self.load_data_groupbox)
+        self.crop_tiles_btn.setGeometry(180, 50, 100, 22)
+        self.crop_tiles_btn.setText("Crop tiles")
+        self.crop_tiles_btn.clicked.connect(self.crop_tiles)
+
         # Compute BAC
         self.compute_bac_checkbox = QCheckBox(self.load_data_groupbox)
-        self.compute_bac_checkbox.setGeometry(180, 50, 100, 22)
+        self.compute_bac_checkbox.setGeometry(180, 80, 100, 22)
         self.compute_bac_checkbox.setText(f"BAC")
         self.compute_bac_checkbox.stateChanged.connect(self.update_compute_bac)
         self.compute_bac_checkbox.setChecked(True)
@@ -926,9 +943,9 @@ class MyWindow(QMainWindow):
             if platform.system() == "Windows":
                 filepath = filepath.replace("/", "\\")
             self.input_filepath, self.input_filename = filepath.rsplit(os.sep, 1)
-            self.labels_filename = f"{self.input_filename.rsplit('.', 1)[0]}.json"
-
-            print(self.input_filepath, self.input_filename)
+            self.labels_filename = f"{self.input_filename.rsplit('.', 1)[0]}_labels.json"
+            self.tiles_filename = f"{self.input_filename.rsplit('.', 1)[0]}_tiles.json"
+            self.coco_anns_filename = f"{self.input_filename.rsplit('.', 1)[0]}.json"
 
             arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
             pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
@@ -947,12 +964,14 @@ class MyWindow(QMainWindow):
                 pixmap = toqpixmap(self.image)
                 self.canvas.set_image(True, pixmap)
                 self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
+                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
             else:
                 self.clear_labels()
                 self.image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.image)
                 self.canvas.set_image(True, pixmap)
                 self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
+                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
 
             self.splits_textbox.setText(str(self.splits))
             self.selected_split_spinbox.setMaximum(self.splits)
@@ -961,6 +980,7 @@ class MyWindow(QMainWindow):
             self.stretch_slider.setValue(self.stretch)
             self.stretch_label.setText(f"Stretch: {self.stretch}")
             self.setWindowTitle(f"{self.window_title} - {self.input_filename}")
+            self.draw_crop_tile_btn.setEnabled(True)
 
     def reload(self):
         if self.input_filepath is None:
@@ -983,12 +1003,14 @@ class MyWindow(QMainWindow):
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
             self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
+            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
         else:
             self.clear_labels()
             self.image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
             self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
+            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
 
         self.splits_textbox.setText(str(self.splits))
         self.selected_split_spinbox.setMaximum(self.splits)
@@ -1033,13 +1055,56 @@ class MyWindow(QMainWindow):
                 self.old_classes[polygons[key]["label"]] = label_idx
         self.polygons_data = polygons
 
+        try:
+            with open(os.path.join(self.input_filepath, self.tiles_filename), "r") as f:
+                data = json.load(f)
+        except:
+            return
+
+        tiles = data["shapes"]
+        self.tiles_data = tiles
+        #for key in tiles:
+
+            #if tiles[key]["rectangle"] not in set(self.canvas.classes.values()):
+
         # Clear list of selected polygons
         self.canvas.selected_polygons = []
+        self.canvas.selected_tiles = []
 
     def save_labels(self):
         if self.image is None:
             return
         
+        split_size = floor(self.full_image_height / self.splits)
+
+        try:
+            with open(os.path.join(self.input_filepath, self.tiles_filename), "r") as f:
+                old_tiles = json.load(f)
+        except:
+            old_tiles = {}
+
+        with open(os.path.join(self.input_filepath, self.tiles_filename), "w") as f:
+            data = {}
+            data["full_height"] = self.full_image_height
+            data["full_width"] = self.full_image_width
+            tiles = {}
+            i = 0
+
+            for tile_data in self.canvas._tiles:
+                if tile_data["tiles"] == None:
+                    if str(i) in old_tiles.keys():
+                        tiles[i] = old_tiles[str(i)]
+                        i += 1
+                elif tile_data["tiles"] == "del":
+                    tiles[i] = "del"
+                    i += 1
+                else:
+                    tiles[i] = {"rectangle": [tile_data["tiles"].rect().x() * self.decimation, (self.port_image.size[1] - tile_data["tiles"].rect().y()) / self.stretch + split_size * (self.selected_split - 1), tile_data["tiles"].rect().width() * self.decimation, tile_data["tiles"].rect().height() / self.stretch]}
+                    i += 1
+
+            data["shapes"] = tiles
+            json.dump(data, f, indent=4)
+
         try:
             with open(os.path.join(self.input_filepath, self.labels_filename), "r") as f:
                 old_polygons = json.load(f)
@@ -1053,7 +1118,7 @@ class MyWindow(QMainWindow):
             new_polygons = self.canvas._polygons
             polygons = {}
             i = 0
-            split_size = floor(self.full_image_height / self.splits)
+            
             old_classes = {}
 
             for polygon_data in new_polygons:
@@ -1109,6 +1174,95 @@ class MyWindow(QMainWindow):
 
             data["shapes"] = new_polygons
             json.dump(data, f, indent=4)
+
+    def crop_tiles(self):
+        if self.image is None:
+            return
+        anns = {
+        "info": {
+            "description": "SSS 2024 Dataset",
+            "url": "",
+            "version": "1.0",
+            "year": 2024,
+            "contributor": "Michal Motylinski",
+            "date_created": "2024-01-01"
+        },
+        "categories": [
+            {
+            "supercategory": "obstacle",
+            "id": 1,
+            "name": "Boulder"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 2,
+            "name": "Debris"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 3,
+            "name": "Possible UXO"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 4,
+            "name": "Shadow"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 5,
+            "name": "Boulder+Shadow"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 6,
+            "name": "Debris+Shadow"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 7,
+            "name": "Possible UXO+Shadow"
+        }
+        ],
+        "images": [],
+        "annotations": []
+        }
+
+        with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
+            tile_idx = 0
+            ann_idx = 0
+            for tile_data in self.canvas._tiles:
+                image = {
+                    "id": tile_idx,
+                    "width": TILE_SHAPE[0],
+                    "height": TILE_SHAPE[1],
+                    "file_name": f"{str(tile_idx).zfill(5)}.png"
+                }
+                tile_idx += 1
+                anns["images"].append(image)
+                for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
+
+                    xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
+                    xmax, ymax = np.max(np.array(polygon.polygon_corners).T[0]), np.max(np.array(polygon.polygon_corners).T[1])
+                    ann = {
+                        "id": ann_idx,
+                        "image_id": tile_idx,
+                        "category_id": next((category for category in anns["categories"] if category["name"] == polygon.polygon_class), None)["id"],
+                        "segmentation": np.array(polygon.polygon_corners).flatten().tolist(),
+                        "bbox": [xmin, ymin, xmax - xmin, ymax - ymin],
+                        "area": (xmax - xmin) * (ymax - ymin),
+                        "iscrowd": 0
+                    }
+                    ann_idx += 1
+                    anns["annotations"].append(ann)
+        if os.path.exists("sss_dataset"):
+            rmtree("sss_dataset")
+        os.mkdir("sss_dataset")
+
+        with open(os.path.join("sss_dataset", "annotations.json"), "w") as f:
+            json.dump(anns, f, indent=4)
+
+        
 
     def update_compute_bac(self):
         self.compute_bac = self.sender().isChecked()
@@ -1974,15 +2128,27 @@ class MyWindow(QMainWindow):
         self.draw_polygons_btn.setEnabled(False)
 
         self.edit_polygons_btn = QPushButton(self.splits_groupbox)
-        self.edit_polygons_btn.setGeometry(210, 45, 100, 22)
+        self.edit_polygons_btn.setGeometry(210, 35, 100, 22)
         self.edit_polygons_btn.setText("Edit polygons")
         self.edit_polygons_btn.clicked.connect(self.edit_polygons)
 
         self.delete_polygons_btn = QPushButton(self.splits_groupbox)
-        self.delete_polygons_btn.setGeometry(210, 85, 100, 22)
+        self.delete_polygons_btn.setGeometry(210, 60, 100, 22)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
         self.delete_polygons_btn.setEnabled(False)
+
+        self.draw_crop_tile_btn = QPushButton(self.splits_groupbox)
+        self.draw_crop_tile_btn.setGeometry(210, 85, 100, 22)
+        self.draw_crop_tile_btn.setText("Draw crop tile")
+        self.draw_crop_tile_btn.clicked.connect(self.draw_tile_mode)
+        self.draw_crop_tile_btn.setEnabled(False)
+
+        self.delete_crop_tile_btn = QPushButton(self.splits_groupbox)
+        self.delete_crop_tile_btn.setGeometry(140, 85, 100, 22)
+        self.delete_crop_tile_btn.setText("Delete crop tile")
+        self.delete_crop_tile_btn.clicked.connect(self.delete_tiles)
+        self.delete_crop_tile_btn.setEnabled(False)
 
         ################################################
         # Labels group box
@@ -2012,13 +2178,19 @@ class MyWindow(QMainWindow):
         self.edit_label_btn.clicked.connect(self.edit_label)
 
         self.label_list_widget = QListWidget(self.labels_groupbox)
-        self.label_list_widget.setGeometry(60, 70, 200, 140)
+        self.label_list_widget.setGeometry(10, 70, 145, 140)
         self.label_list_widget.itemSelectionChanged.connect(self.on_label_list_selection)
         self.label_list_widget.itemChanged.connect(self.on_label_item_changed)
 
         self.polygons_list_widget = QListWidget(self.labels_groupbox)
-        self.polygons_list_widget.setGeometry(60, 230, 200, 140)
+        self.polygons_list_widget.setGeometry(165, 70, 150, 140)
         self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
+
+        self.tiles_list_widget = QListWidget(self.labels_groupbox)
+        self.tiles_list_widget.setGeometry(10, 230, 150, 140)
+        self.tiles_list_widget.itemChanged.connect(self.on_tile_item_changed)
+
+
 
         ################################################
         # Coords group box
@@ -2114,16 +2286,27 @@ class MyWindow(QMainWindow):
         print("draw data", end-start)
 
     def draw_polygons(self):
+        self.canvas._draw_tile_mode = False
         self.canvas._draw_mode = True
         self.delete_polygons_btn.setEnabled(False)
 
     def edit_polygons(self):
+        self.canvas._draw_tile_mode = False
         self.canvas._draw_mode = False
         self.delete_polygons_btn.setEnabled(True)
 
     def delete_polygons(self):
         self.canvas.delete_polygons()
         self.delete_polygons_btn.setEnabled(False)
+    
+    def draw_tile_mode(self):
+        self.canvas._draw_tile_mode = True
+        self.canvas._draw_mode = False
+        self.delete_polygons_btn.setEnabled(False)
+
+    def delete_tiles(self):
+        self.canvas.delete_tiles()
+        self.delete_crop_tile_btn.setEnabled(False)
 
     ################################################
     # Side toolbar label adding, removal and edits
@@ -2250,12 +2433,19 @@ class MyWindow(QMainWindow):
             self.polygons_list_widget.takeItem(0)
         for _ in range(self.label_list_widget.count()):
             self.label_list_widget.takeItem(0)
+        for _ in range(self.tiles_list_widget.count()):
+            self.tiles_list_widget.takeItem(0)
         self.canvas.classes = {}
 
     def on_polygon_item_changed(self, item):
         self.polygons_list_widget.setCurrentItem(item)
         if self.polygons_list_widget.currentItem() != None:
             self.canvas.hide_polygon(self.polygons_list_widget.currentItem().polygon_idx, item.checkState())
+
+    def on_tile_item_changed(self, item):
+        self.tiles_list_widget.setCurrentItem(item)
+        if self.tiles_list_widget.currentItem() != None:
+            self.canvas.hide_tile(self.tiles_list_widget.currentItem().polygon_idx, item.checkState())
 
     ################################################
     # Side toolbar map projections

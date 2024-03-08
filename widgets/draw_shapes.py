@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QLineF, QPointF,  Qt
 from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygonF, QPainterPath, QVector2D
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QComboBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem, QComboBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
     def __init__(self, rect, shift, polygon_idx, ellipse_idx, color):
@@ -111,6 +111,52 @@ class Polygon(QGraphicsPolygonItem):
             return
         self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
         self.setPen(QPen(QColor(*self.color[:-1])))
+
+class Rectangle(QGraphicsRectItem):
+    def __init__(self, parent, rect_idx, polygons_inside, color):
+        super().__init__(parent)
+
+        self._rect_idx = rect_idx
+        self._polygons_inside = polygons_inside
+        self.color = color
+        self.setBrush(QBrush(QColor(*color)))
+        self.setPen(QPen(QColor(*color[:-1]), 1))
+        self.setAcceptHoverEvents(True)
+        self._selected = False
+        
+    def setPen(self, pen: QPen):
+        super().setPen(pen)
+        self._path = None
+
+    def setPolygon(self, polygon: QPolygonF):
+        super().setPolygon(polygon)
+        self._path = None
+
+    def hoverEnterEvent(self, event):
+        self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
+        self.setPen(QPen(QColor(255, 255, 255)))
+    
+    def hoverLeaveEvent(self, event):
+        if self._selected:
+            return
+        self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
+        self.setPen(QPen(QColor(*self.color[:-1])))
+
+    @property
+    def rect_idx(self):
+        return self._rect_idx
+    
+    @rect_idx.setter
+    def rect_idx(self, val):
+        self._rect_idx = val
+    
+    @property
+    def polygons_inside(self):
+        return self._polygons_inside
+    
+    @polygons_inside.setter
+    def polygons_inside(self, val):
+        self._polygons_inside = val
 
 class ListWidgetItem(QListWidgetItem):
     """

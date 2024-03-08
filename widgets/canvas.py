@@ -9,6 +9,7 @@ from widgets.draw_shapes import *
 ZOOM_NUM = 0
 X_POS = 0
 Y_POS = 0
+TILE_SHAPE = (128, 128)
 POLY_COLORS = [[255, 0, 0], [0, 0, 255], [255, 255, 0],
                 [255, 0, 255], [0, 255, 255], [128, 0, 0], [0, 128, 0],
                 [0, 0, 128], [128, 128, 0], [128, 0, 128], [0, 128, 128]]
@@ -37,10 +38,13 @@ class Canvas(QGraphicsView):
         # Drawing parameters
         self._draw_mode = False
         self._drawing = False
+        self._draw_tile_mode = False
         self._line = None
         self._selected_corner = None
         self._selected_polygons = []
+        self._selected_tiles = []
         self._polygons = []
+        self._tiles = []
         self._selected_class = None
         self._classes = {}
         self._adding_polygon_to_list = False
@@ -68,12 +72,14 @@ class Canvas(QGraphicsView):
         self.duplicate_polygons_action = self.menu.addAction("Duplicate Polygons")
         self.remove_point_action = self.menu.addAction("Remove Selected Point")
         self.edit_polygon_label_action = self.menu.addAction("Edit Polygon Label")
+        self.delete_tiles_action = self.menu.addAction("Remove Tiles")
 
         # Connect the actions to slots
         self.delete_polygons_action.triggered.connect(self.on_delete_polygons_action)
         self.duplicate_polygons_action.triggered.connect(self.on_duplicate_polygons_action)
         self.remove_point_action.triggered.connect(self.on_remove_point_action)
         self.edit_polygon_label_action.triggered.connect(self.on_edit_polygon_label_action)
+        self.delete_polygons_action.triggered.connect(self.on_delete_tiles_action)
 
         self.show()
 
@@ -147,6 +153,15 @@ class Canvas(QGraphicsView):
         self._drawing = val
 
     @property
+    def draw_tile_mode(self):
+        """The draw_tile_mode property."""
+        return self._draw_tile_mode
+    
+    @draw_tile_mode.setter
+    def draw_tile_mode(self, val):
+        self._draw_tile_mode = val
+
+    @property
     def line(self):
         """The line property."""
         return self._line
@@ -172,6 +187,15 @@ class Canvas(QGraphicsView):
     @selected_polygons.setter
     def selected_polygons(self, val):
         self._selected_polygons = val
+
+    @property
+    def selected_tiles(self):
+        """The selected_tiles property."""
+        return self._selected_tiles
+    
+    @selected_tiles.setter
+    def selected_tiles(self, val):
+        self._selected_tiles = val
     
     @property
     def polygons(self):
@@ -294,11 +318,27 @@ class Canvas(QGraphicsView):
             
         self.selected_polygons = []
 
+    def delete_tiles(self):
+        for tile in self.selected_tiles:
+            k = 0
+            for j, item in enumerate(self._tiles):
+                if item == None:
+                    continue
+                if item != "del":
+                    k += 1
+                    if item == tile:
+                        break
+            
+            self.scene().removeItem(tile)
+            self._tiles[tile._rect_idx] = "del"
+            self.parent().parent().tiles_list_widget.takeItem(k - 1)
+
     def clear_canvas(self):
         for item in self.scene().items():
-            if isinstance(item, Polygon) or isinstance(item, Ellipse):
+            if isinstance(item, Polygon) or isinstance(item, Ellipse) or isinstance(item, Rectangle):
                 self.scene().removeItem(item)
         self._polygons = []
+        self._tiles = []
 
     def hide_polygons(self, label, state):
         # Loop over polygons of selected label and hide them from user's view
@@ -318,7 +358,7 @@ class Canvas(QGraphicsView):
     
     def hide_polygon(self, idx, state):
         # Hide a singular polygon
-        if  idx >= len(self._polygons):
+        if idx >= len(self._polygons):
             return
         if state == Qt.CheckState.Checked:
             self._polygons[idx]["polygon"].setVisible(True)
@@ -328,6 +368,15 @@ class Canvas(QGraphicsView):
             self._polygons[idx]["polygon"].setVisible(False)
             for point in self._polygons[idx]["corners"]:
                 point.setVisible(False)
+
+    def hide_tile(self, idx, state):
+        # Hide a singular tile
+        if idx >= len(self._tiles):
+            return
+        if state == Qt.CheckState.Checked:
+            self._tiles[idx]["tiles"].setVisible(True)
+        else:
+            self._tiles[idx]["tiles"].setVisible(False)
 
     def update_hor_val(self):
         global X_POS
@@ -414,6 +463,28 @@ class Canvas(QGraphicsView):
                 # If not in range append None to create space for items from other splits
                 self._polygons.append(None)
             idx += 1
+
+    def load_tiles(self, tiles, decimation, stretch, bottom, top):
+
+        if tiles == None:
+            return
+        for key in tiles:
+            in_range = False
+            x, y, width, height = tiles[key]["rectangle"]
+            if top > y > bottom or top > y + height > bottom :
+                in_range = True
+            if in_range:
+                rectangle = Rectangle(QRectF(x / decimation,  (top - y) * stretch, TILE_SHAPE[0] / decimation, TILE_SHAPE[1] *  stretch), len(self._tiles), [], [255, 128, 64, 120])
+                self.scene().addItem(rectangle)
+                self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
+
+                colliding_list = []
+                for colliding_item in self.scene().items()[-1].collidingItems():
+                    if isinstance(colliding_item, Polygon):
+                        colliding_list.append(colliding_item.polygon_idx)
+
+                rectangle.polygons_inside = sorted(colliding_list)
+                self._tiles.append({"tiles": rectangle})
 
     def wheelEvent(self, event):
         global ZOOM_NUM, X_POS, Y_POS
@@ -541,16 +612,71 @@ class Canvas(QGraphicsView):
 
                         # Reset list of currently drawn objects
                         self.active_draw = {"points": [], "corners": [], "lines": []}
+            elif self._draw_tile_mode:
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                
+                rectangle = Rectangle(QRectF(x_point - (TILE_SHAPE[0] / self.parent().parent().decimation / 2),  y_point - (TILE_SHAPE[1] / self.parent().parent().stretch / 2), TILE_SHAPE[0] / self.parent().parent().decimation, TILE_SHAPE[1] * self.parent().parent().stretch), len(self._tiles), [], [255, 128, 64, 120])
+                self.scene().addItem(rectangle)
+                self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
+
+                colliding_list = []
+                for colliding_item in self.scene().items()[-1].collidingItems():
+                    if isinstance(colliding_item, Polygon):
+                        colliding_list.append(colliding_item.polygon_idx)
+
+                rectangle.polygons_inside = sorted(colliding_list)
+                self._tiles.append({"tiles": rectangle})
             else:
                 # If not in drawing mode select item that was clicked
                 if len(self.items(event.position().toPoint())) == 0:
                     return
-                
-                if isinstance(self.items(event.position().toPoint())[0], Ellipse):
+                if isinstance(self.items(event.position().toPoint())[0], Rectangle):
+                    for i in self.selected_polygons:
+                        for j in self.scene().items():
+                            if i == j:
+                                label_idx = self.get_label_idx(i.polygon_class)
+                                j._selected = False
+                                j.setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
+                                j.setPen(QPen(QColor(*POLY_COLORS[label_idx])))
+                    self.selected_polygons = []
+                    self.parent().parent().delete_crop_tile_btn.setEnabled(True)
+
+                    if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                        if self.items(event.position().toPoint())[0] not in self.selected_tiles:
+                            self.selected_tiles.append(self.items(event.position().toPoint())[0])
+                            self.items(event.position().toPoint())[0]._selected = True
+
+                            self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 128, 64, 200)))
+                            self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
+                    else:
+                        for i in self.selected_tiles:
+                            for j in self.scene().items():
+                                if i == j:
+                                    j._selected = False
+                                    j.setBrush(QBrush(QColor(255, 128, 64, 120)))
+                                    j.setPen(QPen(QColor(255, 128, 64)))
+                        self.selected_tiles = []
+                        self.selected_tiles.append(self.items(event.position().toPoint())[0])
+                        self.items(event.position().toPoint())[0]._selected = True
+
+                        self.items(event.position().toPoint())[0].setBrush(QBrush(QColor(255, 128, 64, 200)))
+                        self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
+                        self.adding_polygon_to_list = True
+                    self.previous_cursor_position = event.position()
+
+                elif isinstance(self.items(event.position().toPoint())[0], Ellipse):
                     self.selected_corner = self.items(event.position().toPoint())[0]
                     self.selected_polygons = []
                 
-                if isinstance(self.items(event.position().toPoint())[0], Polygon):
+                elif isinstance(self.items(event.position().toPoint())[0], Polygon):
+                    for i in self.selected_tiles:
+                        for j in self.scene().items():
+                            if i == j:
+                                j._selected = False
+                                j.setBrush(QBrush(QColor(255, 128, 64, 120)))
+                                j.setPen(QPen(QColor(255, 128, 64)))
+                    self.selected_tiles = []
                     self.parent().parent().delete_polygons_btn.setEnabled(True)
 
                     added = False
@@ -604,6 +730,13 @@ class Canvas(QGraphicsView):
                                 self.items(event.position().toPoint())[0].setPen(QPen(QColor(255, 255, 255)))
                                 self.adding_polygon_to_list = True
                         else:
+                            for i in self.selected_polygons:
+                                for j in self.scene().items():
+                                    if i == j:
+                                        label_idx = self.get_label_idx(i.polygon_class)
+                                        j._selected = False
+                                        j.setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
+                                        j.setPen(QPen(QColor(*POLY_COLORS[label_idx])))
                             self.selected_polygons = []
                             self.selected_polygons.append(self.items(event.position().toPoint())[0])
                             self.items(event.position().toPoint())[0]._selected = True
@@ -622,6 +755,14 @@ class Canvas(QGraphicsView):
                                 j.setBrush(QBrush(QColor(*POLY_COLORS[label_idx], 120)))
                                 j.setPen(QPen(QColor(*POLY_COLORS[label_idx])))
                     self.selected_polygons = []
+
+                    for i in self.selected_tiles:
+                        for j in self.scene().items():
+                            if i == j:
+                                j._selected = False
+                                j.setBrush(QBrush(QColor(255, 128, 64, 120)))
+                                j.setPen(QPen(QColor(255, 128, 64)))
+                    self.selected_tiles = []
             self.mouse_pressed = True
         self.mouse_moved = False
         super().mousePressEvent(event)
@@ -822,6 +963,34 @@ class Canvas(QGraphicsView):
                     new_selected_polygons.append(new_polygon)
                 self.selected_polygons = new_selected_polygons
             self.previous_cursor_position = event.position()
+        elif len(self.selected_tiles) > 0:
+            if self.mouse_pressed == True:
+                # Calculate mouse movement
+                x_point = (self.previous_cursor_position.x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                y_point = (self.previous_cursor_position.y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
+                new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+
+                x_change = new_x_point - x_point
+                y_change = new_y_point - y_point
+                
+                new_selected_tiles = []
+                for tile in self.selected_tiles:
+                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, TILE_SHAPE[0] / self.parent().parent().decimation, TILE_SHAPE[1] / self.parent().parent().stretch), tile._rect_idx, [], [255, 128, 64, 120])
+                    new_tile.setPen(QPen(QColor(255, 255, 255)))
+                    self.scene().addItem(new_tile)
+                    self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]
+                    
+                    colliding_list = []
+                    for colliding_item in self.scene().items()[-1].collidingItems():
+                        if isinstance(colliding_item, Polygon):
+                            colliding_list.append(colliding_item.polygon_idx)
+
+                    new_tile.polygons_inside = sorted(colliding_list)
+                    self.scene().removeItem(tile)
+                    new_selected_tiles.append(new_tile)
+                self.selected_tiles = new_selected_tiles
+            self.previous_cursor_position = event.position()
         if self.mouse_pressed:
             self.mouse_moved = True
         super().mouseMoveEvent(event)
@@ -864,6 +1033,9 @@ class Canvas(QGraphicsView):
     def on_delete_polygons_action(self):
         # Delete polygons
         self.delete_polygons()
+
+    def on_delete_tiles_action(self):
+        self.delete_tiles()
 
     def on_duplicate_polygons_action(self):
         # Duplicate polygons
