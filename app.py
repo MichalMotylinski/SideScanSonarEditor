@@ -1091,16 +1091,22 @@ class MyWindow(QMainWindow):
             i = 0
 
             for tile_data in self.canvas._tiles:
-                if tile_data["tiles"] == None:
+                print(self.canvas._tiles)
+                if tile_data == None:
                     if str(i) in old_tiles.keys():
                         tiles[i] = old_tiles[str(i)]
                         i += 1
-                elif tile_data["tiles"] == "del":
+                elif tile_data == "del":
                     tiles[i] = "del"
                     i += 1
                 else:
                     tiles[i] = {"rectangle": [tile_data["tiles"].rect().x() * self.decimation, (self.port_image.size[1] - tile_data["tiles"].rect().y()) / self.stretch + split_size * (self.selected_split - 1), tile_data["tiles"].rect().width() * self.decimation, tile_data["tiles"].rect().height() / self.stretch]}
                     i += 1
+
+            # Remove polygons from dict 
+            for key in list(tiles.keys()):
+                if tiles[key] == "del":
+                    del tiles[key]
 
             data["shapes"] = tiles
             json.dump(data, f, indent=4)
@@ -1228,10 +1234,13 @@ class MyWindow(QMainWindow):
         "annotations": []
         }
 
+        split_size = floor(self.full_image_height / self.splits)
+
         with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
             tile_idx = 0
             ann_idx = 0
             for tile_data in self.canvas._tiles:
+                
                 image = {
                     "id": tile_idx,
                     "width": TILE_SHAPE[0],
@@ -1240,17 +1249,39 @@ class MyWindow(QMainWindow):
                 }
                 tile_idx += 1
                 anns["images"].append(image)
+                print(tile_data["tiles"].rect(), self.port_image.size[1])
+                x_tile = tile_data["tiles"].rect().x() * self.decimation
+                y_tile = tile_data["tiles"].rect().y() / self.stretch
+                width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
+                height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch + split_size * (self.selected_split - 1)) - y_tile
+                print(x_tile, y_tile, width_tile, height_tile)
                 for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
 
                     xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
                     xmax, ymax = np.max(np.array(polygon.polygon_corners).T[0]), np.max(np.array(polygon.polygon_corners).T[1])
+                    print(xmin, ymin,xmax, ymax)
+                    tile_xmin, tile_ymin = tile_data["tiles"].rect().x() * self.decimation, (self.port_image.size[1] - tile_data["tiles"].rect().y()) / self.stretch + split_size * (self.selected_split - 1),
+                    #tile_xmax, tile_ymax = tile_data["tiles"].rect().width() * self.decimation, tile_data["tiles"].rect().height() / self.stretch]}
+                    #print(np.array(polygon.polygon_corners).T[0], np.array(polygon.polygon_corners).T[0]  * self.decimation)
+                    #x = polygon[0] * self.decimation
+                    #y = (self.port_image.size[1] - polygon[1]) / self.stretch + split_size * (self.selected_split - 1)
+                    x_list = np.array(polygon.polygon_corners).T[0]  * self.decimation
+                    y_list = np.array(polygon.polygon_corners).T[1] / self.stretch
+
+                    x_list = x_list - x_tile
+                    y_list = y_list - y_tile
+                    new_polygon = [item for pair in zip(x_list, y_list) for item in pair]
+                    #polygons1 = [item1 * 2 if i % 2 == 0 else item2 / 4 for i, (item1, item2) in enumerate(zip(list1, list2))]
+                    
+                    print(new_polygon)
+                    print([np.min(x_list) - x_tile, np.min(y_list) - y_tile, np.max(x_list) - np.min(x_list), np.max(y_list) - np.min(y_list)])
                     ann = {
                         "id": ann_idx,
                         "image_id": tile_idx,
                         "category_id": next((category for category in anns["categories"] if category["name"] == polygon.polygon_class), None)["id"],
-                        "segmentation": np.array(polygon.polygon_corners).flatten().tolist(),
-                        "bbox": [xmin, ymin, xmax - xmin, ymax - ymin],
-                        "area": (xmax - xmin) * (ymax - ymin),
+                        "segmentation": new_polygon,
+                        "bbox": [np.min(x_list), np.min(y_list), np.max(x_list) - np.min(x_list), np.max(y_list) - np.min(y_list)],
+                        "area": (np.max(x_list) - np.min(x_list)) * (np.max(y_list) - np.min(y_list)),
                         "iscrowd": 0
                     }
                     ann_idx += 1

@@ -344,7 +344,7 @@ class Canvas(QGraphicsView):
         # Loop over polygons of selected label and hide them from user's view
         for polygon in self._polygons:
             # Ignore if not in current split
-            if polygon == None:
+            if polygon == None or polygon == "del":
                 continue
             if polygon["polygon"].polygon_class == label:
                 if state == Qt.CheckState.Checked:
