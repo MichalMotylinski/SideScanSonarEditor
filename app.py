@@ -9,6 +9,7 @@ import platform
 import sys
 import time
 from shutil import rmtree
+import cv2
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
@@ -26,7 +27,7 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__()
         
         # Set window properties
-        self.setGeometry(200, 40, 1180, 780)
+        self.setGeometry(1000, 400, 1180, 780)
         self.window_title = "Side Scan Sonar Editor"
         self.setWindowTitle(self.window_title)
         
@@ -958,6 +959,7 @@ class MyWindow(QMainWindow):
             bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
             top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
             self.polygons_data = []
+            self.tiles_data = []
             if os.path.exists(os.path.join(self.input_filepath, self.labels_filename)):
                 self.load_data()
                 self.image = merge_images(self.port_image, self.starboard_image)
@@ -997,6 +999,7 @@ class MyWindow(QMainWindow):
         bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
         top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
         self.polygons_data = []
+        self.tiles_data = []
         if os.path.exists(os.path.join(self.input_filepath, self.labels_filename)):
             self.load_data()
             self.image = merge_images(self.port_image, self.starboard_image)
@@ -1082,7 +1085,7 @@ class MyWindow(QMainWindow):
                 old_tiles = json.load(f)
         except:
             old_tiles = {}
-
+        
         with open(os.path.join(self.input_filepath, self.tiles_filename), "w") as f:
             data = {}
             data["full_height"] = self.full_image_height
@@ -1091,7 +1094,6 @@ class MyWindow(QMainWindow):
             i = 0
 
             for tile_data in self.canvas._tiles:
-                print(self.canvas._tiles)
                 if tile_data == None:
                     if str(i) in old_tiles.keys():
                         tiles[i] = old_tiles[str(i)]
@@ -1144,9 +1146,9 @@ class MyWindow(QMainWindow):
                 else:
                     corners = []
                     for idx, polygon in enumerate(polygon_data["polygon"]._polygon_corners):
+                        
                         x = polygon[0] * self.decimation
                         y = (self.port_image.size[1] - polygon[1]) / self.stretch + split_size * (self.selected_split - 1)
-                        
                         corners.append([x, y])
                     polygons[i] = {"label": polygon_data["polygon"].polygon_class,
                                    "points": corners}
@@ -1236,65 +1238,92 @@ class MyWindow(QMainWindow):
 
         split_size = floor(self.full_image_height / self.splits)
 
-        with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
-            tile_idx = 0
-            ann_idx = 0
-            for tile_data in self.canvas._tiles:
+        tile_idx = 0
+        ann_idx = 0
+        for tile_data in self.canvas._tiles:
+            x_tile = tile_data["tiles"].rect().x() * self.decimation
+            y_tile = tile_data["tiles"].rect().y() / self.stretch + split_size * (self.splits - self.selected_split)
+            width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
+            height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch + split_size * (self.selected_split - 1)) - y_tile
+            
+            xmin = x_tile
+            xmax = x_tile + tile_data["tiles"].rect().width() * self.decimation
+            ymin = int(y_tile)
+            ymax = int(y_tile + tile_data["tiles"].rect().height() / self.stretch)
+            
+            tiler_xmin = tile_data["tiles"].rect().x() * self.decimation
+            tiler_xmax = tiler_xmin + tile_data["tiles"].rect().width() * self.decimation
+            tiler_ymin = tile_data["tiles"].rect().y() / self.stretch
+            tiler_ymax = tiler_ymin + tile_data["tiles"].rect().height() / self.stretch
+
+            tile_xmin = xmin
+            side = "port" if xmin < self.full_image_width else "stbd"
+            if side == "port":
+                xmin = self.full_image_width - xmax
+                xmax = xmin + tile_data["tiles"].rect().width() * self.decimation
+                data = np.fliplr(self.port_data)
+            else:
+                xmin = x_tile - self.full_image_width
+                xmax = xmin + tile_data["tiles"].rect().width() * self.decimation
+                data = self.starboard_data
+
+            image = {
+                "id": tile_idx,
+                "width": TILE_SHAPE[0],
+                "height": TILE_SHAPE[1],
+                "file_name": f"{str(tile_idx).zfill(5)}.png",
+                "rectangle": [xmin, ymin, xmax - xmin, ymax - ymin],
+                "side": side
+            }
+            tile_idx += 1
+            anns["images"].append(image)
+
+            til = data[ymin:ymax, int(xmin):int(xmax)]  
+            
+            for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
                 
-                image = {
-                    "id": tile_idx,
-                    "width": TILE_SHAPE[0],
-                    "height": TILE_SHAPE[1],
-                    "file_name": f"{str(tile_idx).zfill(5)}.png"
+                xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
+                xmax, ymax = np.max(np.array(polygon.polygon_corners).T[0]), np.max(np.array(polygon.polygon_corners).T[1])
+                
+                x_list = np.array(polygon.polygon_corners).T[0] * self.decimation
+                y_list = np.array(polygon.polygon_corners).T[1] / self.stretch
+
+                iou = calculate_iou([tiler_xmin,tiler_ymin,tiler_xmax,tiler_ymax], [min(x_list),min(y_list),max(x_list),max(y_list)])
+                inter = intersection([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
+                
+                if inter < 50:
+                    continue
+
+                x_list = x_list - x_tile
+                y_list = y_list - y_tile
+                new_polygon = [item for pair in zip(x_list, y_list) for item in pair]
+                
+                ann = {
+                    "id": ann_idx,
+                    "image_id": tile_idx,
+                    "category_id": next((category for category in anns["categories"] if category["name"] == polygon.polygon_class), None)["id"],
+                    "segmentation": new_polygon,
+                    "bbox": [np.min(x_list), np.min(y_list), np.max(x_list) - np.min(x_list), np.max(y_list) - np.min(y_list)],
+                    "area": (np.max(x_list) - np.min(x_list)) * (np.max(y_list) - np.min(y_list)),
+                    "iscrowd": 0
                 }
-                tile_idx += 1
-                anns["images"].append(image)
-                print(tile_data["tiles"].rect(), self.port_image.size[1])
-                x_tile = tile_data["tiles"].rect().x() * self.decimation
-                y_tile = tile_data["tiles"].rect().y() / self.stretch
-                width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
-                height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch + split_size * (self.selected_split - 1)) - y_tile
-                print(x_tile, y_tile, width_tile, height_tile)
-                for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
+                ann_idx += 1
+                
+                xmin = 128 - ann["bbox"][0]-ann["bbox"][2]
+                ymin = ann["bbox"][1]
+                xmax = xmin + ann["bbox"][2]
+                ymax = ann["bbox"][1] + ann["bbox"][3]
 
-                    xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
-                    xmax, ymax = np.max(np.array(polygon.polygon_corners).T[0]), np.max(np.array(polygon.polygon_corners).T[1])
-                    print(xmin, ymin,xmax, ymax)
-                    tile_xmin, tile_ymin = tile_data["tiles"].rect().x() * self.decimation, (self.port_image.size[1] - tile_data["tiles"].rect().y()) / self.stretch + split_size * (self.selected_split - 1),
-                    #tile_xmax, tile_ymax = tile_data["tiles"].rect().width() * self.decimation, tile_data["tiles"].rect().height() / self.stretch]}
-                    #print(np.array(polygon.polygon_corners).T[0], np.array(polygon.polygon_corners).T[0]  * self.decimation)
-                    #x = polygon[0] * self.decimation
-                    #y = (self.port_image.size[1] - polygon[1]) / self.stretch + split_size * (self.selected_split - 1)
-                    x_list = np.array(polygon.polygon_corners).T[0]  * self.decimation
-                    y_list = np.array(polygon.polygon_corners).T[1] / self.stretch
+                if side == "port":
+                    flipped = cv2.flip(np.array([[ann["segmentation"][i], ann["segmentation"][i+1]] for i in range(0, len(ann["segmentation"]), 2)]), flipCode=0)
+                    ann["segmentation"] = flipped.flatten().tolist()
+                    ann["bbox"] = [xmin, ymin, ann["bbox"][2], ann["bbox"][3]]
 
-                    x_list = x_list - x_tile
-                    y_list = y_list - y_tile
-                    new_polygon = [item for pair in zip(x_list, y_list) for item in pair]
-                    #polygons1 = [item1 * 2 if i % 2 == 0 else item2 / 4 for i, (item1, item2) in enumerate(zip(list1, list2))]
-                    
-                    print(new_polygon)
-                    print([np.min(x_list) - x_tile, np.min(y_list) - y_tile, np.max(x_list) - np.min(x_list), np.max(y_list) - np.min(y_list)])
-                    ann = {
-                        "id": ann_idx,
-                        "image_id": tile_idx,
-                        "category_id": next((category for category in anns["categories"] if category["name"] == polygon.polygon_class), None)["id"],
-                        "segmentation": new_polygon,
-                        "bbox": [np.min(x_list), np.min(y_list), np.max(x_list) - np.min(x_list), np.max(y_list) - np.min(y_list)],
-                        "area": (np.max(x_list) - np.min(x_list)) * (np.max(y_list) - np.min(y_list)),
-                        "iscrowd": 0
-                    }
-                    ann_idx += 1
-                    anns["annotations"].append(ann)
-        if os.path.exists("sss_dataset"):
-            rmtree("sss_dataset")
-        os.mkdir("sss_dataset")
-
-        with open(os.path.join("sss_dataset", "annotations.json"), "w") as f:
-            json.dump(anns, f, indent=4)
-
+                anns["annotations"].append(ann)
         
-
+        with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
+            json.dump(anns, f, indent=4)
+    
     def update_compute_bac(self):
         self.compute_bac = self.sender().isChecked()
 
@@ -2113,7 +2142,7 @@ class MyWindow(QMainWindow):
         # Splits group box
         ################################################
         self.splits_groupbox = QGroupBox(self.side_toolbox_groupbox)
-        self.splits_groupbox.setGeometry(0, 0, 320, 120)
+        self.splits_groupbox.setGeometry(0, 0, 320, 140)
         self.splits_groupbox.setMinimumWidth(320)
 
         self.splits_label = QLabel(self.splits_groupbox)
@@ -2148,7 +2177,7 @@ class MyWindow(QMainWindow):
         self.shift_textbox.editingFinished.connect(self.update_shift_textbox)
         
         self.load_split_btn = QPushButton(self.splits_groupbox)
-        self.load_split_btn.setGeometry(30, 85, 100, 22)
+        self.load_split_btn.setGeometry(30, 110, 100, 22)
         self.load_split_btn.setText("Show split")
         self.load_split_btn.clicked.connect(self.load_split)
 
@@ -2176,7 +2205,7 @@ class MyWindow(QMainWindow):
         self.draw_crop_tile_btn.setEnabled(False)
 
         self.delete_crop_tile_btn = QPushButton(self.splits_groupbox)
-        self.delete_crop_tile_btn.setGeometry(140, 85, 100, 22)
+        self.delete_crop_tile_btn.setGeometry(210, 110, 100, 22)
         self.delete_crop_tile_btn.setText("Delete crop tile")
         self.delete_crop_tile_btn.clicked.connect(self.delete_tiles)
         self.delete_crop_tile_btn.setEnabled(False)
@@ -2185,7 +2214,7 @@ class MyWindow(QMainWindow):
         # Labels group box
         ################################################
         self.labels_groupbox = QGroupBox(self.side_toolbox_groupbox)
-        self.labels_groupbox.setGeometry(0, 120, 320, 380)
+        self.labels_groupbox.setGeometry(0, 140, 320, 360)
         self.labels_groupbox.setMinimumWidth(330)
 
         self.load_labels_btn = QPushButton(self.labels_groupbox)
@@ -2209,16 +2238,16 @@ class MyWindow(QMainWindow):
         self.edit_label_btn.clicked.connect(self.edit_label)
 
         self.label_list_widget = QListWidget(self.labels_groupbox)
-        self.label_list_widget.setGeometry(10, 70, 145, 140)
+        self.label_list_widget.setGeometry(10, 70, 140, 135)
         self.label_list_widget.itemSelectionChanged.connect(self.on_label_list_selection)
         self.label_list_widget.itemChanged.connect(self.on_label_item_changed)
 
         self.polygons_list_widget = QListWidget(self.labels_groupbox)
-        self.polygons_list_widget.setGeometry(165, 70, 150, 140)
+        self.polygons_list_widget.setGeometry(165, 70, 140, 135)
         self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
 
         self.tiles_list_widget = QListWidget(self.labels_groupbox)
-        self.tiles_list_widget.setGeometry(10, 230, 150, 140)
+        self.tiles_list_widget.setGeometry(10, 215, 140, 135)
         self.tiles_list_widget.itemChanged.connect(self.on_tile_item_changed)
 
 
@@ -2277,6 +2306,9 @@ class MyWindow(QMainWindow):
         for i in range(self.polygons_list_widget.count()):
             self.polygons_list_widget.takeItem(0)
 
+        for i in range(self.tiles_list_widget.count()):
+            self.tiles_list_widget.takeItem(0)
+
         # Load port and starboarrd data
         start = time.perf_counter()
         if self.auto_stretch:
@@ -2308,11 +2340,13 @@ class MyWindow(QMainWindow):
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
             self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
+            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
         else:
             self.image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.image)
             self.canvas.set_image(True, pixmap)
             self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
+            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
         end = time.perf_counter()
         print("draw data", end-start)
 
@@ -2535,7 +2569,33 @@ class MyWindow(QMainWindow):
 # Other functions
 ################################################
 def closest(arr, val):
-        return arr[min(range(len(arr)), key = lambda i: abs(arr[i] - val))]
+    return arr[min(range(len(arr)), key = lambda i: abs(arr[i] - val))]
+
+
+def intersection(box1, box2):
+    x1, y1, w1, h1 = box1
+    x2, y2, w2, h2 = box2
+
+    x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
+    y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
+
+    # Calculate intersection area
+    intersection_area = x_overlap * y_overlap
+
+    # Calculate area of smaller rectangle
+    smaller_rect_area = min(w1 * h1, w2 * h2)
+
+    # Calculate percentage of smaller rectangle inside the other rectangle
+    percentage_inside = (intersection_area / smaller_rect_area) * 100 if smaller_rect_area != 0 else 0
+
+    return percentage_inside
+def calculate_iou(box1, box2):
+    # Calculate intersection and union areas
+    intersection = max(0, min(box1[2], box2[2]) - max(box1[0], box2[0])) * max(0, min(box1[3], box2[3]) - max(box1[1], box2[1]))
+    union = (box1[2] - box1[0]) * (box1[3] - box1[1]) + (box2[2] - box2[0]) * (box2[3] - box2[1]) - intersection
+    # Calculate IoU
+    iou = intersection / union if union > 0 else 0
+    return iou
 
 def window():
     app = QApplication(sys.argv)

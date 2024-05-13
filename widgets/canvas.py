@@ -428,7 +428,8 @@ class Canvas(QGraphicsView):
     def load_polygons(self, polygons, decimation, stretch, bottom, top):
         # Clean the canvas before drawing the polygons
         self.clear_canvas()
-        
+        self._polygons = []
+
         if polygons == None:
             return
         
@@ -445,7 +446,7 @@ class Canvas(QGraphicsView):
             if in_range:
                 # If in range draw polygon and its corners
                 label_idx = self.get_label_idx(polygons[key]["label"])
-                        
+
                 polygon = Polygon(QPolygonF([QPointF(x[0] / decimation, (top - x[1]) * stretch) for x in polygons[key]["points"]]), idx, polygons[key]["label"], [*POLY_COLORS[label_idx], 120])
                 self.scene().addItem(polygon)
 
@@ -465,13 +466,13 @@ class Canvas(QGraphicsView):
             idx += 1
 
     def load_tiles(self, tiles, decimation, stretch, bottom, top):
-
+        self._tiles = []
         if tiles == None:
             return
         for key in tiles:
             in_range = False
             x, y, width, height = tiles[key]["rectangle"]
-            if top > y > bottom or top > y + height > bottom :
+            if top > y > bottom or top > y - height * stretch > bottom :
                 in_range = True
             if in_range:
                 rectangle = Rectangle(QRectF(x / decimation,  (top - y) * stretch, TILE_SHAPE[0] / decimation, TILE_SHAPE[1] *  stretch), len(self._tiles), [], [255, 128, 64, 120])
@@ -479,7 +480,7 @@ class Canvas(QGraphicsView):
                 self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
                 colliding_list = []
-                for colliding_item in self.scene().items()[-1].collidingItems():
+                for colliding_item in self.scene().items()[0].collidingItems():
                     if isinstance(colliding_item, Polygon):
                         colliding_list.append(colliding_item.polygon_idx)
 
@@ -976,7 +977,7 @@ class Canvas(QGraphicsView):
                 
                 new_selected_tiles = []
                 for tile in self.selected_tiles:
-                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, TILE_SHAPE[0] / self.parent().parent().decimation, TILE_SHAPE[1] / self.parent().parent().stretch), tile._rect_idx, [], [255, 128, 64, 120])
+                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, TILE_SHAPE[0] / self.parent().parent().decimation, TILE_SHAPE[1] * self.parent().parent().stretch), tile._rect_idx, [], [255, 128, 64, 120])
                     new_tile.setPen(QPen(QColor(255, 255, 255)))
                     self.scene().addItem(new_tile)
                     self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]
