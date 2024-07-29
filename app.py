@@ -1034,8 +1034,8 @@ class MyWindow(QMainWindow):
         except:
             return
 
-        self.full_image_height = data["full_height"]
-        self.full_image_width = data["full_width"]
+        #self.full_image_height = data["full_height"]
+        #self.full_image_width = data["full_width"]
         polygons = data["shapes"]
 
         for key in polygons:
@@ -1241,6 +1241,8 @@ class MyWindow(QMainWindow):
         tile_idx = 0
         ann_idx = 0
         for tile_data in self.canvas._tiles:
+            if tile_data == "del":
+                continue
             x_tile = tile_data["tiles"].rect().x() * self.decimation
             y_tile = tile_data["tiles"].rect().y() / self.stretch + split_size * (self.splits - self.selected_split)
             width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
@@ -1257,13 +1259,13 @@ class MyWindow(QMainWindow):
             tiler_ymax = tiler_ymin + tile_data["tiles"].rect().height() / self.stretch
 
             tile_xmin = xmin
-            side = "port" if xmin < self.full_image_width else "stbd"
+            side = "port" if xmin < self.full_image_width / 2 else "stbd"
             if side == "port":
-                xmin = self.full_image_width - xmax
+                xmin = (self.full_image_width / 2) - xmax
                 xmax = xmin + tile_data["tiles"].rect().width() * self.decimation
                 data = np.fliplr(self.port_data)
             else:
-                xmin = x_tile - self.full_image_width
+                xmin = x_tile# - (self.full_image_width / 2)
                 xmax = xmin + tile_data["tiles"].rect().width() * self.decimation
                 data = self.starboard_data
 

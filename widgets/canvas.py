@@ -9,7 +9,7 @@ from widgets.draw_shapes import *
 ZOOM_NUM = 0
 X_POS = 0
 Y_POS = 0
-TILE_SHAPE = (128, 128)
+TILE_SHAPE = (128,128)
 POLY_COLORS = [[255, 0, 0], [0, 0, 255], [255, 255, 0],
                 [255, 0, 255], [0, 255, 255], [128, 0, 0], [0, 128, 0],
                 [0, 0, 128], [128, 128, 0], [128, 0, 128], [0, 128, 128]]
@@ -79,7 +79,7 @@ class Canvas(QGraphicsView):
         self.duplicate_polygons_action.triggered.connect(self.on_duplicate_polygons_action)
         self.remove_point_action.triggered.connect(self.on_remove_point_action)
         self.edit_polygon_label_action.triggered.connect(self.on_edit_polygon_label_action)
-        self.delete_polygons_action.triggered.connect(self.on_delete_tiles_action)
+        self.delete_tiles_action.triggered.connect(self.on_delete_tiles_action)
 
         self.show()
 
@@ -319,6 +319,7 @@ class Canvas(QGraphicsView):
         self.selected_polygons = []
 
     def delete_tiles(self):
+        print(self.selected_tiles)
         for tile in self.selected_tiles:
             k = 0
             for j, item in enumerate(self._tiles):
@@ -840,7 +841,7 @@ class Canvas(QGraphicsView):
                 converted_northing = self.parent().parent().coords[math.floor(y)]['x'] + (self.parent().parent().accross_interval * rotated_x) / self.parent().parent().decimation
                 converted_easting = self.parent().parent().coords[math.floor(y)]['y'] - (self.parent().parent().accross_interval * rotated_y) / self.parent().parent().decimation
                 self.parent().parent().location_label.setText(f"N: {round(converted_northing, 4): .4f}, E: {round(converted_easting, 4): .4f}")
-                
+                print(x,y, middle_point, diff_x, diff_y, angle_rad ,self.parent().parent().coords[math.floor(y)]['x'], self.parent().parent().coords[math.floor(y)]['y'], self.parent().parent().accross_interval, rotated_x, rotated_y, converted_northing, converted_easting)
             # Convert UTM to longitude and latitude coordinates
             try:
                 zone_letter = self.parent().parent().utm_zone[-1]
@@ -1012,6 +1013,7 @@ class Canvas(QGraphicsView):
             self.edit_polygon_label_action.setEnabled(True)
             self.duplicate_polygons_action.setEnabled(True)
             self.remove_point_action.setEnabled(False)
+            self.delete_tiles_action.setEnabled(False)
 
             if self.items(event.pos())[0] not in self.selected_polygons:
                 self.selected_polygons.append(self.items(event.pos())[0])
@@ -1020,13 +1022,24 @@ class Canvas(QGraphicsView):
             self.edit_polygon_label_action.setEnabled(False)
             self.delete_polygons_action.setEnabled(False)
             self.duplicate_polygons_action.setEnabled(False)
+            self.delete_tiles_action.setEnabled(False)
 
             self.selected_corner = self.items(event.pos())[0]
+        elif isinstance(self.items(event.pos())[0], Rectangle):
+            self.remove_point_action.setEnabled(False)
+            self.edit_polygon_label_action.setEnabled(False)
+            self.delete_polygons_action.setEnabled(False)
+            self.duplicate_polygons_action.setEnabled(False)
+            self.delete_tiles_action.setEnabled(True)
+
+            if self.items(event.pos())[0] not in self.selected_tiles:
+                self.selected_tiles.append(self.items(event.pos())[0])
         else:
             self.edit_polygon_label_action.setEnabled(False)
             self.delete_polygons_action.setEnabled(False)
             self.duplicate_polygons_action.setEnabled(False)
             self.remove_point_action.setEnabled(False)
+            self.delete_tiles_action.setEnabled(False)
 
         # Show the menu at the mouse position
         self.menu.exec(event.globalPos())
