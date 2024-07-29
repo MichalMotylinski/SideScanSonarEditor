@@ -27,7 +27,7 @@ class XTFNAVIGATIONRECORD:
         self.sensorAltitude = sensorAltitude
         self.sensorHeading = SensorHeading
         self.sensorSpeed = sensorSpeed
-           
+
 class XTFPINGHEADER:
     def __init__(self, fileptr, XTFFileHdr, SubChannelNumber, NumChansToFollow):
         # start_time = time.time() # time the process
@@ -288,7 +288,7 @@ class XTFFILEHDR:
         for i in range(6):
             ch = XTFCHANINFO(fileptr, self)
             self.XTFChanInfo.append(ch)
-            
+
         # there can be more than 6 channels.  If so, we need to read another 1024 bytes here.  As we do not have an example of this, the code is not written
         
     def __str__(self):
@@ -339,10 +339,9 @@ class XTFReader:
         max_samples_port = max(ping.pingChannel[channel_num].NumSamples, max_samples_port)
         max_range = max(max_range, ping.pingChannel[channel_num].SlantRange)
         
-        d = datetime (ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000)
+        d = datetime(ping.Year, ping.Month, ping.Day, ping.Hour, ping.Minute, ping.Second, ping.HSeconds * 10000)
         r = XTFNAVIGATIONRECORD(d, ping.PingNumber, ping.SensorXcoordinate, ping.SensorYcoordinate, ping.SensorDepth, ping.SensorPrimaryAltitude, ping.SensorHeading, ping.SensorSpeed)
-        return max_samples_port, max_range, r.dateTime.timestamp()
-          
+        return max_samples_port, max_range, r.dateTime.timestamp()        
     def readPacketheader(self):
         data = self.fileptr.read(self.XTFPacketHeader_len)
         s = self.XTFPacketHeader_unpack(data)
