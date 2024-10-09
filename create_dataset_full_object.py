@@ -45,13 +45,14 @@ base_data = 0
 start = time.perf_counter()
 stretches = []
 for input_filename in files:
-    print(input_filename)
+    
 
     #if "a160h" not in input_filename:
     #    continue
     xtf_filename = f"{input_filename.rsplit('.', 1)[0]}.xtf"
     
     port_data,starboard_data,coords,splits,stretch,packet_size,full_image_height,full_image_width,accross_interval,along_interval = read_xtf(xtf_filename, 0, decimation, auto_stretch, stretch, shift, compute_bac)
+    print(input_filename, port_data.shape,starboard_data.shape, stretch)
     stretches.append(stretch)
     stretch = 1
     port_data = np.fliplr(port_data)
