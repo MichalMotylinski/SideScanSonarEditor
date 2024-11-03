@@ -975,8 +975,8 @@ class MyWindow(QMainWindow):
                 self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
                 self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
 
-            self.splits_textbox.setText(str(self.splits))
-            self.selected_split_spinbox.setMaximum(self.splits)
+            #self.splits_textbox.setText(str(self.splits))
+            #self.selected_split_spinbox.setMaximum(self.splits)
             
             self.stretch_auto = self.stretch
             self.stretch_slider.setValue(self.stretch)
@@ -1102,7 +1102,7 @@ class MyWindow(QMainWindow):
                     tiles[i] = "del"
                     i += 1
                 else:
-                    tiles[i] = {"rectangle": [tile_data["tiles"].rect().x() * self.decimation, (self.port_image.size[1] - tile_data["tiles"].rect().y()) / self.stretch + split_size * (self.selected_split - 1), tile_data["tiles"].rect().width() * self.decimation, tile_data["tiles"].rect().height() / self.stretch]}
+                    tiles[i] = {"rectangle": [math.floor(tile_data["tiles"].rect().x()) * self.decimation, math.floor((self.port_image.size[1] - math.floor(tile_data["tiles"].rect().y())) / self.stretch + split_size * (self.selected_split - 1)), tile_data["tiles"].rect().width() * self.decimation, math.floor(math.floor(tile_data["tiles"].rect().height()) / self.stretch)]}
                     i += 1
 
             # Remove polygons from dict 
@@ -1145,11 +1145,12 @@ class MyWindow(QMainWindow):
                     i += 1
                 else:
                     corners = []
+                    
                     for idx, polygon in enumerate(polygon_data["polygon"]._polygon_corners):
-                        
-                        x = polygon[0] * self.decimation
-                        y = (self.port_image.size[1] - polygon[1]) / self.stretch + split_size * (self.selected_split - 1)
+                        x = math.floor(polygon[0]) * self.decimation
+                        y = math.floor(self.port_image.size[1] / (self.stretch + split_size * (self.selected_split - 1)) - math.floor(polygon[1] / (self.stretch + split_size * (self.selected_split - 1))))
                         corners.append([x, y])
+
                     polygons[i] = {"label": polygon_data["polygon"].polygon_class,
                                    "points": corners}
                     i += 1
@@ -1248,27 +1249,24 @@ class MyWindow(QMainWindow):
             width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
             height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch + split_size * (self.selected_split - 1)) - y_tile
             
-            xmin = x_tile
-            xmax = x_tile + tile_data["tiles"].rect().width() * self.decimation
-            ymin = int(y_tile)
-            ymax = int(y_tile + tile_data["tiles"].rect().height() / self.stretch)
+            xmin = math.floor(x_tile)
+            xmax = math.floor(x_tile + tile_data["tiles"].rect().width() * self.decimation)
+            ymin = math.floor(y_tile)
+            ymax = math.floor(y_tile + tile_data["tiles"].rect().height() / self.stretch)
             
             tiler_xmin = tile_data["tiles"].rect().x() * self.decimation
             tiler_xmax = tiler_xmin + tile_data["tiles"].rect().width() * self.decimation
             tiler_ymin = tile_data["tiles"].rect().y() / self.stretch
             tiler_ymax = tiler_ymin + tile_data["tiles"].rect().height() / self.stretch
 
-            tile_xmin = xmin
             side = "port" if xmin < self.full_image_width / 2 else "stbd"
             if side == "port":
-                xmin = (self.full_image_width / 2) - xmax
-                xmax = xmin + tile_data["tiles"].rect().width() * self.decimation
-                data = np.fliplr(self.port_data)
+                xmin = math.floor((self.full_image_width / 2) - xmax)
+                xmax = math.floor(xmin + tile_data["tiles"].rect().width() * self.decimation)
             else:
-                xmin = x_tile# - (self.full_image_width / 2)
-                xmax = xmin + tile_data["tiles"].rect().width() * self.decimation
-                data = self.starboard_data
-
+                xmin = math.floor(x_tile)# - (self.full_image_width / 2)
+                xmax = math.floor(xmin + tile_data["tiles"].rect().width() * self.decimation)
+ 
             image = {
                 "id": tile_idx,
                 "width": TILE_SHAPE[0],
@@ -1280,8 +1278,6 @@ class MyWindow(QMainWindow):
             tile_idx += 1
             anns["images"].append(image)
 
-            til = data[ymin:ymax, int(xmin):int(xmax)]  
-            
             for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
                 
                 xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
@@ -1294,19 +1290,21 @@ class MyWindow(QMainWindow):
                 inter = intersection([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
                 
                 if inter < 50:
-                    continue
+                    continue        
 
                 x_list = x_list - x_tile
                 y_list = y_list - y_tile
+                x_list = [math.floor(x) for x in x_list]
+                y_list = [math.floor(y) for y in y_list]
+
                 new_polygon = [item for pair in zip(x_list, y_list) for item in pair]
-                
                 ann = {
                     "id": ann_idx,
                     "image_id": tile_idx,
                     "category_id": next((category for category in anns["categories"] if category["name"] == polygon.polygon_class), None)["id"],
                     "segmentation": new_polygon,
-                    "bbox": [np.min(x_list), np.min(y_list), np.max(x_list) - np.min(x_list), np.max(y_list) - np.min(y_list)],
-                    "area": (np.max(x_list) - np.min(x_list)) * (np.max(y_list) - np.min(y_list)),
+                    "bbox": [min(x_list), min(y_list), max(x_list) - min(x_list), max(y_list) - min(y_list)],
+                    "area": (max(x_list) - min(x_list)) * (max(y_list) - min(y_list)),
                     "iscrowd": 0
                 }
                 ann_idx += 1
@@ -2144,10 +2142,10 @@ class MyWindow(QMainWindow):
         # Splits group box
         ################################################
         self.splits_groupbox = QGroupBox(self.side_toolbox_groupbox)
-        self.splits_groupbox.setGeometry(0, 0, 320, 140)
+        self.splits_groupbox.setGeometry(0, 0, 320, 90)
         self.splits_groupbox.setMinimumWidth(320)
 
-        self.splits_label = QLabel(self.splits_groupbox)
+        """self.splits_label = QLabel(self.splits_groupbox)
         self.splits_label.setGeometry(10, 10, 80, 22)
         self.splits_label.setText("Max splits")
 
@@ -2181,33 +2179,33 @@ class MyWindow(QMainWindow):
         self.load_split_btn = QPushButton(self.splits_groupbox)
         self.load_split_btn.setGeometry(30, 110, 100, 22)
         self.load_split_btn.setText("Show split")
-        self.load_split_btn.clicked.connect(self.load_split)
+        self.load_split_btn.clicked.connect(self.load_split)"""
 
         self.draw_polygons_btn = QPushButton(self.splits_groupbox)
-        self.draw_polygons_btn.setGeometry(210, 10, 100, 22)
+        self.draw_polygons_btn.setGeometry(10, 10, 100, 22)
         self.draw_polygons_btn.setText("Draw polygons")
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
         self.draw_polygons_btn.setEnabled(False)
 
         self.edit_polygons_btn = QPushButton(self.splits_groupbox)
-        self.edit_polygons_btn.setGeometry(210, 35, 100, 22)
+        self.edit_polygons_btn.setGeometry(10, 35, 100, 22)
         self.edit_polygons_btn.setText("Edit polygons")
         self.edit_polygons_btn.clicked.connect(self.edit_polygons)
 
         self.delete_polygons_btn = QPushButton(self.splits_groupbox)
-        self.delete_polygons_btn.setGeometry(210, 60, 100, 22)
+        self.delete_polygons_btn.setGeometry(10, 60, 100, 22)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
         self.delete_polygons_btn.setEnabled(False)
 
         self.draw_crop_tile_btn = QPushButton(self.splits_groupbox)
-        self.draw_crop_tile_btn.setGeometry(210, 85, 100, 22)
+        self.draw_crop_tile_btn.setGeometry(210, 10, 100, 22)
         self.draw_crop_tile_btn.setText("Draw crop tile")
         self.draw_crop_tile_btn.clicked.connect(self.draw_tile_mode)
         self.draw_crop_tile_btn.setEnabled(False)
 
         self.delete_crop_tile_btn = QPushButton(self.splits_groupbox)
-        self.delete_crop_tile_btn.setGeometry(210, 110, 100, 22)
+        self.delete_crop_tile_btn.setGeometry(210, 35, 100, 22)
         self.delete_crop_tile_btn.setText("Delete crop tile")
         self.delete_crop_tile_btn.clicked.connect(self.delete_tiles)
         self.delete_crop_tile_btn.setEnabled(False)
@@ -2216,7 +2214,7 @@ class MyWindow(QMainWindow):
         # Labels group box
         ################################################
         self.labels_groupbox = QGroupBox(self.side_toolbox_groupbox)
-        self.labels_groupbox.setGeometry(0, 140, 320, 360)
+        self.labels_groupbox.setGeometry(0, 90, 320, 410)
         self.labels_groupbox.setMinimumWidth(330)
 
         self.load_labels_btn = QPushButton(self.labels_groupbox)
@@ -2240,16 +2238,16 @@ class MyWindow(QMainWindow):
         self.edit_label_btn.clicked.connect(self.edit_label)
 
         self.label_list_widget = QListWidget(self.labels_groupbox)
-        self.label_list_widget.setGeometry(10, 70, 140, 135)
+        self.label_list_widget.setGeometry(10, 70, 140, 145)
         self.label_list_widget.itemSelectionChanged.connect(self.on_label_list_selection)
         self.label_list_widget.itemChanged.connect(self.on_label_item_changed)
 
         self.polygons_list_widget = QListWidget(self.labels_groupbox)
-        self.polygons_list_widget.setGeometry(165, 70, 140, 135)
+        self.polygons_list_widget.setGeometry(165, 70, 140, 145)
         self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
 
         self.tiles_list_widget = QListWidget(self.labels_groupbox)
-        self.tiles_list_widget.setGeometry(10, 215, 140, 135)
+        self.tiles_list_widget.setGeometry(85, 245, 140, 145)
         self.tiles_list_widget.itemChanged.connect(self.on_tile_item_changed)
 
 
