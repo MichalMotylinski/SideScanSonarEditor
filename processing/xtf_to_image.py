@@ -83,7 +83,7 @@ def read_xtf(filepath, channel_num, decimation, auto_stretch, stretch, shift, co
         
         current_x_coordinate, current_y_coordinate= ping[i].SensorXcoordinate, ping[i].SensorYcoordinate
         current_datetime = datetime(ping[i].Year, ping[i].Month, ping[i].Day, ping[i].Hour, ping[i].Minute, ping[i].Second, ping[i].HSeconds * 10000).timestamp()
-        print(ping[i].ping_chan_headers[0].NumSamples / ping[i].ping_chan_headers[0].SlantRange)
+        
         if i == 0:
             time_first = current_datetime
             previous_x = ping[i].ShipXcoordinate
@@ -197,6 +197,7 @@ def convert_to_image(channel, invert, auto_min_max, channel_min=None, auto_scale
         if (channel_max - channel_min) != 0:
             scale = (gs_max - gs_min) / (channel_max - channel_min)
     
+    print(channel_min, channel_max, scale)
     if color_scheme == "greylog":
         channel = np.log10(channel + 0.00001, dtype=np.float32)
     

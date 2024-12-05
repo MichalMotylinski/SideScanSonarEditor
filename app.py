@@ -592,11 +592,11 @@ class MyWindow(QMainWindow):
         self.crop_tiles_btn.clicked.connect(self.crop_tiles)
 
         # Compute BAC
-        self.compute_bac_checkbox = QCheckBox(self.load_data_groupbox)
+        """self.compute_bac_checkbox = QCheckBox(self.load_data_groupbox)
         self.compute_bac_checkbox.setGeometry(180, 80, 100, 22)
         self.compute_bac_checkbox.setText(f"BAC")
         self.compute_bac_checkbox.stateChanged.connect(self.update_compute_bac)
-        self.compute_bac_checkbox.setChecked(True)
+        self.compute_bac_checkbox.setChecked(True)"""
 
         # Loading data parameters
         self.decimation_label = QLabel(self.load_data_groupbox)
@@ -654,7 +654,7 @@ class MyWindow(QMainWindow):
 
         self.port_channel_min_label = QLabel(self.port_channel_groupbox)
         self.port_channel_min_label.setGeometry(10, 40, 100, 22)
-        self.port_channel_min_label.setText(f"Channel min")
+        self.port_channel_min_label.setText(f"Map range min")
         self.port_channel_min_label.adjustSize()
 
         self.port_channel_min_step_label = QLabel(self.port_channel_groupbox)
@@ -702,7 +702,7 @@ class MyWindow(QMainWindow):
         # Channel scale value slider
         self.port_channel_scale_label = QLabel(self.port_channel_groupbox)
         self.port_channel_scale_label.setGeometry(10, 130, 60, 22)
-        self.port_channel_scale_label.setText(f"Grey scale")
+        self.port_channel_scale_label.setText(f"Map range max")
         self.port_channel_scale_label.adjustSize()
 
         self.port_channel_scale_step_label = QLabel(self.port_channel_groupbox)
@@ -770,13 +770,14 @@ class MyWindow(QMainWindow):
         # Color scheme selection box
         self.port_color_scheme_combobox = QComboBox(self.port_channel_groupbox)
         self.port_color_scheme_combobox.setGeometry(320, 120, 100, 22)
-        self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
+        #self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
+        self.port_color_scheme_combobox.addItems(["greylog", "grey"])
         self.port_color_scheme_combobox.currentIndexChanged.connect(self.update_port_color_scheme)
 
-        self.upload_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
+        """self.upload_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
         self.upload_port_color_scheme_btn.setGeometry(320, 150, 100, 22)
         self.upload_port_color_scheme_btn.setText("Upload cmap")
-        self.upload_port_color_scheme_btn.clicked.connect(self.upload_port_color_scheme)
+        self.upload_port_color_scheme_btn.clicked.connect(self.upload_port_color_scheme)"""
 
         # Apply selected display parameter values
         self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
@@ -798,7 +799,7 @@ class MyWindow(QMainWindow):
 
         self.starboard_channel_min_label = QLabel(self.starboard_channel_groupbox)
         self.starboard_channel_min_label.setGeometry(10, 40, 100, 22)
-        self.starboard_channel_min_label.setText(f"Channel min")
+        self.starboard_channel_min_label.setText(f"Map range min")
         self.starboard_channel_min_label.adjustSize()
 
         self.starboard_channel_min_step_label = QLabel(self.starboard_channel_groupbox)
@@ -846,7 +847,7 @@ class MyWindow(QMainWindow):
         # Channel scale value slider
         self.starboard_channel_scale_label = QLabel(self.starboard_channel_groupbox)
         self.starboard_channel_scale_label.setGeometry(10, 130, 60, 22)
-        self.starboard_channel_scale_label.setText(f"Channel scale")
+        self.starboard_channel_scale_label.setText(f"Map range max")
         self.starboard_channel_scale_label.adjustSize()
 
         self.starboard_channel_scale_step_label = QLabel(self.starboard_channel_groupbox)
@@ -914,13 +915,14 @@ class MyWindow(QMainWindow):
         # Color scheme selection box
         self.starboard_color_scheme_combobox = QComboBox(self.starboard_channel_groupbox)
         self.starboard_color_scheme_combobox.setGeometry(320, 120, 100, 22)
-        self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
+        #self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
+        self.starboard_color_scheme_combobox.addItems(["greylog", "grey"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
-        self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)
+        """self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)
         self.upload_starboard_color_scheme_btn.setGeometry(320, 150, 100, 22)
         self.upload_starboard_color_scheme_btn.setText("Upload cmap")
-        self.upload_starboard_color_scheme_btn.clicked.connect(self.upload_starboard_color_scheme)
+        self.upload_starboard_color_scheme_btn.clicked.connect(self.upload_starboard_color_scheme)"""
 
         # Apply selected display parameter values
         self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)

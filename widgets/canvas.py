@@ -951,10 +951,18 @@ class Canvas(QGraphicsView):
                 rotated_x = diff_x * math.cos(angle_rad) - diff_y * math.sin(angle_rad)
                 rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
 
+                
                 # Convert rotated pixel coordinate into UTM and add to to the center point
                 converted_northing = self.parent().parent().coords[math.floor(y)]['x'] + (self.parent().parent().accross_interval * rotated_x) / self.parent().parent().decimation
                 converted_easting = self.parent().parent().coords[math.floor(y)]['y'] - (self.parent().parent().accross_interval * rotated_y) / self.parent().parent().decimation
+                
+                
                 self.parent().parent().location_label.setText(f"N: {round(converted_northing, 4): .4f}, E: {round(converted_easting, 4): .4f}")
+                along_track_distance = (y - middle_point[1]) * self.parent().parent().along_interval / self.parent().parent().decimation
+
+                converted_northing1 = converted_northing + along_track_distance * math.cos(angle_rad)
+                converted_easting1 = converted_easting + along_track_distance * math.sin(angle_rad)
+                print(self.parent().parent().coords[math.floor(y)]['x'], self.parent().parent().coords[math.floor(y)]['y'], converted_northing, converted_northing1, converted_easting, converted_easting1)
                 
             # Convert UTM to longitude and latitude coordinates
             try:

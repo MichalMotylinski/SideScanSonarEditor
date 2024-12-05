@@ -14,6 +14,7 @@ class Ellipse(QGraphicsEllipseItem):
         self.setBrush(QBrush(QColor(*self.color)))
         self.setPen(QPen(QColor(*self.color), 1))
         self.setRect(rect.x() - shift, rect.y() - shift, shift * 2, shift * 2)
+        #self.setRect(rect.x(), rect.y(), shift, shift)
         self.setAcceptHoverEvents(True)
 
     def hoverEnterEvent(self, event):
@@ -45,7 +46,8 @@ class Polygon(QGraphicsPolygonItem):
         self.polygon_class = polygon_class
         self.color = color
         self.setBrush(QBrush(QColor(*color)))
-        self.setPen(QPen(QColor(*color[:-1]), 1))
+        #self.setPen(QPen(QColor(*color[:-1]), 1))
+        self.setPen(QPen(Qt.PenStyle.NoPen))
         self.setAcceptHoverEvents(True)
         self._polygon_idx = polygon_idx
         self._polygon_corners = []
@@ -104,13 +106,15 @@ class Polygon(QGraphicsPolygonItem):
 
     def hoverEnterEvent(self, event):
         self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
-        self.setPen(QPen(QColor(255, 255, 255)))
+        #self.setPen(QPen(QColor(255, 255, 255)))
+        self.setPen(QPen(Qt.PenStyle.NoPen)) 
     
     def hoverLeaveEvent(self, event):
         if self._selected:
             return
         self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
-        self.setPen(QPen(QColor(*self.color[:-1])))
+        #self.setPen(QPen(QColor(*self.color[:-1])))
+        self.setPen(QPen(Qt.PenStyle.NoPen)) 
 
 class Rectangle(QGraphicsRectItem):
     def __init__(self, parent, rect_idx, polygons_inside, color):
@@ -120,7 +124,8 @@ class Rectangle(QGraphicsRectItem):
         self._polygons_inside = polygons_inside
         self.color = color
         self.setBrush(QBrush(QColor(*color)))
-        self.setPen(QPen(QColor(*color[:-1]), 1))
+        self.setPen(QPen(Qt.PenStyle.NoPen))        
+        #self.setPen(QPen(QColor(*color[:-1]), 1))
         self.setAcceptHoverEvents(True)
         self._selected = False
         
@@ -134,13 +139,15 @@ class Rectangle(QGraphicsRectItem):
 
     def hoverEnterEvent(self, event):
         self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
-        self.setPen(QPen(QColor(255, 255, 255)))
+        #self.setPen(QPen(QColor(255, 255, 255)))
+        self.setPen(QPen(Qt.PenStyle.NoPen))
     
     def hoverLeaveEvent(self, event):
         if self._selected:
             return
         self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
-        self.setPen(QPen(QColor(*self.color[:-1])))
+        #self.setPen(QPen(QColor(*self.color[:-1])))
+        self.setPen(QPen(Qt.PenStyle.NoPen))
 
     @property
     def rect_idx(self):
