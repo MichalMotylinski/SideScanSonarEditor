@@ -28,11 +28,7 @@ def convert_to_utm(point, middle_point, coords):
     #print(converted_northing, converted_easting)
     return [converted_northing, converted_easting]
 
-"""with open("test_file_list_10.txt", "r") as f:
-    data = f.readlines()
 
-print(', '.join(['"'+ x.strip() + '"' for x in data]))"""
-#print([x.strip() for x in data])
 test_files = ["SSS_MS_M13405_RAW_jsf-CH34.json", "SSS_MS_M13406_RAW_jsf-CH34.json", "SSS_MS_M13408_RAW_jsf-CH34.json", "SSS_MS_M13409_RAW_jsf-CH34.json", "SSS_MS_M13411_RAW_jsf-CH34.json",
               "SSS_MS_M13412_RAW_jsf-CH34.json", "te_a100h_xtf-ch12.json", "te_a101h_xtf-ch12.json", "te_a102.001h_xtf-ch12.json", "te_a102h_xtf-ch12.json",
               "te_a103h_xtf-ch12.json", "te_a104h_xtf-ch12.json", "te_a105.001h_xtf-ch12.json", "te_a105h_xtf-ch12.json", "te_a106h_xtf-ch12.json",
@@ -96,9 +92,9 @@ train_ann_idx = 0
 valid_ann_idx = 0
 test_ann_idx = 0
 
-ea1 = {"swaths": {"train": 0, "valid": 0, "test":0}, "images": {"train": 0, "valid": 0, "test":0}, "instances": {"train": 0, "valid": 0, "test":0}}
-erebus = {"swaths": {"train": 0, "valid": 0, "test":0}, "images": {"train": 0, "valid": 0, "test":0}, "instances": {"train": 0, "valid": 0, "test":0}}
-barnegat = {"swaths": {"train": 0, "valid": 0, "test":0}, "images": {"train": 0, "valid": 0, "test":0}, "instances": {"train": 0, "valid": 0, "test":0}}
+ea1 = {"train": 0, "valid": 0, "test":0}
+erebus = {"train": 0, "valid": 0, "test":0}
+barnegat = {"train": 0, "valid": 0, "test":0}
 
 decimation = 1
 auto_stretch = False
@@ -106,7 +102,7 @@ stretch = 1
 shift = 0
 compute_bac = False
 
-dataset_dir = "sss_dataset"
+dataset_dir = "sss_dataset_boulder_shadow"
 if os.path.exists(dataset_dir):
     rmtree(dataset_dir)
 os.mkdir(dataset_dir)
@@ -130,24 +126,19 @@ test_data = {}
 kkk=0
 start = time.perf_counter()
 stretches = []
-middle_coords = {"train": [], "valid": [], "test": []}
-
 for input_filename in files:
+    
+    #if "Erebus" not in str(input_filename):
+        #if kkk > 10:
+    #    continue
     print(input_filename)
-    #if "Erebus" not in input_filename:
+    #if "A4-A5_IS_25" not in input_filename:# and "A4-A5_IS_65" not in input_filename:
     #    continue
     #####################################################################################
     # Load xtf data
     #####################################################################################
     xtf_filename = f"{input_filename.rsplit('.', 1)[0]}.xtf"
     port_data,starboard_data,coords,splits,stretch,packet_size,full_image_height,full_image_width,accross_interval,along_interval = read_xtf(xtf_filename, 0, decimation, auto_stretch, stretch, shift, compute_bac)
-    
-    if input_filename.rsplit("/")[-1] in test_files:
-        middle_coords["test"].append({"surveyline": f"{input_filename.rsplit('.', 1)[0]}", "coords": coords})
-    elif input_filename.rsplit("/")[-1] in valid_files:
-        middle_coords["valid"].append({"surveyline": f"{input_filename.rsplit('.', 1)[0]}", "coords": coords})
-    else:
-        middle_coords["train"].append({"surveyline": f"{input_filename.rsplit('.', 1)[0]}", "coords": coords})
     channel_width = full_image_width / 2
     stretches.append(stretch)
     stretch = 1
@@ -189,33 +180,24 @@ for input_filename in files:
     if (starboard_max - starboard_min) != 0:
         starboard_scale = (gs_max - gs_min) / (starboard_max - starboard_min)
 
+    # Normalize data to obtain an image
+    """mean_intensity = np.mean(port_data)
+    # Bring the intensity values closer to the mean
+    compression_factor = 0.9 # Adjust this factor to control how close to the mean you want to bring the values
+    port_data = mean_intensity + compression_factor * (port_data- mean_intensity)
+    # Normalize data to obtain an image
+    mean_intensity = np.mean(starboard_data)
+    # Bring the intensity values closer to the mean
+    compression_factor = 0.9 # Adjust this factor to control how close to the mean you want to bring the values
+    starboard_data = mean_intensity + compression_factor * (starboard_data- mean_intensity)"""
+
     #####################################################################################
 
     # Load annotations file
     with open(input_filename, "r") as f:
         data = json.load(f)
-        
-        if input_filename.rsplit("/")[-1] in test_files:
-            if "Erebus" in str(input_filename):
-                erebus["swaths"]["test"] += 1
-            if "EA1" in str(input_filename):
-                ea1["swaths"]["test"] +=1
-            if "Barnegat" in str(input_filename):
-                barnegat["swaths"]["test"] +=1
-        elif input_filename.rsplit("/")[-1] in valid_files:
-            if "Erebus" in str(input_filename):
-                erebus["swaths"]["valid"] += 1
-            if "EA1" in str(input_filename):
-                ea1["swaths"]["valid"] +=1
-            if "Barnegat" in str(input_filename):
-                barnegat["swaths"]["valid"] +=1
-        else:
-            if "Erebus" in str(input_filename):
-                erebus["swaths"]["train"] += 1
-            if "EA1" in str(input_filename):
-                ea1["swaths"]["train"] +=1
-            if "Barnegat" in str(input_filename):
-                barnegat["swaths"]["train"] +=1
+        #if image_idx == 0:
+        #    base_data = data
         
         for image_anns in data["images"]:
             xmin, ymin, width, height = image_anns["rectangle"]
@@ -231,6 +213,8 @@ for input_filename in files:
                 scale = port_scale
                 utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
                             convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
+                
+                #print("SDSADASDASD", utm_box)
             else:
                 tile = starboard_data[ymin:ymax, xmin - starboard_data.shape[1]:xmax - starboard_data.shape[1]]
                 channel_min = starboard_min
@@ -239,59 +223,39 @@ for input_filename in files:
                             convert_to_utm([xmax, ymax], [channel_width, ymax], coords)]
             
             image_anns["utm_box"] = utm_box
-            
-            if image_anns["rectangle"][0] == 3355:#[3123, 973, 128, 128]:
-                cv2.imwrite("testimage.png", tile)
-                print(starboard_data.shape[1], xmin - starboard_data.shape[1], xmax - starboard_data.shape[1])
-                a = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
-                            convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
-                b = [convert_to_utm([channel_width + xmin, ymin], [channel_width, ymax], coords),
-                            convert_to_utm([channel_width + xmax, ymax], [channel_width, ymin], coords)]
-                c = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymax], coords),
-                            convert_to_utm([channel_width - xmin, ymax], [channel_width, ymin], coords)]
-                print(image_anns["side"],image_anns["rectangle"],  channel_width, xmin, ymin, xmax, ymax, utm_box, a, b, c)
 
             raw_data = tile
             channel = np.log10(tile + 0.00001, dtype=np.float32)
             channel = np.subtract(channel, channel_min)
             channel = np.multiply(channel, scale)
             channel = np.add(gs_min, channel)
-            
-            if input_filename.rsplit("/")[-1] in test_files:
-                if "Erebus" in str(input_filename):
-                    erebus["images"]["test"] += 1
-                if "EA1" in str(input_filename):
-                    ea1["images"]["test"] +=1
-                if "Barnegat" in str(input_filename):
-                    barnegat["images"]["test"] +=1
-            elif input_filename.rsplit("/")[-1] in valid_files:
-                if "Erebus" in str(input_filename):
-                    erebus["images"]["valid"] += 1
-                if "EA1" in str(input_filename):
-                    ea1["images"]["valid"] +=1
-                if "Barnegat" in str(input_filename):
-                    barnegat["images"]["valid"] +=1
-            else:
-                if "Erebus" in str(input_filename):
-                    erebus["images"]["train"] += 1
-                if "EA1" in str(input_filename):
-                    ea1["images"]["train"] +=1
-                if "Barnegat" in str(input_filename):
-                    barnegat["images"]["train"] +=1
-            
+            #print(channel[0, :10])
+            #channel = np.subtract(gs_max, channel)
+            #if "Barnegat" in input_filename:
+                #channel = np.add(gs_min, channel)
+                #kkk+=1
+            #else:
+                #channel = np.subtract(gs_max, channel)
             img_anns = []
-            for annotation_data1 in data["annotations"]:
+            for k, annotation_data1 in enumerate(data["annotations"]):
                 annotation_data = annotation_data1.copy()
                 # Filter out all classes but the Boulder
-                if annotation_data["category_id"] != 5:
+                if annotation_data["category_id"] != 1:
                     continue
+                #print(annotation_data["category_id"])
                 if annotation_data["image_id"] - 1 != image_anns["id"]:
                     continue
+
                 xmin = image_anns["rectangle"][0] + annotation_data["bbox"][0]
                 xmax = image_anns["rectangle"][0] + annotation_data["bbox"][0] + annotation_data["bbox"][2]
                 ymin = image_anns["rectangle"][1] + annotation_data["bbox"][1]
                 ymax = image_anns["rectangle"][1] + annotation_data["bbox"][1] + annotation_data["bbox"][3]
 
+                """utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
+                            convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
+                x_list = [[channel_width - (image_anns["rectangle"][0] + (128 - annotation_data["segmentation"][x])), annotation_data["segmentation"][x+1]] for x in range(0, len(annotation_data["segmentation"]), 2)]
+                utm_mask = [convert_to_utm([channel_width - (image_anns["rectangle"][0] + annotation_data["segmentation"][x]), image_anns["rectangle"][1] + annotation_data["segmentation"][x+1]], [channel_width, image_anns["rectangle"][1] + annotation_data["segmentation"][x+1]], coords) for x in range(0, len(annotation_data["segmentation"]), 2)]
+                """
                 if image_anns["side"] == "port":
                     utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
                                 convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
@@ -308,8 +272,6 @@ for input_filename in files:
                 annotation_data["utm_bbox"] = utm_box
                 annotation_data["utm_mask"] = utm_mask
 
-                if image_anns["rectangle"] == [3123, 973, 128, 128]:
-                    print(utm_box, utm_mask)
                 if input_filename.rsplit("/")[-1] in test_files:
                     annotation_data["id"] = test_ann_idx
                     annotation_data["image_id"] = test_image_idx
@@ -326,36 +288,89 @@ for input_filename in files:
                 if input_filename.rsplit("/")[-1] in test_files:
                     test_annotations.append(annotation_data)
                     if "Erebus" in str(input_filename):
-                        erebus["instances"]["test"] += 1
+                        erebus["test"] += 1
                     if "EA1" in str(input_filename):
-                        ea1["instances"]["test"] +=1
+                        ea1["test"] +=1
                     if "Barnegat" in str(input_filename):
-                        barnegat["instances"]["test"] +=1
+                        barnegat["test"] +=1
                 elif input_filename.rsplit("/")[-1] in valid_files:
                     valid_annotations.append(annotation_data)
                     if "Erebus" in str(input_filename):
-                        erebus["instances"]["valid"] += 1
+                        erebus["valid"] += 1
                     if "EA1" in str(input_filename):
-                        ea1["instances"]["valid"] +=1
+                        ea1["valid"] +=1
                     if "Barnegat" in str(input_filename):
-                        barnegat["instances"]["valid"] +=1
+                        barnegat["valid"] +=1
                 else:
                     train_annotations.append(annotation_data)
                     if "Erebus" in str(input_filename):
-                        erebus["instances"]["train"] += 1
+                        erebus["train"] += 1
                     if "EA1" in str(input_filename):
-                        ea1["instances"]["train"] +=1
+                        ea1["train"] +=1
                     if "Barnegat" in str(input_filename):
-                        barnegat["instances"]["train"] +=1
-                
-                
+                        barnegat["train"] +=1
 
-                """if "Erebus" in str(input_filename):
-                    erebus += 1
-                if "EA1" in str(input_filename):
-                    ea1 += 1
-                if "Barnegat" in str(input_filename):
-                    barnegat += 1"""
+                shadow_data = data["annotations"][k + 1].copy()
+
+                xmin = image_anns["rectangle"][0] + shadow_data["bbox"][0]
+                xmax = image_anns["rectangle"][0] + shadow_data["bbox"][0] + shadow_data["bbox"][2]
+                ymin = image_anns["rectangle"][1] + shadow_data["bbox"][1]
+                ymax = image_anns["rectangle"][1] + shadow_data["bbox"][1] + shadow_data["bbox"][3]
+
+                if image_anns["side"] == "port":
+                    utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
+                                convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
+                    x_list = [[channel_width - (image_anns["rectangle"][0] + (128 - shadow_data["segmentation"][x])), shadow_data["segmentation"][x+1]] for x in range(0, len(shadow_data["segmentation"]), 2)]
+
+                    utm_mask = [convert_to_utm([channel_width - (image_anns["rectangle"][0] + shadow_data["segmentation"][x]), image_anns["rectangle"][1] + shadow_data["segmentation"][x+1]], [channel_width, image_anns["rectangle"][1] + shadow_data["segmentation"][x+1]], coords) for x in range(0, len(shadow_data["segmentation"]), 2)]
+                else:
+                    utm_box = [convert_to_utm([xmin, ymin], [channel_width, ymin], coords),
+                                convert_to_utm([xmax, ymax], [channel_width, ymax], coords)]
+                    x_list = [[(image_anns["rectangle"][0] + (128 - shadow_data["segmentation"][x])), shadow_data["segmentation"][x+1]] for x in range(0, len(shadow_data["segmentation"]), 2)]
+
+                    utm_mask = [convert_to_utm([(image_anns["rectangle"][0] + shadow_data["segmentation"][x]), image_anns["rectangle"][1] + shadow_data["segmentation"][x+1]], [channel_width, image_anns["rectangle"][1] + shadow_data["segmentation"][x+1]], coords) for x in range(0, len(shadow_data["segmentation"]), 2)]
+                
+                shadow_data["utm_bbox"] = utm_box
+                shadow_data["utm_mask"] = utm_mask
+
+                if input_filename.rsplit("/")[-1] in test_files:
+                    shadow_data["id"] = test_ann_idx
+                    shadow_data["image_id"] = test_image_idx
+                    test_ann_idx += 1
+                elif input_filename.rsplit("/")[-1] in valid_files:
+                    shadow_data["id"] = valid_ann_idx
+                    shadow_data["image_id"] = valid_image_idx
+                    valid_ann_idx += 1
+                else:
+                    shadow_data["id"] = train_ann_idx
+                    shadow_data["image_id"] = train_image_idx
+                    train_ann_idx += 1
+
+                if input_filename.rsplit("/")[-1] in test_files:
+                    test_annotations.append(shadow_data)
+                    if "Erebus" in str(input_filename):
+                        erebus["test"] += 1
+                    if "EA1" in str(input_filename):
+                        ea1["test"] +=1
+                    if "Barnegat" in str(input_filename):
+                        barnegat["test"] +=1
+                elif input_filename.rsplit("/")[-1] in valid_files:
+                    valid_annotations.append(shadow_data)
+                    if "Erebus" in str(input_filename):
+                        erebus["valid"] += 1
+                    if "EA1" in str(input_filename):
+                        ea1["valid"] +=1
+                    if "Barnegat" in str(input_filename):
+                        barnegat["valid"] +=1
+                else:
+                    train_annotations.append(shadow_data)
+                    if "Erebus" in str(input_filename):
+                        erebus["train"] += 1
+                    if "EA1" in str(input_filename):
+                        ea1["train"] +=1
+                    if "Barnegat" in str(input_filename):
+                        barnegat["train"] +=1
+
                 seg = []
                 # Convert to COCO segmentation format and flip annotations if port side
                 for i, val in enumerate(annotation_data["segmentation"]):
@@ -368,6 +383,20 @@ for input_filename in files:
                         # Add 1 to compensate for 
                         seg.append(val)
                 annotation_data["segmentation"] = seg
+                img_anns.append(seg)
+
+                seg = []
+                # Convert to COCO segmentation format and flip annotations if port side
+                for i, val in enumerate(shadow_data["segmentation"]):
+                    if not i % 2:
+                        if image_anns["side"] == "port":
+                            seg.append(128-val)
+                        else:
+                            seg.append(val)
+                    else:
+                        # Add 1 to compensate for 
+                        seg.append(val)
+                shadow_data["segmentation"] = seg
                 img_anns.append(seg)
             
             # Add data to dataset
@@ -400,11 +429,7 @@ for input_filename in files:
                 draw_masks(os.path.join(dataset_dir, "train"), img_anns, f"{str(train_image_idx).zfill(5)}.png")
                 train_image_idx += 1
             #break
-    #print(barnegat, ea1, erebus)
 
-with open("middle_coords.json", "w") as f:
-    json.dump(middle_coords, f)
-    
 train_data["images"] = train_images
 train_data["annotations"] = train_annotations
 with open(os.path.join(dataset_dir, "train", "annotations.json"), "w") as f:
