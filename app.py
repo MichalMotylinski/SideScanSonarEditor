@@ -1,5 +1,5 @@
+import cv2
 import json
-from math import floor
 import numpy as np
 import os
 import pickle
@@ -7,7 +7,6 @@ from PIL import Image
 from PIL.ImageQt import toqpixmap
 import platform
 import sys
-import cv2
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
@@ -52,8 +51,12 @@ class MyWindow(QMainWindow):
         self._auto_stretch = True
         self._stretch = 1
         self._stretch_max = 10
-        self._stretch_auto = 1
         self._coords = []
+
+        self.load_params = {"decimation": 1, "stretch": 1, "auto_stretch": True, "stretch_max": 10,
+                            "coords": [], "full_image_height": 0, "full_image_width": 0, "slant_range_correct": False,
+                            "across_track_sample_interval": 0, "along_track_sample_interval": 0
+                           }
 
         # Map projection parameters
         self._crs = ""
@@ -61,7 +64,7 @@ class MyWindow(QMainWindow):
         
         # Port channel parameters
         self._port_params = {"channel_min": 0, "channel_min_step": 1, 
-                             "channel_max": 1, "channel_max_step": 1,
+                             "channel_max": 0, "channel_max_step": 1,
                              "channel_min_dict": {int(x): float(x) for x in range(101)},
                              "channel_max_dict": {int(x): float(x) for x in range(101)},
                              "auto_min": True, "auto_max": True, 
@@ -71,7 +74,7 @@ class MyWindow(QMainWindow):
 
         # Starboard channel parameters
         self._starboard_params = {"channel_min": 0, "channel_min_step": 1, 
-                                  "channel_max": 1, "channel_max_step": 1,
+                                  "channel_max": 0, "channel_max_step": 1,
                                   "channel_min_dict": {int(x): float(x) for x in range(101)},
                                   "channel_max_dict": {int(x): float(x) for x in range(101)},
                                   "auto_min": True, "auto_max": True, 
@@ -282,15 +285,6 @@ class MyWindow(QMainWindow):
         self._stretch_max = val
     
     @property
-    def stretch_auto(self):
-        """The stretch_auto property."""
-        return self._stretch_auto
-    
-    @stretch_auto.setter
-    def stretch_auto(self, val):
-        self._stretch_auto = val
-    
-    @property
     def coords(self):
         """The coords property."""
         return self._coords
@@ -370,41 +364,47 @@ class MyWindow(QMainWindow):
 
         # Save labels button
         self.save_btn = QtWidgets.QPushButton(self.load_data_groupbox)
-        self.save_btn.setGeometry(50, 50, 100, 22)
+        self.save_btn.setGeometry(50, 40, 100, 22)
         self.save_btn.setText("Save labels")
         self.save_btn.clicked.connect(self.save_labels)
 
         # Crop tiles button
         self.crop_tiles_btn = QtWidgets.QPushButton(self.load_data_groupbox)
-        self.crop_tiles_btn.setGeometry(180, 50, 100, 22)
+        self.crop_tiles_btn.setGeometry(180, 40, 100, 22)
         self.crop_tiles_btn.setText("Crop tiles")
         self.crop_tiles_btn.clicked.connect(self.crop_tiles)
+
+        self.slant_range_correct_checkbox = QCheckBox(self.load_data_groupbox)
+        self.slant_range_correct_checkbox.setGeometry(180, 70, 100, 25)
+        self.slant_range_correct_checkbox.setText(f"slant range \ncorrect")
+        self.slant_range_correct_checkbox.stateChanged.connect(self.update_slant_range_correct)
+
 
         # Loading data parameters
         self.decimation_label = QLabel(self.load_data_groupbox)
         self.decimation_label.setGeometry(10, 90, 200, 10)
-        self.decimation_label.setText(f"Decimation: {self.decimation}")
+        self.decimation_label.setText(f"Decimation: {self.load_params['decimation']}")
         self.decimation_label.adjustSize()
 
         self.decimation_slider = QSlider(Qt.Orientation.Horizontal, self.load_data_groupbox)
         self.decimation_slider.setGeometry(10, 110, 300, 15)
         self.decimation_slider.setMinimum(1)
         self.decimation_slider.setMaximum(10)
-        self.decimation_slider.setValue(self.decimation)
+        self.decimation_slider.setValue(self.load_params["decimation"])
         self.decimation_slider.setTickInterval(1)
         self.decimation_slider.valueChanged.connect(self.update_decimation)
 
         # Strech slider
         self.stretch_label = QLabel(self.load_data_groupbox)
         self.stretch_label.setGeometry(10, 140, 200, 15)
-        self.stretch_label.setText(f"Stretch: {self.stretch}")
+        self.stretch_label.setText(f"Stretch: {self.load_params['stretch']}")
         self.stretch_label.adjustSize()
 
         self.stretch_slider = QSlider(Qt.Orientation.Horizontal, self.load_data_groupbox)
         self.stretch_slider.setGeometry(10, 160, 300, 15)
         self.stretch_slider.setMinimum(1)
         self.stretch_slider.setMaximum(10)
-        self.stretch_slider.setValue(self.stretch)
+        self.stretch_slider.setValue(self.load_params["stretch"])
         self.stretch_slider.valueChanged.connect(self.update_stretch)
 
         self.stretch_max_textbox = QLineEdit(self.load_data_groupbox)
@@ -412,7 +412,7 @@ class MyWindow(QMainWindow):
         self.stretch_max_textbox.setValidator(non_zero_int_validator)
         self.stretch_max_textbox.setEnabled(False)
         self.stretch_max_textbox.editingFinished.connect(self.update_stretch_max_textbox)
-        self.stretch_max_textbox.setText(str(self.stretch_max))
+        self.stretch_max_textbox.setText(str(self.load_params["stretch_max"]))
 
         self.stretch_checkbox = QCheckBox(self.load_data_groupbox)
         self.stretch_checkbox.setGeometry(10, 180, 100, 22)
@@ -455,7 +455,7 @@ class MyWindow(QMainWindow):
         self.port_min_slider.setGeometry(10, 70, 300, 15)
         self.port_min_slider.setMinimum(0)
         self.port_min_slider.setMaximum(100)
-        self.port_min_slider.setValue(4)#self.port_params["channel_min"])
+        self.port_min_slider.setValue(self.port_params["channel_min"])
         self.port_min_slider.setTickInterval(1)
         self.port_min_slider.valueChanged.connect(self.update_port_min)
         self.port_min_slider.setEnabled(False)
@@ -723,7 +723,7 @@ class MyWindow(QMainWindow):
             self.coco_anns_filename = f"{self.input_filename.rsplit('.', 1)[0]}.json"
 
             pixmap = toqpixmap(Image.fromarray(np.full((self.canvas.size().height(), self.canvas.size().width()), 255).astype(np.uint8)))
-            self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width, self.across_track_sample_interval, self.along_track_sample_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
+            self.port_data, self.starboard_data, self.load_params = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.load_params)
             self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
             self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
 
@@ -734,20 +734,19 @@ class MyWindow(QMainWindow):
                 self.merged_image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.merged_image)
                 self.canvas.set_image(True, pixmap)
-                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
-                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
+                self.canvas.load_polygons(self.polygons_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
+                self.canvas.load_tiles(self.tiles_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
             else:
                 self.clear_labels()
                 self.merged_image = merge_images(self.port_image, self.starboard_image)
                 pixmap = toqpixmap(self.merged_image)
                 self.canvas.set_image(True, pixmap)
-                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
-                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
+                self.canvas.load_polygons(self.polygons_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
+                self.canvas.load_tiles(self.tiles_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
             
             self.update_params()
-            self.stretch_auto = self.stretch
-            self.stretch_slider.setValue(self.stretch)
-            self.stretch_label.setText(f"Stretch: {self.stretch}")
+            self.stretch_slider.setValue(self.load_params["stretch"])
+            self.stretch_label.setText(f"Stretch: {self.load_params['stretch']}")
             self.setWindowTitle(f"{self.window_title} - {self.input_filename}")
             self.draw_crop_tile_btn.setEnabled(True)
 
@@ -756,7 +755,7 @@ class MyWindow(QMainWindow):
             return
         
         pixmap = toqpixmap(Image.fromarray(np.full((self.canvas.size().height(), self.canvas.size().width()), 255).astype(np.uint8)))
-        self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width, self.across_track_sample_interval, self.along_track_sample_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
+        self.port_data, self.starboard_data, self.load_params = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.load_params)
         self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
         self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
 
@@ -767,27 +766,26 @@ class MyWindow(QMainWindow):
             self.merged_image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.merged_image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
-            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
+            self.canvas.load_polygons(self.polygons_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
+            self.canvas.load_tiles(self.tiles_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
         else:
             self.clear_labels()
             self.merged_image = merge_images(self.port_image, self.starboard_image)
             pixmap = toqpixmap(self.merged_image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
-            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
+            self.canvas.load_polygons(self.polygons_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
+            self.canvas.load_tiles(self.tiles_data, self.load_params["decimation"], self.load_params["stretch"], self.load_params["full_image_height"])
         
         self.update_params()
-        self.stretch_auto = self.stretch
-        self.stretch_slider.setValue(self.stretch)
-        self.stretch_label.setText(f"Stretch: {self.stretch}")
+        self.stretch_slider.setValue(self.load_params["stretch"])
+        self.stretch_label.setText(f"Stretch: {self.load_params['stretch']}")
         self.setWindowTitle(f"{self.window_title} - {self.input_filename}")
         self.draw_crop_tile_btn.setEnabled(True)
 
     def load_data(self):
         self.clear_labels()
 
-        self.stretch_slider.setValue(self.stretch)
+        self.stretch_slider.setValue(self.load_params["stretch"])
         self.stretch = int(self.stretch_slider.value())
 
         try:
@@ -843,8 +841,8 @@ class MyWindow(QMainWindow):
         
         with open(os.path.join(self.input_filepath, self.tiles_filename), "w") as f:
             data = {}
-            data["full_height"] = self.full_image_height
-            data["full_width"] = self.full_image_width
+            data["full_height"] = self.load_params["full_image_height"]
+            data["full_width"] = self.load_params["full_image_width"]
             tiles = {}
             i = 0
 
@@ -857,7 +855,7 @@ class MyWindow(QMainWindow):
                     tiles[i] = "del"
                     i += 1
                 else:
-                    tiles[i] = {"rectangle": [math.floor(tile_data["tiles"].rect().x()) * self.decimation, math.floor((self.port_image.size[1] - math.floor(tile_data["tiles"].rect().y())) / self.stretch), tile_data["tiles"].rect().width() * self.decimation, math.floor(math.floor(tile_data["tiles"].rect().height()) / self.stretch)]}
+                    tiles[i] = {"rectangle": [math.floor(tile_data["tiles"].rect().x()) * self.load_params["decimation"], math.floor((self.port_image.size[1] - math.floor(tile_data["tiles"].rect().y())) / self.load_params["stretch"]), tile_data["tiles"].rect().width() * self.load_params["decimation"], math.floor(math.floor(tile_data["tiles"].rect().height()) / self.load_params["stretch"])]}
                     i += 1
 
             # Remove polygons from dict 
@@ -876,8 +874,8 @@ class MyWindow(QMainWindow):
         
         with open(os.path.join(self.input_filepath, self.labels_filename), "w") as f:
             data = {}
-            data["full_height"] = self.full_image_height
-            data["full_width"] = self.full_image_width
+            data["full_height"] = self.load_params["full_image_height"]
+            data["full_width"] = self.load_params["full_image_width"]
             new_polygons = self.canvas._polygons
             polygons = {}
             i = 0
@@ -902,8 +900,8 @@ class MyWindow(QMainWindow):
                     corners = []
                     
                     for idx, polygon in enumerate(polygon_data["polygon"]._polygon_corners):
-                        x = math.floor(polygon[0]) * self.decimation
-                        y = math.floor(self.port_image.size[1] / self.stretch - math.floor(polygon[1] / self.stretch))
+                        x = math.floor(polygon[0]) * self.load_params["decimation"]
+                        y = math.floor(self.port_image.size[1] / self.load_params["stretch"] - math.floor(polygon[1] / self.load_params["stretch"]))
                         corners.append([x, y])
 
                     polygons[i] = {"label": polygon_data["polygon"].polygon_class,
@@ -997,28 +995,26 @@ class MyWindow(QMainWindow):
         for tile_data in self.canvas._tiles:
             if tile_data == "del":
                 continue
-            x_tile = tile_data["tiles"].rect().x() * self.decimation
-            y_tile = tile_data["tiles"].rect().y() / self.stretch
-            width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
-            height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch) - y_tile
-            
-            xmin = math.floor(x_tile)
-            xmax = math.floor(x_tile + tile_data["tiles"].rect().width() * self.decimation)
-            ymin = math.floor(y_tile)
-            ymax = math.floor(y_tile + tile_data["tiles"].rect().height() / self.stretch)
-            
-            tiler_xmin = tile_data["tiles"].rect().x() * self.decimation
-            tiler_xmax = tiler_xmin + tile_data["tiles"].rect().width() * self.decimation
-            tiler_ymin = tile_data["tiles"].rect().y() / self.stretch
-            tiler_ymax = tiler_ymin + tile_data["tiles"].rect().height() / self.stretch
+            x_tile = tile_data["tiles"].rect().x() * self.load_params["decimation"]
+            y_tile = tile_data["tiles"].rect().y() / self.load_params["stretch"]
 
-            side = "port" if xmin < self.full_image_width / 2 else "stbd"
+            xmin = math.floor(x_tile)
+            xmax = math.floor(x_tile + tile_data["tiles"].rect().width() * self.load_params["decimation"])
+            ymin = math.floor(y_tile)
+            ymax = math.floor(y_tile + tile_data["tiles"].rect().height() / self.load_params["stretch"])
+            
+            tiler_xmin = tile_data["tiles"].rect().x() * self.load_params["decimation"]
+            tiler_xmax = tiler_xmin + tile_data["tiles"].rect().width() * self.load_params["decimation"]
+            tiler_ymin = tile_data["tiles"].rect().y() / self.load_params["stretch"]
+            tiler_ymax = tiler_ymin + tile_data["tiles"].rect().height() / self.load_params["stretch"]
+
+            side = "port" if xmin < self.load_params["full_image_width"] / 2 else "stbd"
             if side == "port":
-                xmin = math.floor((self.full_image_width / 2) - xmax)
-                xmax = math.floor(xmin + tile_data["tiles"].rect().width() * self.decimation)
+                xmin = math.floor((self.load_params["full_image_width"] / 2) - xmax)
+                xmax = math.floor(xmin + tile_data["tiles"].rect().width() * self.load_params["decimation"])
             else:
-                xmin = math.floor(x_tile)# - (self.full_image_width / 2)
-                xmax = math.floor(xmin + tile_data["tiles"].rect().width() * self.decimation)
+                xmin = math.floor(x_tile)
+                xmax = math.floor(xmin + tile_data["tiles"].rect().width() * self.load_params["decimation"])
  
             image = {
                 "id": tile_idx,
@@ -1036,8 +1032,8 @@ class MyWindow(QMainWindow):
                 xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
                 xmax, ymax = np.max(np.array(polygon.polygon_corners).T[0]), np.max(np.array(polygon.polygon_corners).T[1])
                 
-                x_list = np.array(polygon.polygon_corners).T[0] * self.decimation
-                y_list = np.array(polygon.polygon_corners).T[1] / self.stretch
+                x_list = np.array(polygon.polygon_corners).T[0] * self.load_params["decimation"]
+                y_list = np.array(polygon.polygon_corners).T[1] / self.load_params["stretch"]
 
                 iou = calculate_iou([tiler_xmin,tiler_ymin,tiler_xmax,tiler_ymax], [min(x_list),min(y_list),max(x_list),max(y_list)])
                 inter = intersection([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
@@ -1078,8 +1074,11 @@ class MyWindow(QMainWindow):
         with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
             json.dump(anns, f, indent=4)
 
+    def update_slant_range_correct(self):
+        self.load_params["slant_range_correct"] = self.sender().isChecked()
+
     def update_decimation(self):
-        self.decimation = self.sender().value()
+        self.load_params["decimation"] = self.sender().value()
         self.decimation_label.setText(f"Decimation: {str(self.sender().value())}")
         self.decimation_label.adjustSize()
 
@@ -1089,11 +1088,11 @@ class MyWindow(QMainWindow):
         
         self.stretch_label.setText(f"Stretch: {str(self.sender().value())}")
         self.stretch_label.adjustSize()
-        self.stretch = self.sender().value()
+        self.load_params["stretch"] = self.sender().value()
 
     def update_auto_stretch(self):
-        self.auto_stretch = self.sender().isChecked()
-        if self.auto_stretch:
+        self.load_params["auto_stretch"] = self.sender().isChecked()
+        if self.load_params["auto_stretch"]:
             self.stretch_slider.setEnabled(False)
             self.stretch_max_textbox.setEnabled(False)
         else:
@@ -1101,8 +1100,8 @@ class MyWindow(QMainWindow):
             self.stretch_max_textbox.setEnabled(True)
 
     def update_stretch_max_textbox(self):
-        self.stretch_max = int(self.sender().text())
-        self.stretch_slider.setMaximum(self.stretch_max)
+        self.load_params["stretch_max"] = int(self.sender().text())
+        self.stretch_slider.setMaximum(self.load_params["stretch_max"])
 
     ################################################
     # Top toolbar port side parameters functions

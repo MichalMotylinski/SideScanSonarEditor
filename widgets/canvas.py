@@ -576,7 +576,7 @@ class Canvas(QGraphicsView):
                 #x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)) + 0.5
                 #y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().stretch) + 0.5) * self.parent().parent().stretch
                 x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom))
-                y_point = math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().stretch)
+                y_point = math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().load_params["stretch"])
 
                 # Starting just add a single point, then draw point and a line connecting it with a previous point
                 if len(self.active_draw["points"]) == 0:
@@ -636,7 +636,7 @@ class Canvas(QGraphicsView):
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
                 
-                rectangle = Rectangle(QRectF(x_point - (self.parent().parent().tile_size / self.parent().parent().decimation / 2),  y_point - (self.parent().parent().tile_size / self.parent().parent().stretch / 2), self.parent().parent().tile_size / self.parent().parent().decimation, self.parent().parent().tile_size * self.parent().parent().stretch), len(self._tiles), [], [255, 128, 64, 120])
+                rectangle = Rectangle(QRectF(x_point - (self.parent().parent().tile_size / self.parent().parent().load_params["decimation"] / 2),  y_point - (self.parent().parent().tile_size / self.parent().parent().load_params["stretch"] / 2), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), len(self._tiles), [], [255, 128, 64, 120])
                 self.scene().addItem(rectangle)
                 self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
@@ -801,7 +801,7 @@ class Canvas(QGraphicsView):
             
             if self.was_moving_corner:
                 x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom))
-                y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().stretch) * self.parent().parent().stretch)
+                y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"])
 
                 # Get index of the polygon to which point belongs and its own index in that polygon
                 ellipse_idx = self.selected_corner.ellipse_idx
@@ -858,7 +858,7 @@ class Canvas(QGraphicsView):
                     # Get new coords for each point of the polygon
                     polygon_copy = polygon.polygon()
                     for i, item in enumerate(polygon_copy):
-                        polygon_copy[i] = QPointF(math.floor(item.x()), math.floor(math.floor(item.y() / self.parent().parent().stretch) * self.parent().parent().stretch))
+                        polygon_copy[i] = QPointF(math.floor(item.x()), math.floor(math.floor(item.y() / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"]))
                     
                     # Create new polygon
                     label_idx = self.get_label_idx(polygon.polygon_class)
@@ -872,7 +872,7 @@ class Canvas(QGraphicsView):
                     # Create new points
                     for i, item in enumerate(self._polygons[polygon._polygon_idx]["corners"]):
                         self.scene().removeItem(item)
-                        rect = Ellipse(QRectF(QPointF(math.floor(polygon._polygon_corners[i][0]), math.floor(math.floor(polygon._polygon_corners[i][1] / self.parent().parent().stretch) * self.parent().parent().stretch)), self.ellipse_size), self.ellipse_shift, polygon._polygon_idx, i, POLY_COLORS[label_idx])
+                        rect = Ellipse(QRectF(QPointF(math.floor(polygon._polygon_corners[i][0]), math.floor(math.floor(polygon._polygon_corners[i][1] / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"])), self.ellipse_size), self.ellipse_shift, polygon._polygon_idx, i, POLY_COLORS[label_idx])
                         rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                         self.scene().addItem(rect)
                         self._polygons[polygon._polygon_idx]["corners"][i] = self.scene().items()[0]
@@ -885,7 +885,7 @@ class Canvas(QGraphicsView):
             if self.was_moving_tiles:
                 new_selected_tiles = []
                 for tile in self.selected_tiles:
-                    new_tile = Rectangle(QRectF(math.floor(tile.rect().x()), (math.floor(math.floor(tile.rect().y()) / self.parent().parent().stretch) * self.parent().parent().stretch), self.parent().parent().tile_size / self.parent().parent().decimation, self.parent().parent().tile_size * self.parent().parent().stretch), tile._rect_idx, [], [255, 128, 64, 120])
+                    new_tile = Rectangle(QRectF(math.floor(tile.rect().x()), (math.floor(math.floor(tile.rect().y()) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"]), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), tile._rect_idx, [], [255, 128, 64, 120])
                     new_tile.setPen(QPen(QColor(255, 255, 255)))
                     self.scene().addItem(new_tile)
                     self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]
@@ -938,16 +938,16 @@ class Canvas(QGraphicsView):
             self.parent().parent().mouse_coords = event.position()
             
             # Get position of the cursor and calculate its position on a full size data
-            x = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom) * self.parent().parent().decimation
-            y = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom) / self.parent().parent().stretch
+            x = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom) * self.parent().parent().load_params["decimation"]
+            y = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom) / self.parent().parent().load_params["stretch"]
             self.parent().parent().location_label3.setText(f"X: {round(x, 2)}, Y: {round(y, 2)}")
 
             # Get vertical middle point of the image in reference to a cursor current position
-            middle_point = ((self.scene().sceneRect().width() * self.parent().parent().decimation) / 2, y)
+            middle_point = ((self.scene().sceneRect().width() * self.parent().parent().load_params["decimation"]) / 2, y)
             
             # Get gyro angle of the currently highlighted ping
-            if (math.floor(y) < len(self.parent().parent().coords)):
-                angle_rad = math.radians(self.parent().parent().coords[math.floor(y)]["gyro"])
+            if (math.floor(y) < len(self.parent().parent().load_params["coords"])):
+                angle_rad = math.radians(self.parent().parent().load_params["coords"][math.floor(y)]["gyro"])
             
                 # Calculate cursor coordinate in reference to a middle point
                 diff_x = x - middle_point[0]
@@ -958,8 +958,8 @@ class Canvas(QGraphicsView):
                 rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
 
                 # Convert rotated pixel coordinate into UTM and add to to the center point
-                converted_northing = self.parent().parent().coords[math.floor(y)]['x'] + (self.parent().parent().across_track_sample_interval * rotated_x) / self.parent().parent().decimation
-                converted_easting = self.parent().parent().coords[math.floor(y)]['y'] - (self.parent().parent().across_track_sample_interval * rotated_y) / self.parent().parent().decimation
+                converted_northing = self.parent().parent().load_params["coords"][math.floor(y)]['x'] + (self.parent().parent().load_params["across_track_sample_interval"] * rotated_x) / self.parent().parent().load_params["decimation"]
+                converted_easting = self.parent().parent().load_params["coords"][math.floor(y)]['y'] - (self.parent().parent().load_params["across_track_sample_interval"] * rotated_y) / self.parent().parent().load_params["decimation"]
                 
                 self.parent().parent().location_label.setText(f"N: {round(converted_northing, 4): .4f}, E: {round(converted_easting, 4): .4f}")
 
@@ -1103,7 +1103,7 @@ class Canvas(QGraphicsView):
                 
                 new_selected_tiles = []
                 for tile in self.selected_tiles:
-                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, self.parent().parent().tile_size / self.parent().parent().decimation, self.parent().parent().tile_size * self.parent().parent().stretch), tile._rect_idx, [], [255, 128, 64, 120])
+                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), tile._rect_idx, [], [255, 128, 64, 120])
                     new_tile.setPen(QPen(QColor(255, 255, 255)))
                     self.scene().addItem(new_tile)
                     self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]

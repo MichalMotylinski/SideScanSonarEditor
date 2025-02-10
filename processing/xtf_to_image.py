@@ -1,12 +1,12 @@
+from datetime import datetime
 import numpy as np
 import math
 import matplotlib as mpl
 import pandas as pd
 from PIL import Image
 from processing import geodetic
-from datetime import datetime
-from scipy.interpolate import interp1d
 import pyxtf
+from scipy.interpolate import interp1d
 
 def slant_range_correction(ping_data, slant_range, depth):
     """
@@ -21,7 +21,7 @@ def slant_range_correction(ping_data, slant_range, depth):
     corrected_ping_data (numpy array): Intensity values interpolated to horizontal distances.
     horizontal_ranges (numpy array): Corrected horizontal ranges for each return.
     """
-    N = len(ping_data)  # Number of returns in the ping
+    N = len(ping_data)
     
     # Compute slant range for each return
     slant_ranges = np.linspace(0, slant_range, N)
@@ -38,14 +38,13 @@ def slant_range_correction(ping_data, slant_range, depth):
     # Interpolate the ping data to the new horizontal range grid
     corrected_ping_data = interp_func(uniform_horizontal_range)
     
-    return corrected_ping_data#, uniform_horizontal_range
+    return corrected_ping_data
 
 def calculate_distance(easting1, northing1, easting2, northing2):
     return math.sqrt((easting2 - easting1)**2 + (northing2 - northing1)**2)
 
-def read_xtf(filepath, decimation, auto_stretch, stretch):
+def read_xtf(filepath, params):#decimation, auto_stretch, stretch):
     (file_header, packets) = pyxtf.xtf_read(filepath)
-
     ping = packets[pyxtf.XTFHeaderType.sonar]
     
     geographicals = False
@@ -53,7 +52,6 @@ def read_xtf(filepath, decimation, auto_stretch, stretch):
     prev_x_coordinate = None
     prev_y_coordinate = None
     prev_datetime = None
-    across_track_sample_interval = 0
     time_first = 0
     time_last = 0
 
@@ -94,32 +92,36 @@ def read_xtf(filepath, decimation, auto_stretch, stretch):
     ping_count = i
     time_last = current_datetime
 
-    image_height = port_channel.shape[0]
-    image_width = port_channel.shape[1] + stbd_channel.shape[1]
+    # Get full spatial size of the data before stretching and decimation
+    params["full_image_height"] = port_channel.shape[0]
+    params["full_image_width"] = port_channel.shape[1] + stbd_channel.shape[1]
 
     # Sample interval in metres
-    across_track_sample_interval *= decimation 
+    params["across_track_sample_interval"] *= params["decimation"] 
     
     # To make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
     distance = mean_speed * (time_last - time_first)
     
     #distance = mean_speed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
-    along_track_sample_interval = (distance / ping_count)
+    params["along_track_sample_interval"] = (distance / ping_count)
 
-    """port_channel = np.fliplr(port_channel)
-    for i, p in enumerate(port_channel):
-        port_channel[i] = slant_range_correction(port_channel[i], coords[i]["slant_range"], coords[i]["altitude"])
-        stbd_channel[i] = slant_range_correction(stbd_channel[i], coords[i]["slant_range"], coords[i]["altitude"])
-    port_channel = np.fliplr(port_channel)"""
+    if params["slant_range_correct"]:
+        port_channel = np.fliplr(port_channel)
+        for i, _ in enumerate(port_channel):
+            port_channel[i] = slant_range_correction(port_channel[i], coords[i]["slant_range"], coords[i]["altitude"])
+            stbd_channel[i] = slant_range_correction(stbd_channel[i], coords[i]["slant_range"], coords[i]["altitude"])
+        port_channel = np.fliplr(port_channel)
 
     # Automatic calculation of stretch that needs to be applied to the data
-    if auto_stretch:
-        stretch = math.ceil(along_track_sample_interval / across_track_sample_interval)
+    if params["auto_stretch"]:
+        params["stretch"] = math.ceil(params["along_track_sample_interval"] / params["across_track_sample_interval"])
 
-    port_channel = np.repeat(port_channel, stretch, axis=0)[:, ::decimation]
-    stbd_channel = np.repeat(stbd_channel, stretch, axis=0)[:, ::decimation]
+    port_channel = np.repeat(port_channel, params["stretch"], axis=0)[:, ::params["decimation"]]
+    stbd_channel = np.repeat(stbd_channel, params["stretch"], axis=0)[:, ::params["decimation"]]
 
-    return port_channel, stbd_channel, coords, stretch, image_height, image_width, across_track_sample_interval, along_track_sample_interval
+    params["coords"] = coords
+
+    return port_channel, stbd_channel, params
 
 def convert_to_image(channel, params):
     gs_min = 0
