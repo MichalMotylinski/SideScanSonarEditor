@@ -46,8 +46,7 @@ class Polygon(QGraphicsPolygonItem):
         self.polygon_class = polygon_class
         self.color = color
         self.setBrush(QBrush(QColor(*color)))
-        #self.setPen(QPen(QColor(*color[:-1]), 1))
-        self.setPen(QPen(Qt.PenStyle.NoPen))
+        self.setPen(QPen(QColor(*color[:-1]), 1))
         self.setAcceptHoverEvents(True)
         self._polygon_idx = polygon_idx
         self._polygon_corners = []
@@ -106,15 +105,13 @@ class Polygon(QGraphicsPolygonItem):
 
     def hoverEnterEvent(self, event):
         self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
-        #self.setPen(QPen(QColor(255, 255, 255)))
-        self.setPen(QPen(Qt.PenStyle.NoPen)) 
+        self.setPen(QPen(QColor(255, 255, 255)))
     
     def hoverLeaveEvent(self, event):
         if self._selected:
             return
         self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
-        #self.setPen(QPen(QColor(*self.color[:-1])))
-        self.setPen(QPen(Qt.PenStyle.NoPen)) 
+        self.setPen(QPen(QColor(*self.color[:-1])))
 
 class Rectangle(QGraphicsRectItem):
     def __init__(self, parent, rect_idx, polygons_inside, color):
@@ -123,9 +120,8 @@ class Rectangle(QGraphicsRectItem):
         self._rect_idx = rect_idx
         self._polygons_inside = polygons_inside
         self.color = color
-        self.setBrush(QBrush(QColor(*color)))
-        self.setPen(QPen(Qt.PenStyle.NoPen))        
-        #self.setPen(QPen(QColor(*color[:-1]), 1))
+        self.setBrush(QBrush(QColor(*color)))      
+        self.setPen(QPen(QColor(*color[:-1]), 1))
         self.setAcceptHoverEvents(True)
         self._selected = False
         
@@ -139,15 +135,13 @@ class Rectangle(QGraphicsRectItem):
 
     def hoverEnterEvent(self, event):
         self.setBrush(QBrush(QColor(*self.color[:-1], 220)))
-        #self.setPen(QPen(QColor(255, 255, 255)))
-        self.setPen(QPen(Qt.PenStyle.NoPen))
+        self.setPen(QPen(QColor(255, 255, 255)))
     
     def hoverLeaveEvent(self, event):
         if self._selected:
             return
         self.setBrush(QBrush(QColor(*self.color[:-1], 120)))
-        #self.setPen(QPen(QColor(*self.color[:-1])))
-        self.setPen(QPen(Qt.PenStyle.NoPen))
+        self.setPen(QPen(QColor(*self.color[:-1])))
 
     @property
     def rect_idx(self):
@@ -174,8 +168,8 @@ class ListWidgetItem(QListWidgetItem):
         self.checked = checked
         self.label_idx = label_idx
         self.polygon_idx = polygon_idx   
-        self.circle_size = 16
-        self.circle_pixmap = QPixmap(self.circle_size, self.circle_size)
+        self.circle_size = 13
+        self.circle_pixmap = QPixmap(self.circle_size+1, self.circle_size+1)
         self.circle_pixmap.fill(Qt.GlobalColor.transparent)
  
         self.setText(text)
@@ -188,8 +182,8 @@ class ListWidgetItem(QListWidgetItem):
         # Set color of the ListWidgetItem circle
         self.color = color
         painter = QPainter(self.circle_pixmap)
-        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(*self.color))
+        painter.setPen(QColor(*self.color))
         painter.drawEllipse(0, 0, self.circle_size, self.circle_size)
         painter.end()
         self.setIcon(QIcon(self.circle_pixmap))
