@@ -8,10 +8,7 @@ import time
 import cv2
 
 def convert_to_utm(point, middle_point, coords):
-    #print(len(coords), math.floor(point[1]))
     angle_rad = math.radians(coords[math.floor(point[1])]["gyro"])
-
-    #middle_point = [self.image_size[1] / 2, point[1]]
 
     # Calculate cursor coordinate in reference to a middle point
     diff_x = point[0] - middle_point[0]
@@ -24,8 +21,6 @@ def convert_to_utm(point, middle_point, coords):
     # Convert rotated pixel coordinate into UTM and add to to the center point
     converted_northing = coords[math.floor(point[1])]['x'] + (coords[math.floor(point[1])]["across_interval"] * rotated_x)
     converted_easting = coords[math.floor(point[1])]['y'] - (coords[math.floor(point[1])]["across_interval"] * rotated_y)
-    #print("X: ",  point[0], "Y: ", point[1], "middle: ", middle_point, "EN", coords[math.floor(point[1])]['x'], coords[math.floor(point[1])]['y'], "across", (coords[math.floor(point[1])]["across_interval"]), rotated_x, rotated_y)
-    #print(converted_northing, converted_easting)
     return [converted_northing, converted_easting]
 
 
@@ -64,7 +59,6 @@ def draw_masks(path, anns, filename):
     # Create RGB image with an object mask displayed
     grayscale_img = cv2.imread(os.path.join(path, "images", filename), cv2.IMREAD_GRAYSCALE)
     rgb_img = cv2.cvtColor(grayscale_img, cv2.COLOR_GRAY2RGB)
-    #print(anns)
     masks = []
     for polygon_points in anns:
         mask = np.zeros_like(rgb_img)
@@ -72,12 +66,11 @@ def draw_masks(path, anns, filename):
         masks.append(mask)
     
     # Apply transparency to each mask and overlay it on the original image
-    alpha = 0.5  # Transparency factor (0: fully transparent, 1: fully opaque)
+    alpha = 0.5
     for mask in masks:
         overlay = np.uint8(mask * alpha)
         rgb_img = cv2.addWeighted(rgb_img, 1, overlay, 1 - alpha, 0)
     cv2.imwrite(os.path.join(path, "color", filename), rgb_img)
-
 
 train_images = []
 valid_images = []
@@ -123,17 +116,9 @@ for dir in sorted(os.listdir(input_dir)):
 train_data = {}
 valid_data = {}
 test_data = {}
-kkk=0
 start = time.perf_counter()
 stretches = []
 for input_filename in files:
-    
-    #if "Erebus" not in str(input_filename):
-        #if kkk > 10:
-    #    continue
-    print(input_filename)
-    #if "A4-A5_IS_25" not in input_filename:# and "A4-A5_IS_65" not in input_filename:
-    #    continue
     #####################################################################################
     # Load xtf data
     #####################################################################################
@@ -148,8 +133,6 @@ for input_filename in files:
     gs_max = 255
 
     upper_limit = 2 ** 14
-    #port_data.clip(0, upper_limit-1, out=port_data)
-    #starboard_data.clip(0, upper_limit-1, out=starboard_data)
 
     port_min = port_data.min()
     port_max = port_data.max()
@@ -180,25 +163,9 @@ for input_filename in files:
     if (starboard_max - starboard_min) != 0:
         starboard_scale = (gs_max - gs_min) / (starboard_max - starboard_min)
 
-    # Normalize data to obtain an image
-    """mean_intensity = np.mean(port_data)
-    # Bring the intensity values closer to the mean
-    compression_factor = 0.9 # Adjust this factor to control how close to the mean you want to bring the values
-    port_data = mean_intensity + compression_factor * (port_data- mean_intensity)
-    # Normalize data to obtain an image
-    mean_intensity = np.mean(starboard_data)
-    # Bring the intensity values closer to the mean
-    compression_factor = 0.9 # Adjust this factor to control how close to the mean you want to bring the values
-    starboard_data = mean_intensity + compression_factor * (starboard_data- mean_intensity)"""
-
-    #####################################################################################
-
     # Load annotations file
     with open(input_filename, "r") as f:
         data = json.load(f)
-        #if image_idx == 0:
-        #    base_data = data
-        
         for image_anns in data["images"]:
             xmin, ymin, width, height = image_anns["rectangle"]
             xmax = int(xmin + width)
@@ -213,8 +180,6 @@ for input_filename in files:
                 scale = port_scale
                 utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
                             convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
-                
-                #print("SDSADASDASD", utm_box)
             else:
                 tile = starboard_data[ymin:ymax, xmin - starboard_data.shape[1]:xmax - starboard_data.shape[1]]
                 channel_min = starboard_min
@@ -229,20 +194,13 @@ for input_filename in files:
             channel = np.subtract(channel, channel_min)
             channel = np.multiply(channel, scale)
             channel = np.add(gs_min, channel)
-            #print(channel[0, :10])
-            #channel = np.subtract(gs_max, channel)
-            #if "Barnegat" in input_filename:
-                #channel = np.add(gs_min, channel)
-                #kkk+=1
-            #else:
-                #channel = np.subtract(gs_max, channel)
+
             img_anns = []
             for k, annotation_data1 in enumerate(data["annotations"]):
                 annotation_data = annotation_data1.copy()
                 # Filter out all classes but the Boulder
                 if annotation_data["category_id"] != 1:
                     continue
-                #print(annotation_data["category_id"])
                 if annotation_data["image_id"] - 1 != image_anns["id"]:
                     continue
 
@@ -251,11 +209,6 @@ for input_filename in files:
                 ymin = image_anns["rectangle"][1] + annotation_data["bbox"][1]
                 ymax = image_anns["rectangle"][1] + annotation_data["bbox"][1] + annotation_data["bbox"][3]
 
-                """utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
-                            convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
-                x_list = [[channel_width - (image_anns["rectangle"][0] + (128 - annotation_data["segmentation"][x])), annotation_data["segmentation"][x+1]] for x in range(0, len(annotation_data["segmentation"]), 2)]
-                utm_mask = [convert_to_utm([channel_width - (image_anns["rectangle"][0] + annotation_data["segmentation"][x]), image_anns["rectangle"][1] + annotation_data["segmentation"][x+1]], [channel_width, image_anns["rectangle"][1] + annotation_data["segmentation"][x+1]], coords) for x in range(0, len(annotation_data["segmentation"]), 2)]
-                """
                 if image_anns["side"] == "port":
                     utm_box = [convert_to_utm([channel_width - xmax, ymin], [channel_width, ymin], coords),
                                 convert_to_utm([channel_width - xmin, ymax], [channel_width, ymax], coords)]
@@ -380,7 +333,6 @@ for input_filename in files:
                         else:
                             seg.append(val)
                     else:
-                        # Add 1 to compensate for 
                         seg.append(val)
                 annotation_data["segmentation"] = seg
                 img_anns.append(seg)
@@ -394,13 +346,11 @@ for input_filename in files:
                         else:
                             seg.append(val)
                     else:
-                        # Add 1 to compensate for 
                         seg.append(val)
                 shadow_data["segmentation"] = seg
                 img_anns.append(seg)
             
             # Add data to dataset
-            #print(input_filename.rsplit("/")[-1])
             if input_filename.rsplit("/")[-1] in test_files:
                 with open(os.path.join(dataset_dir, "test", "data", f"{str(test_image_idx).zfill(5)}.pickle"), "wb") as f:
                     pickle.dump(raw_data, f)
@@ -428,7 +378,6 @@ for input_filename in files:
                 train_images.append(image_anns)
                 draw_masks(os.path.join(dataset_dir, "train"), img_anns, f"{str(train_image_idx).zfill(5)}.png")
                 train_image_idx += 1
-            #break
 
 train_data["images"] = train_images
 train_data["annotations"] = train_annotations
@@ -446,7 +395,5 @@ with open(os.path.join(dataset_dir, "test", "annotations.json"), "w") as f:
     json.dump(test_data, f, indent=4)
 
 end = time.perf_counter()
-
-#print(min(stretches), max(stretches))
 print(end-start)
 print(barnegat, ea1, erebus)
