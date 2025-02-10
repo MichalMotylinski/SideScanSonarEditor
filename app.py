@@ -7,14 +7,12 @@ from PIL import Image
 from PIL.ImageQt import toqpixmap
 import platform
 import sys
-import time
-from shutil import rmtree
 import cv2
 
 os.environ['QT_IMAGEIO_MAXALLOC'] = "100000000000000000"
 
 from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QSpinBox, QGroupBox, QApplication, QListWidget, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QGroupBox, QApplication, QListWidget, QComboBox, QCheckBox, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QFileDialog, QSlider, QLabel, QLineEdit, QWidget
 from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont
 from PyQt6.QtCore import pyqtSlot, Qt
 
@@ -41,12 +39,14 @@ class MyWindow(QMainWindow):
         self._port_image = None
         self._starboard_data = None
         self._starboard_image = None
-        self._image = None
+        self._merged_image = None
         self._full_image_height = 0
         self._full_image_width = 0
         self._polygons_data = None
         self._tiles_data = None
         self._old_classes = {}
+        self.across_track_sample_interval = None
+        self.along_track_sample_interval = None
         
         # Image load parameters
         self._decimation = 4
@@ -55,44 +55,30 @@ class MyWindow(QMainWindow):
         self._stretch_max = 10
         self._stretch_auto = 1
         self._coords = []
-        self._accross_interval = 0
-        self._along_interval = 0
-        self._compute_bac = True
 
         # Map projection parameters
         self._crs = ""
         self._utm_zone = ""
-
-        # Split parameters
-        self._selected_split = 1
-        self._selected_split_auto = 1
-        self._shift = 0
         
         # Port channel parameters
-        self._port_channel_min = 0
-        self._port_channel_min_step = 1
-        self._port_channel_scale = 1
-        self._port_channel_scale_step = 1
-        self._port_channel_min_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
-        self._port_channel_scale_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
-        self._port_auto_min = True
-        self._port_auto_scale = True
-        self._port_invert = False
-        self._port_color_scheme = "greylog"
-        self._port_cmap = None
+        self._port_params = {"channel_min": 0, "channel_min_step": 1, 
+                             "channel_max": 1, "channel_max_step": 1,
+                             "channel_min_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
+                             "channel_max_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
+                             "auto_min": True, "auto_max": True, 
+                             "invert": False, "color_scheme": "greylog",
+                             "cmap": None
+                            }
 
         # Starboard channel parameters
-        self._starboard_channel_min = 0
-        self._starboard_channel_min_step = 1
-        self._starboard_channel_scale = 1
-        self._starboard_channel_scale_step = 1
-        self._starboard_channel_min_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
-        self._starboard_channel_scale_dict = {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)}
-        self._starboard_auto_min = True
-        self._starboard_auto_scale = True
-        self._starboard_invert = False
-        self._starboard_color_scheme = "greylog"
-        self._starboard_cmap = None
+        self._starboard_params = {"channel_min": 0, "channel_min_step": 1, 
+                                  "channel_max": 1, "channel_max_step": 1,
+                                  "channel_min_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
+                                  "channel_max_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
+                                  "auto_min": True, "auto_max": True, 
+                                  "invert": False, "color_scheme": "greylog",
+                                  "cmap": None
+                                 }
         
         self.initialise_ui()
 
@@ -168,11 +154,11 @@ class MyWindow(QMainWindow):
     @property
     def image(self):
         """The image property."""
-        return self._image
+        return self._merged_image
     
     @image.setter
     def image(self, val):
-        self._image = val
+        self._merged_image = val
 
     @property
     def full_image_height(self):
@@ -273,33 +259,6 @@ class MyWindow(QMainWindow):
     @coords.setter
     def coords(self, val):
         self._coords = val
-    
-    @property
-    def accross_interval(self):
-        """The accross_interval property."""
-        return self._accross_interval
-    
-    @accross_interval.setter
-    def accross_interval(self, val):
-        self._accross_interval = val
-    
-    @property
-    def along_interval(self):
-        """The along_interval property."""
-        return self._along_interval
-    
-    @along_interval.setter
-    def along_interval(self, val):
-        self._along_interval = val
-    
-    @property
-    def compute_bac(self):
-        """The compute_bac property."""
-        return self._compute_bac
-    
-    @compute_bac.setter
-    def compute_bac(self, val):
-        self._compute_bac = val
 
     # Map projection parameters encapsulation
     @property
@@ -320,233 +279,24 @@ class MyWindow(QMainWindow):
     def utm_zone(self, val):
         self._utm_zone = val
 
-    # Split parameters encapsulation
+    # channel parameters encapsulation
     @property
-    def selected_split(self):
-        """The selected_split property."""
-        return self._selected_split
+    def port_params(self):
+        """The port_params property."""
+        return self._port_params
     
-    @selected_split.setter
-    def selected_split(self, val):
-        self._selected_split = val
+    @port_params.setter
+    def port_params(self, val):
+        self._port_params = val
 
     @property
-    def selected_split_auto(self):
-        """The selected_split_auto property."""
-        return self._selected_split_auto
+    def starboard_params(self):
+        """The starboard_params property."""
+        return self._starboard_params
     
-    @selected_split_auto.setter
-    def selected_split_auto(self, val):
-        self._selected_split_auto = val
-
-    @property
-    def shift(self):
-        """The shift property."""
-        return self._shift
-    
-    @shift.setter
-    def shift(self, val):
-        self._shift = val
-
-    # Port channel parameters encapsulation
-    @property
-    def port_channel_min(self):
-        """The port_channel_min property."""
-        return self._port_channel_min
-    
-    @port_channel_min.setter
-    def port_channel_min(self, val):
-        self._port_channel_min = val
-    
-    @property
-    def port_channel_min_step(self):
-        """The port_channel_min_step property."""
-        return self._port_channel_min_step
-    
-    @port_channel_min_step.setter
-    def port_channel_min_step(self, val):
-        self._port_channel_min_step = val
-    
-    @property
-    def port_channel_scale(self):
-        """The port_channel_scale property."""
-        return self._port_channel_scale
-    
-    @port_channel_scale.setter
-    def port_channel_scale(self, val):
-        self._port_channel_scale = val
-
-    @property
-    def port_channel_scale_step(self):
-        """The port_channel_scale_step property."""
-        return self._port_channel_scale_step
-    
-    @port_channel_scale_step.setter
-    def port_channel_scale_step(self, val):
-        self._port_channel_scale_step = val
-
-    @property
-    def port_channel_min_dict(self):
-        """The port_channel_min_dict property."""
-        return self._port_channel_min_dict
-    
-    @port_channel_min_dict.setter
-    def port_channel_min_dict(self, val):
-        self._port_channel_min_dict = val
-
-    @property
-    def port_channel_scale_dict(self):
-        """The port_channel_scale_dict property."""
-        return self._port_channel_scale_dict
-    
-    @port_channel_scale_dict.setter
-    def port_channel_scale_dict(self, val):
-        self._port_channel_scale_dict = val
-
-    @property
-    def port_auto_min(self):
-        """The port_auto_min property."""
-        return self._port_auto_min
-    
-    @port_auto_min.setter
-    def port_auto_min(self, val):
-        self._port_auto_min = val
-
-    @property
-    def port_auto_scale(self):
-        """The port_auto_scale property."""
-        return self._port_auto_scale
-    
-    @port_auto_scale.setter
-    def port_auto_scale(self, val):
-        self._port_auto_scale = val
-
-    @property
-    def port_invert(self):
-        """The port_invert property."""
-        return self._port_invert
-    
-    @port_invert.setter
-    def port_invert(self, val):
-        self._port_invert = val
-    
-    @property
-    def port_color_scheme(self):
-        """The port_color_scheme property."""
-        return self._port_color_scheme
-    
-    @port_color_scheme.setter
-    def port_color_scheme(self, val):
-        self._port_color_scheme = val
-
-    @property
-    def port_cmap(self):
-        """The port_cmap property."""
-        return self._port_cmap
-    
-    @port_cmap.setter
-    def port_cmap(self, val):
-        self._port_cmap = val
-
-    # Starboard channel parameters encapsulation
-    @property
-    def starboard_channel_min(self):
-        """The starboard_channel_min property."""
-        return self._starboard_channel_min
-    
-    @starboard_channel_min.setter
-    def starboard_channel_min(self, val):
-        self._starboard_channel_min = val
-    
-    @property
-    def starboard_channel_min_step(self):
-        """The starboard_channel_min_step property."""
-        return self._starboard_channel_min_step
-    
-    @starboard_channel_min_step.setter
-    def starboard_channel_min_step(self, val):
-        self._starboard_channel_min_step = val
-    
-    @property
-    def starboard_channel_scale(self):
-        """The starboard_channel_scale property."""
-        return self._starboard_channel_scale
-    
-    @starboard_channel_scale.setter
-    def starboard_channel_scale(self, val):
-        self._starboard_channel_scale = val
-
-    @property
-    def starboard_channel_scale_step(self):
-        """The starboard_channel_scale_step property."""
-        return self._starboard_channel_scale_step
-    
-    @starboard_channel_scale_step.setter
-    def starboard_channel_scale_step(self, val):
-        self._starboard_channel_scale_step = val
-
-    @property
-    def starboard_channel_min_dict(self):
-        """The starboard_channel_min_dict property."""
-        return self._starboard_channel_min_dict
-    
-    @starboard_channel_min_dict.setter
-    def starboard_channel_min_dict(self, val):
-        self._starboard_channel_min_dict = val
-
-    @property
-    def starboard_channel_scale_dict(self):
-        """The starboard_channel_scale_dict property."""
-        return self._starboard_channel_scale_dict
-    
-    @starboard_channel_scale_dict.setter
-    def starboard_channel_scale_dict(self, val):
-        self._starboard_channel_scale_dict = val
-
-    @property
-    def starboard_auto_min(self):
-        """The starboard_auto_min property."""
-        return self._starboard_auto_min
-    
-    @starboard_auto_min.setter
-    def starboard_auto_min(self, val):
-        self._starboard_auto_min = val
-
-    @property
-    def starboard_auto_scale(self):
-        """The starboard_auto_scale property."""
-        return self._starboard_auto_scale
-    
-    @starboard_auto_scale.setter
-    def starboard_auto_scale(self, val):
-        self._starboard_auto_scale = val
-
-    @property
-    def starboard_invert(self):
-        """The starboard_invert property."""
-        return self._starboard_invert
-    
-    @starboard_invert.setter
-    def starboard_invert(self, val):
-        self._starboard_invert = val
-    
-    @property
-    def starboard_color_scheme(self):
-        """The starboard_color_scheme property."""
-        return self._starboard_color_scheme
-    
-    @starboard_color_scheme.setter
-    def starboard_color_scheme(self, val):
-        self._starboard_color_scheme = val
-
-    @property
-    def starboard_cmap(self):
-        """The starboard_cmap property."""
-        return self._starboard_cmap
-    
-    @starboard_cmap.setter
-    def starboard_cmap(self, val):
-        self._starboard_cmap = val
+    @starboard_params.setter
+    def starboard_params(self, val):
+        self._starboard_params = val
 
     ################################################
     # Initiate top toolbar
@@ -591,13 +341,6 @@ class MyWindow(QMainWindow):
         self.crop_tiles_btn.setText("Crop tiles")
         self.crop_tiles_btn.clicked.connect(self.crop_tiles)
 
-        # Compute BAC
-        """self.compute_bac_checkbox = QCheckBox(self.load_data_groupbox)
-        self.compute_bac_checkbox.setGeometry(180, 80, 100, 22)
-        self.compute_bac_checkbox.setText(f"BAC")
-        self.compute_bac_checkbox.stateChanged.connect(self.update_compute_bac)
-        self.compute_bac_checkbox.setChecked(True)"""
-
         # Loading data parameters
         self.decimation_label = QLabel(self.load_data_groupbox)
         self.decimation_label.setGeometry(10, 90, 200, 10)
@@ -641,146 +384,141 @@ class MyWindow(QMainWindow):
         ########################################################
         # Port channel layout
         ########################################################
-        self.port_channel_groupbox = QGroupBox(self.top_toolbar_groupbox)
-        self.port_channel_groupbox.setGeometry(320, 0, 430, 300)
-        self.port_channel_groupbox.setProperty("border", "none")
-        self.port_channel_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
+        self.port_groupbox = QGroupBox(self.top_toolbar_groupbox)
+        self.port_groupbox.setGeometry(320, 0, 430, 300)
+        self.port_groupbox.setProperty("border", "none")
+        self.port_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
 
 
-        self.port_channel_title_label = QLabel(self.port_channel_groupbox)
-        self.port_channel_title_label.setGeometry(165, 10, 100, 22)
-        self.port_channel_title_label.setText(f"PORT SIDE")
-        self.port_channel_title_label.setFont(font)
+        self.port_title_label = QLabel(self.port_groupbox)
+        self.port_title_label.setGeometry(165, 10, 100, 22)
+        self.port_title_label.setText(f"PORT SIDE")
+        self.port_title_label.setFont(font)
 
-        self.port_channel_min_label = QLabel(self.port_channel_groupbox)
-        self.port_channel_min_label.setGeometry(10, 40, 100, 22)
-        self.port_channel_min_label.setText(f"Map range min")
-        self.port_channel_min_label.adjustSize()
+        self.port_min_label = QLabel(self.port_groupbox)
+        self.port_min_label.setGeometry(10, 40, 100, 22)
+        self.port_min_label.setText(f"Map range min")
+        self.port_min_label.adjustSize()
 
-        self.port_channel_min_step_label = QLabel(self.port_channel_groupbox)
-        self.port_channel_min_step_label.setGeometry(220, 40, 100, 22)
-        self.port_channel_min_step_label.setText(f"step")
-        self.port_channel_min_step_label.adjustSize()
+        self.port_min_step_label = QLabel(self.port_groupbox)
+        self.port_min_step_label.setGeometry(220, 40, 100, 22)
+        self.port_min_step_label.setText(f"step")
+        self.port_min_step_label.adjustSize()
         
-        self.port_channel_min_step_textbox = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_min_step_textbox.setGeometry(250, 40, 60, 22)
-        self.port_channel_min_step_textbox.setValidator(non_zero_double_validator)
-        self.port_channel_min_step_textbox.setEnabled(False)
-        self.port_channel_min_step_textbox.editingFinished.connect(self.update_port_channel_min_step_textbox)
-        self.port_channel_min_step_textbox.setText(str(float(self._port_channel_min_step)))
+        self.port_min_step = QLineEdit(self.port_groupbox)
+        self.port_min_step.setGeometry(250, 40, 60, 22)
+        self.port_min_step.setValidator(non_zero_double_validator)
+        self.port_min_step.setEnabled(False)
+        self.port_min_step.editingFinished.connect(self.update_port_min_slider_range)
+        self.port_min_step.setText(str(float(self.port_params["channel_min_step"])))
 
-        self.port_channel_min_slider = QSlider(Qt.Orientation.Horizontal, self.port_channel_groupbox)
-        self.port_channel_min_slider.setGeometry(10, 70, 300, 15)
-        self.port_channel_min_slider.setMinimum(0)
-        self.port_channel_min_slider.setMaximum(100)
-        self.port_channel_min_slider.setValue(self.port_channel_min)
-        self.port_channel_min_slider.setTickInterval(1)
-        self.port_channel_min_slider.valueChanged.connect(self.update_port_channel_min)
-        self.port_channel_min_slider.setEnabled(False)
+        self.port_min_slider = QSlider(Qt.Orientation.Horizontal, self.port_groupbox)
+        self.port_min_slider.setGeometry(10, 70, 300, 15)
+        self.port_min_slider.setMinimum(0)
+        self.port_min_slider.setMaximum(100)
+        self.port_min_slider.setValue(4)#self.port_params["channel_min"])
+        self.port_min_slider.setTickInterval(1)
+        self.port_min_slider.valueChanged.connect(self.update_port_min)
+        self.port_min_slider.setEnabled(False)
 
-        self.port_channel_min_slider_bottom = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_min_slider_bottom.setGeometry(10, 90, 60, 22)
-        self.port_channel_min_slider_bottom.setPlaceholderText("min")
-        self.port_channel_min_slider_bottom.setValidator(zero_double_validator)
-        self.port_channel_min_slider_bottom.setText("0.0")
-        self.port_channel_min_slider_bottom.setEnabled(False)
-        self.port_channel_min_slider_bottom.editingFinished.connect(self.update_port_channel_min_slider_bottom)
-        self.port_channel_min_slider_current = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_min_slider_current.setGeometry(130, 90, 60, 22)
-        self.port_channel_min_slider_current.setPlaceholderText("current")
-        self.port_channel_min_slider_current.setValidator(zero_double_validator)
-        self.port_channel_min_slider_current.setEnabled(False)
-        self.port_channel_min_slider_current.editingFinished.connect(self.update_port_channel_min_slider_current)
-        self.port_channel_min_slider_top = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_min_slider_top.setGeometry(250, 90, 60, 22)
-        self.port_channel_min_slider_top.setPlaceholderText("max")
-        self.port_channel_min_slider_top.setValidator(zero_double_validator)
-        self.port_channel_min_slider_top.setText("100.0")
-        self.port_channel_min_slider_top.setEnabled(False)
-        self.port_channel_min_slider_top.editingFinished.connect(self.update_port_channel_min_slider_top)
+        self.port_min_slider_bottom = QLineEdit(self.port_groupbox)
+        self.port_min_slider_bottom.setGeometry(10, 90, 60, 22)
+        self.port_min_slider_bottom.setPlaceholderText("min")
+        self.port_min_slider_bottom.setValidator(zero_double_validator)
+        self.port_min_slider_bottom.setText("0.0")
+        self.port_min_slider_bottom.setEnabled(False)
+        self.port_min_slider_bottom.editingFinished.connect(self.update_port_min_slider_range)
+        self.port_min_slider_current = QLineEdit(self.port_groupbox)
+        self.port_min_slider_current.setGeometry(130, 90, 60, 22)
+        self.port_min_slider_current.setPlaceholderText("current")
+        self.port_min_slider_current.setValidator(zero_double_validator)
+        self.port_min_slider_current.setEnabled(False)
+        self.port_min_slider_current.editingFinished.connect(self.update_port_min_slider_range)
+        self.port_min_slider_top = QLineEdit(self.port_groupbox)
+        self.port_min_slider_top.setGeometry(250, 90, 60, 22)
+        self.port_min_slider_top.setPlaceholderText("max")
+        self.port_min_slider_top.setValidator(zero_double_validator)
+        self.port_min_slider_top.setText("100.0")
+        self.port_min_slider_top.setEnabled(False)
+        self.port_min_slider_top.editingFinished.connect(self.update_port_min_slider_range)
 
-        # Channel scale value slider
-        self.port_channel_scale_label = QLabel(self.port_channel_groupbox)
-        self.port_channel_scale_label.setGeometry(10, 130, 60, 22)
-        self.port_channel_scale_label.setText(f"Map range max")
-        self.port_channel_scale_label.adjustSize()
+        # Channel max value slider
+        self.port_max_label = QLabel(self.port_groupbox)
+        self.port_max_label.setGeometry(10, 130, 60, 22)
+        self.port_max_label.setText(f"Map range max")
+        self.port_max_label.adjustSize()
 
-        self.port_channel_scale_step_label = QLabel(self.port_channel_groupbox)
-        self.port_channel_scale_step_label.setGeometry(220, 130, 60, 22)
-        self.port_channel_scale_step_label.setText(f"step")
-        self.port_channel_scale_step_label.adjustSize()
+        self.port_max_step_label = QLabel(self.port_groupbox)
+        self.port_max_step_label.setGeometry(220, 130, 60, 22)
+        self.port_max_step_label.setText(f"step")
+        self.port_max_step_label.adjustSize()
 
-        self.port_channel_scale_step_textbox = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_scale_step_textbox.setGeometry(250, 130, 60, 22)
-        self.port_channel_scale_step_textbox.setValidator(non_zero_double_validator)
-        self.port_channel_scale_step_textbox.setEnabled(False)
-        self.port_channel_scale_step_textbox.editingFinished.connect(self.update_port_channel_scale_step_textbox)
-        self.port_channel_scale_step_textbox.setText(str(float(self._port_channel_scale_step)))
+        self.port_max_step = QLineEdit(self.port_groupbox)
+        self.port_max_step.setGeometry(250, 130, 60, 22)
+        self.port_max_step.setValidator(non_zero_double_validator)
+        self.port_max_step.setEnabled(False)
+        self.port_max_step.editingFinished.connect(self.update_port_max_slider_range)
+        self.port_max_step.setText(str(float(self.port_params["channel_max_step"])))
 
-        self.port_channel_scale_slider = QSlider(Qt.Orientation.Horizontal, self.port_channel_groupbox)
-        self.port_channel_scale_slider.setGeometry(10, 160, 300, 15)
-        self.port_channel_scale_slider.setMinimum(0)
-        self.port_channel_scale_slider.setMaximum(100)
-        self.port_channel_scale_slider.setValue(self.port_channel_scale)
-        self.port_channel_scale_slider.setTickInterval(1)
-        self.port_channel_scale_slider.valueChanged.connect(self.update_port_channel_scale)
-        self.port_channel_scale_slider.setEnabled(False)
+        self.port_max_slider = QSlider(Qt.Orientation.Horizontal, self.port_groupbox)
+        self.port_max_slider.setGeometry(10, 160, 300, 15)
+        self.port_max_slider.setMinimum(0)
+        self.port_max_slider.setMaximum(100)
+        self.port_max_slider.setValue(self.port_params["channel_max"])
+        self.port_max_slider.setTickInterval(1)
+        self.port_max_slider.valueChanged.connect(self.update_port_max)
+        self.port_max_slider.setEnabled(False)
 
-        self.port_channel_scale_slider_bottom = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_scale_slider_bottom.setGeometry(10, 180, 60, 22)
-        self.port_channel_scale_slider_bottom.setPlaceholderText("min")
-        self.port_channel_scale_slider_bottom.setValidator(zero_double_validator)
-        self.port_channel_scale_slider_bottom.setText("0.0")
-        self.port_channel_scale_slider_bottom.setEnabled(False)
-        self.port_channel_scale_slider_bottom.editingFinished.connect(self.update_port_channel_scale_slider_bottom)
-        self.port_channel_scale_slider_current = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_scale_slider_current.setGeometry(130, 180, 60, 22)
-        self.port_channel_scale_slider_current.setPlaceholderText("current")
-        self.port_channel_scale_slider_current.setValidator(zero_double_validator)
-        self.port_channel_scale_slider_current.setEnabled(False)
-        self.port_channel_scale_slider_current.editingFinished.connect(self.update_port_channel_scale_slider_current)
-        self.port_channel_scale_slider_top = QLineEdit(self.port_channel_groupbox)
-        self.port_channel_scale_slider_top.setGeometry(250, 180, 60, 22)
-        self.port_channel_scale_slider_top.setPlaceholderText("max")
-        self.port_channel_scale_slider_top.setValidator(zero_double_validator)
-        self.port_channel_scale_slider_top.setText("100.0")
-        self.port_channel_scale_slider_top.setEnabled(False)
-        self.port_channel_scale_slider_top.editingFinished.connect(self.update_port_channel_scale_slider_top)
+        self.port_max_slider_bottom = QLineEdit(self.port_groupbox)
+        self.port_max_slider_bottom.setGeometry(10, 180, 60, 22)
+        self.port_max_slider_bottom.setPlaceholderText("min")
+        self.port_max_slider_bottom.setValidator(zero_double_validator)
+        self.port_max_slider_bottom.setText("0.0")
+        self.port_max_slider_bottom.setEnabled(False)
+        self.port_max_slider_bottom.editingFinished.connect(self.update_port_max_slider_range)
+        self.port_max_slider_current = QLineEdit(self.port_groupbox)
+        self.port_max_slider_current.setGeometry(130, 180, 60, 22)
+        self.port_max_slider_current.setPlaceholderText("current")
+        self.port_max_slider_current.setValidator(zero_double_validator)
+        self.port_max_slider_current.setEnabled(False)
+        self.port_max_slider_current.editingFinished.connect(self.update_port_max_slider_range)
+        self.port_max_slider_top = QLineEdit(self.port_groupbox)
+        self.port_max_slider_top.setGeometry(250, 180, 60, 22)
+        self.port_max_slider_top.setPlaceholderText("max")
+        self.port_max_slider_top.setValidator(zero_double_validator)
+        self.port_max_slider_top.setText("100.0")
+        self.port_max_slider_top.setEnabled(False)
+        self.port_max_slider_top.editingFinished.connect(self.update_port_max_slider_range)
 
         # Auto min checkbox
-        self.port_auto_min_checkbox = QCheckBox(self.port_channel_groupbox)
+        self.port_auto_min_checkbox = QCheckBox(self.port_groupbox)
         self.port_auto_min_checkbox.setGeometry(320, 40, 100, 20)
         self.port_auto_min_checkbox.setText(f"auto min")
         self.port_auto_min_checkbox.stateChanged.connect(self.update_port_auto_min)
         self.port_auto_min_checkbox.setChecked(True)
 
-        # Auto scale checkbox
-        self.port_auto_scale_checkbox = QCheckBox(self.port_channel_groupbox)
-        self.port_auto_scale_checkbox.setGeometry(320, 65, 100, 20)
-        self.port_auto_scale_checkbox.setText(f"auto scale")
-        self.port_auto_scale_checkbox.stateChanged.connect(self.update_port_auto_scale)
-        self.port_auto_scale_checkbox.setChecked(True)
+        # Auto max checkbox
+        self.port_auto_max_checkbox = QCheckBox(self.port_groupbox)
+        self.port_auto_max_checkbox.setGeometry(320, 65, 100, 20)
+        self.port_auto_max_checkbox.setText(f"auto max")
+        self.port_auto_max_checkbox.stateChanged.connect(self.update_port_auto_max)
+        self.port_auto_max_checkbox.setChecked(True)
 
         # port_invert colors checkbox
-        self.port_invert_checkbox = QCheckBox(self.port_channel_groupbox)
+        self.port_invert_checkbox = QCheckBox(self.port_groupbox)
         self.port_invert_checkbox.setGeometry(320, 90, 100, 20)
         self.port_invert_checkbox.setText(f"invert")
         self.port_invert_checkbox.stateChanged.connect(self.update_port_invert)
 
         # Color scheme selection box
-        self.port_color_scheme_combobox = QComboBox(self.port_channel_groupbox)
+        self.port_color_scheme_combobox = QComboBox(self.port_groupbox)
         self.port_color_scheme_combobox.setGeometry(320, 120, 100, 22)
         #self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.port_color_scheme_combobox.addItems(["greylog", "grey"])
         self.port_color_scheme_combobox.currentIndexChanged.connect(self.update_port_color_scheme)
 
-        """self.upload_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
-        self.upload_port_color_scheme_btn.setGeometry(320, 150, 100, 22)
-        self.upload_port_color_scheme_btn.setText("Upload cmap")
-        self.upload_port_color_scheme_btn.clicked.connect(self.upload_port_color_scheme)"""
-
         # Apply selected display parameter values
-        self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self.port_channel_groupbox)
+        self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self.port_groupbox)
         self.apply_port_color_scheme_btn.setGeometry(320, 180, 100, 22)
         self.apply_port_color_scheme_btn.setText("Apply")
         self.apply_port_color_scheme_btn.clicked.connect(self.apply_port_color_scheme)
@@ -788,144 +526,144 @@ class MyWindow(QMainWindow):
         ########################################################
         # Starboard channel layout
         ########################################################
-        self.starboard_channel_groupbox = QGroupBox(self.top_toolbar_groupbox)
-        self.starboard_channel_groupbox.setGeometry(750, 0, 430, 300)
-        self.starboard_channel_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
+        self.starboard_groupbox = QGroupBox(self.top_toolbar_groupbox)
+        self.starboard_groupbox.setGeometry(750, 0, 430, 300)
+        self.starboard_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
 
-        self.starboard_channel_title_label = QLabel(self.starboard_channel_groupbox)
-        self.starboard_channel_title_label.setGeometry(165, 10, 100, 22)
-        self.starboard_channel_title_label.setText(f"STARBOARD SIDE")
-        self.starboard_channel_title_label.setFont(font)
+        self.starboard_title_label = QLabel(self.starboard_groupbox)
+        self.starboard_title_label.setGeometry(165, 10, 100, 22)
+        self.starboard_title_label.setText(f"STARBOARD SIDE")
+        self.starboard_title_label.setFont(font)
 
-        self.starboard_channel_min_label = QLabel(self.starboard_channel_groupbox)
-        self.starboard_channel_min_label.setGeometry(10, 40, 100, 22)
-        self.starboard_channel_min_label.setText(f"Map range min")
-        self.starboard_channel_min_label.adjustSize()
+        self.starboard_min_label = QLabel(self.starboard_groupbox)
+        self.starboard_min_label.setGeometry(10, 40, 100, 22)
+        self.starboard_min_label.setText(f"Map range min")
+        self.starboard_min_label.adjustSize()
 
-        self.starboard_channel_min_step_label = QLabel(self.starboard_channel_groupbox)
-        self.starboard_channel_min_step_label.setGeometry(220, 40, 100, 22)
-        self.starboard_channel_min_step_label.setText(f"step")
-        self.starboard_channel_min_step_label.adjustSize()
+        self.starboard_min_step_label = QLabel(self.starboard_groupbox)
+        self.starboard_min_step_label.setGeometry(220, 40, 100, 22)
+        self.starboard_min_step_label.setText(f"step")
+        self.starboard_min_step_label.adjustSize()
 
-        self.starboard_channel_min_step_textbox = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_min_step_textbox.setGeometry(250, 40, 60, 22)
-        self.starboard_channel_min_step_textbox.setValidator(non_zero_double_validator)
-        self.starboard_channel_min_step_textbox.setEnabled(False)
-        self.starboard_channel_min_step_textbox.editingFinished.connect(self.update_starboard_channel_min_step_textbox)
-        self.starboard_channel_min_step_textbox.setText(str(float(self._starboard_channel_min_step)))
+        self.starboard_min_step = QLineEdit(self.starboard_groupbox)
+        self.starboard_min_step.setGeometry(250, 40, 60, 22)
+        self.starboard_min_step.setValidator(non_zero_double_validator)
+        self.starboard_min_step.setEnabled(False)
+        self.starboard_min_step.editingFinished.connect(self.update_starboard_min_slider_range)
+        self.starboard_min_step.setText(str(float(self.starboard_params["channel_min_step"])))
 
-        self.starboard_channel_min_slider = QSlider(Qt.Orientation.Horizontal, self.starboard_channel_groupbox)
-        self.starboard_channel_min_slider.setGeometry(10, 70, 300, 15)
-        self.starboard_channel_min_slider.setMinimum(0)
-        self.starboard_channel_min_slider.setMaximum(100)
-        self.starboard_channel_min_slider.setValue(self.starboard_channel_min)
-        self.starboard_channel_min_slider.setTickInterval(1)
-        self.starboard_channel_min_slider.valueChanged.connect(self.update_starboard_channel_min)
-        self.starboard_channel_min_slider.setEnabled(False)
+        self.starboard_min_slider = QSlider(Qt.Orientation.Horizontal, self.starboard_groupbox)
+        self.starboard_min_slider.setGeometry(10, 70, 300, 15)
+        self.starboard_min_slider.setMinimum(0)
+        self.starboard_min_slider.setMaximum(100)
+        self.starboard_min_slider.setValue(self.starboard_params["channel_min"])
+        self.starboard_min_slider.setTickInterval(1)
+        self.starboard_min_slider.valueChanged.connect(self.update_starboard_min)
+        self.starboard_min_slider.setEnabled(False)
 
-        self.starboard_channel_min_slider_bottom = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_min_slider_bottom.setGeometry(10, 90, 60, 22)
-        self.starboard_channel_min_slider_bottom.setPlaceholderText("min")
-        self.starboard_channel_min_slider_bottom.setValidator(zero_double_validator)
-        self.starboard_channel_min_slider_bottom.setText("0.0")
-        self.starboard_channel_min_slider_bottom.setEnabled(False)
-        self.starboard_channel_min_slider_bottom.editingFinished.connect(self.update_starboard_channel_min_slider_bottom)
-        self.starboard_channel_min_slider_current = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_min_slider_current.setGeometry(130, 90, 60, 22)
-        self.starboard_channel_min_slider_current.setPlaceholderText("current")
-        self.starboard_channel_min_slider_current.setValidator(zero_double_validator)
-        self.starboard_channel_min_slider_current.setEnabled(False)
-        self.starboard_channel_min_slider_current.editingFinished.connect(self.update_starboard_channel_min_slider_current)
-        self.starboard_channel_min_slider_top = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_min_slider_top.setGeometry(250, 90, 60, 22)
-        self.starboard_channel_min_slider_top.setPlaceholderText("max")
-        self.starboard_channel_min_slider_top.setValidator(zero_double_validator)
-        self.starboard_channel_min_slider_top.setText("100.0")
-        self.starboard_channel_min_slider_top.setEnabled(False)
-        self.starboard_channel_min_slider_top.editingFinished.connect(self.update_starboard_channel_min_slider_top)
+        self.starboard_min_slider_bottom = QLineEdit(self.starboard_groupbox)
+        self.starboard_min_slider_bottom.setGeometry(10, 90, 60, 22)
+        self.starboard_min_slider_bottom.setPlaceholderText("min")
+        self.starboard_min_slider_bottom.setValidator(zero_double_validator)
+        self.starboard_min_slider_bottom.setText("0.0")
+        self.starboard_min_slider_bottom.setEnabled(False)
+        self.starboard_min_slider_bottom.editingFinished.connect(self.update_starboard_min_slider_range)
+        self.starboard_min_slider_current = QLineEdit(self.starboard_groupbox)
+        self.starboard_min_slider_current.setGeometry(130, 90, 60, 22)
+        self.starboard_min_slider_current.setPlaceholderText("current")
+        self.starboard_min_slider_current.setValidator(zero_double_validator)
+        self.starboard_min_slider_current.setEnabled(False)
+        self.starboard_min_slider_current.editingFinished.connect(self.update_starboard_min_slider_range)
+        self.starboard_min_slider_top = QLineEdit(self.starboard_groupbox)
+        self.starboard_min_slider_top.setGeometry(250, 90, 60, 22)
+        self.starboard_min_slider_top.setPlaceholderText("max")
+        self.starboard_min_slider_top.setValidator(zero_double_validator)
+        self.starboard_min_slider_top.setText("100.0")
+        self.starboard_min_slider_top.setEnabled(False)
+        self.starboard_min_slider_top.editingFinished.connect(self.update_starboard_min_slider_range)
 
-        # Channel scale value slider
-        self.starboard_channel_scale_label = QLabel(self.starboard_channel_groupbox)
-        self.starboard_channel_scale_label.setGeometry(10, 130, 60, 22)
-        self.starboard_channel_scale_label.setText(f"Map range max")
-        self.starboard_channel_scale_label.adjustSize()
+        # Channel max value slider
+        self.starboard_max_label = QLabel(self.starboard_groupbox)
+        self.starboard_max_label.setGeometry(10, 130, 60, 22)
+        self.starboard_max_label.setText(f"Map range max")
+        self.starboard_max_label.adjustSize()
 
-        self.starboard_channel_scale_step_label = QLabel(self.starboard_channel_groupbox)
-        self.starboard_channel_scale_step_label.setGeometry(220, 130, 60, 22)
-        self.starboard_channel_scale_step_label.setText(f"step")
-        self.starboard_channel_scale_step_label.adjustSize()
+        self.starboard_max_step_label = QLabel(self.starboard_groupbox)
+        self.starboard_max_step_label.setGeometry(220, 130, 60, 22)
+        self.starboard_max_step_label.setText(f"step")
+        self.starboard_max_step_label.adjustSize()
 
-        self.starboard_channel_scale_step_textbox = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_scale_step_textbox.setGeometry(250, 130, 60, 22)
-        self.starboard_channel_scale_step_textbox.setValidator(non_zero_double_validator)
-        self.starboard_channel_scale_step_textbox.setEnabled(False)
-        self.starboard_channel_scale_step_textbox.editingFinished.connect(self.update_starboard_channel_scale_step_textbox)
-        self.starboard_channel_scale_step_textbox.setText(str(float(self._starboard_channel_scale_step)))
+        self.starboard_max_step = QLineEdit(self.starboard_groupbox)
+        self.starboard_max_step.setGeometry(250, 130, 60, 22)
+        self.starboard_max_step.setValidator(non_zero_double_validator)
+        self.starboard_max_step.setEnabled(False)
+        self.starboard_max_step.editingFinished.connect(self.update_starboard_max_slider_range)
+        self.starboard_max_step.setText(str(float(self.starboard_params["channel_max_step"])))
 
-        self.starboard_channel_scale_slider = QSlider(Qt.Orientation.Horizontal, self.starboard_channel_groupbox)
-        self.starboard_channel_scale_slider.setGeometry(10, 160, 300, 15)
-        self.starboard_channel_scale_slider.setMinimum(0)
-        self.starboard_channel_scale_slider.setMaximum(100)
-        self.starboard_channel_scale_slider.setValue(self.starboard_channel_scale)
-        self.starboard_channel_scale_slider.setTickInterval(1)
-        self.starboard_channel_scale_slider.valueChanged.connect(self.update_starboard_channel_scale)
-        self.starboard_channel_scale_slider.setEnabled(False)
+        self.starboard_max_slider = QSlider(Qt.Orientation.Horizontal, self.starboard_groupbox)
+        self.starboard_max_slider.setGeometry(10, 160, 300, 15)
+        self.starboard_max_slider.setMinimum(0)
+        self.starboard_max_slider.setMaximum(100)
+        self.starboard_max_slider.setValue(self.starboard_params["channel_max"])
+        self.starboard_max_slider.setTickInterval(1)
+        self.starboard_max_slider.valueChanged.connect(self.update_starboard_max)
+        self.starboard_max_slider.setEnabled(False)
 
-        self.starboard_channel_scale_slider_bottom = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_scale_slider_bottom.setGeometry(10, 180, 60, 22)
-        self.starboard_channel_scale_slider_bottom.setPlaceholderText("min")
-        self.starboard_channel_scale_slider_bottom.setValidator(zero_double_validator)
-        self.starboard_channel_scale_slider_bottom.setText("0.0")
-        self.starboard_channel_scale_slider_bottom.setEnabled(False)
-        self.starboard_channel_scale_slider_bottom.editingFinished.connect(self.update_starboard_channel_scale_slider_bottom)
-        self.starboard_channel_scale_slider_current = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_scale_slider_current.setGeometry(130, 180, 60, 22)
-        self.starboard_channel_scale_slider_current.setPlaceholderText("current")
-        self.starboard_channel_scale_slider_current.setValidator(zero_double_validator)
-        self.starboard_channel_scale_slider_current.setEnabled(False)
-        self.starboard_channel_scale_slider_current.editingFinished.connect(self.update_starboard_channel_scale_slider_current)
-        self.starboard_channel_scale_slider_top = QLineEdit(self.starboard_channel_groupbox)
-        self.starboard_channel_scale_slider_top.setGeometry(250, 180, 60, 22)
-        self.starboard_channel_scale_slider_top.setPlaceholderText("max")
-        self.starboard_channel_scale_slider_top.setValidator(zero_double_validator)
-        self.starboard_channel_scale_slider_top.setText("100.0")
-        self.starboard_channel_scale_slider_top.setEnabled(False)
-        self.starboard_channel_scale_slider_top.editingFinished.connect(self.update_starboard_channel_scale_slider_top)
+        self.starboard_max_slider_bottom = QLineEdit(self.starboard_groupbox)
+        self.starboard_max_slider_bottom.setGeometry(10, 180, 60, 22)
+        self.starboard_max_slider_bottom.setPlaceholderText("min")
+        self.starboard_max_slider_bottom.setValidator(zero_double_validator)
+        self.starboard_max_slider_bottom.setText("0.0")
+        self.starboard_max_slider_bottom.setEnabled(False)
+        self.starboard_max_slider_bottom.editingFinished.connect(self.update_starboard_max_slider_range)
+        self.starboard_max_slider_current = QLineEdit(self.starboard_groupbox)
+        self.starboard_max_slider_current.setGeometry(130, 180, 60, 22)
+        self.starboard_max_slider_current.setPlaceholderText("current")
+        self.starboard_max_slider_current.setValidator(zero_double_validator)
+        self.starboard_max_slider_current.setEnabled(False)
+        self.starboard_max_slider_current.editingFinished.connect(self.update_starboard_max_slider_range)
+        self.starboard_max_slider_top = QLineEdit(self.starboard_groupbox)
+        self.starboard_max_slider_top.setGeometry(250, 180, 60, 22)
+        self.starboard_max_slider_top.setPlaceholderText("max")
+        self.starboard_max_slider_top.setValidator(zero_double_validator)
+        self.starboard_max_slider_top.setText("100.0")
+        self.starboard_max_slider_top.setEnabled(False)
+        self.starboard_max_slider_top.editingFinished.connect(self.update_starboard_max_slider_range)
 
         # Auto min checkbox
-        self.starboard_auto_min_checkbox = QCheckBox(self.starboard_channel_groupbox)
+        self.starboard_auto_min_checkbox = QCheckBox(self.starboard_groupbox)
         self.starboard_auto_min_checkbox.setGeometry(320, 40, 100, 20)
         self.starboard_auto_min_checkbox.setText(f"auto min")
         self.starboard_auto_min_checkbox.stateChanged.connect(self.update_starboard_auto_min)
         self.starboard_auto_min_checkbox.setChecked(True)
 
-        # Auto scale checkbox
-        self.starboard_auto_scale_checkbox = QCheckBox(self.starboard_channel_groupbox)
-        self.starboard_auto_scale_checkbox.setGeometry(320, 65, 100, 20)
-        self.starboard_auto_scale_checkbox.setText(f"auto scale")
-        self.starboard_auto_scale_checkbox.stateChanged.connect(self.update_starboard_auto_scale)
-        self.starboard_auto_scale_checkbox.setChecked(True)
+        # Auto max checkbox
+        self.starboard_auto_max_checkbox = QCheckBox(self.starboard_groupbox)
+        self.starboard_auto_max_checkbox.setGeometry(320, 65, 100, 20)
+        self.starboard_auto_max_checkbox.setText(f"auto max")
+        self.starboard_auto_max_checkbox.stateChanged.connect(self.update_starboard_auto_max)
+        self.starboard_auto_max_checkbox.setChecked(True)
 
         # starboard_invert colors checkbox
-        self.starboard_invert_checkbox = QCheckBox(self.starboard_channel_groupbox)
+        self.starboard_invert_checkbox = QCheckBox(self.starboard_groupbox)
         self.starboard_invert_checkbox.setGeometry(320, 90, 100, 20)
         self.starboard_invert_checkbox.setText(f"invert")
         self.starboard_invert_checkbox.stateChanged.connect(self.update_starboard_invert)
 
         # Color scheme selection box
-        self.starboard_color_scheme_combobox = QComboBox(self.starboard_channel_groupbox)
+        self.starboard_color_scheme_combobox = QComboBox(self.starboard_groupbox)
         self.starboard_color_scheme_combobox.setGeometry(320, 120, 100, 22)
         #self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.starboard_color_scheme_combobox.addItems(["greylog", "grey"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
-        """self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)
+        """self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_groupbox)
         self.upload_starboard_color_scheme_btn.setGeometry(320, 150, 100, 22)
         self.upload_starboard_color_scheme_btn.setText("Upload cmap")
         self.upload_starboard_color_scheme_btn.clicked.connect(self.upload_starboard_color_scheme)"""
 
         # Apply selected display parameter values
-        self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_channel_groupbox)
+        self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_groupbox)
         self.apply_starboard_color_scheme_btn.setGeometry(320, 180, 100, 22)
         self.apply_starboard_color_scheme_btn.setText("Apply")
         self.apply_starboard_color_scheme_btn.clicked.connect(self.apply_starboard_color_scheme)
@@ -953,33 +691,33 @@ class MyWindow(QMainWindow):
             arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
             pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
 
-            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), 0, self.decimation, self.auto_stretch, self.stretch, self.shift, self.compute_bac)
+            self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width, self.across_track_sample_interval, self.along_track_sample_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
             
-            self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
-            self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
+            #self.port_image = convert_to_image(self.port_params, self.port_params["invert"], self.port_params["auto_min"], self.port_params["channel_min"], self.port_params["auto_max"], self.port_params["channel_max"], self.port_params["color_scheme"], self.port_params["cmap"])
+            #self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_min, self.starboard_auto_max, self.starboard_max, self.starboard_color_scheme, self.starboard_cmap)
+            self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
+            self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
+            #self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
+            #self.starboard_image = self.port_image
 
-            bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
-            top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
             self.polygons_data = []
             self.tiles_data = []
             if os.path.exists(os.path.join(self.input_filepath, self.labels_filename)):
                 self.load_data()
-                self.image = merge_images(self.port_image, self.starboard_image)
-                pixmap = toqpixmap(self.image)
+                self.merged_image = merge_images(self.port_image, self.starboard_image)
+                pixmap = toqpixmap(self.merged_image)
                 self.canvas.set_image(True, pixmap)
-                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
-                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
+                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
+                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
             else:
                 self.clear_labels()
-                self.image = merge_images(self.port_image, self.starboard_image)
-                pixmap = toqpixmap(self.image)
+                self.merged_image = merge_images(self.port_image, self.starboard_image)
+                pixmap = toqpixmap(self.merged_image)
                 self.canvas.set_image(True, pixmap)
-                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
-                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
-
-            #self.splits_textbox.setText(str(self.splits))
-            #self.selected_split_spinbox.setMaximum(self.splits)
+                self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
+                self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
             
+            self.update_params()
             self.stretch_auto = self.stretch
             self.stretch_slider.setValue(self.stretch)
             self.stretch_label.setText(f"Stretch: {self.stretch}")
@@ -993,32 +731,27 @@ class MyWindow(QMainWindow):
         arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
         pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
         
-        self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.packet_size, self.full_image_height, self.full_image_width, self.accross_interval, self.along_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), 0, self.decimation, self.auto_stretch, self.stretch, self.shift, self.compute_bac)
+        self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
         
-        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
-        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
+        self.port_image = convert_to_image(self.port_data, self.port_params["invert"], self.port_params["auto_min"], self.port_params["channel_min"], self.port_params["auto_max"], self.port_params["channel_max"], self.port_params["color_scheme"], self.port_params["cmap"])
+        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_min, self.starboard_auto_max, self.starboard_max, self.starboard_color_scheme, self.starboard_cmap)
 
-        bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
-        top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
         self.polygons_data = []
         self.tiles_data = []
         if os.path.exists(os.path.join(self.input_filepath, self.labels_filename)):
             self.load_data()
-            self.image = merge_images(self.port_image, self.starboard_image)
-            pixmap = toqpixmap(self.image)
+            self.merged_image = merge_images(self.port_image, self.starboard_image)
+            pixmap = toqpixmap(self.merged_image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
-            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
+            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
         else:
             self.clear_labels()
-            self.image = merge_images(self.port_image, self.starboard_image)
-            pixmap = toqpixmap(self.image)
+            self.merged_image = merge_images(self.port_image, self.starboard_image)
+            pixmap = toqpixmap(self.merged_image)
             self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
-            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
-
-        self.splits_textbox.setText(str(self.splits))
-        self.selected_split_spinbox.setMaximum(self.splits)
+            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
+            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
 
         self.stretch_auto = self.stretch
         self.stretch_slider.setValue(self.stretch)
@@ -1036,8 +769,6 @@ class MyWindow(QMainWindow):
         except:
             return
 
-        #self.full_image_height = data["full_height"]
-        #self.full_image_width = data["full_width"]
         polygons = data["shapes"]
 
         for key in polygons:
@@ -1077,10 +808,8 @@ class MyWindow(QMainWindow):
         self.canvas.selected_tiles = []
 
     def save_labels(self):
-        if self.image is None:
+        if self.merged_image is None:
             return
-        
-        split_size = floor(self.full_image_height / self.splits)
 
         try:
             with open(os.path.join(self.input_filepath, self.tiles_filename), "r") as f:
@@ -1104,7 +833,7 @@ class MyWindow(QMainWindow):
                     tiles[i] = "del"
                     i += 1
                 else:
-                    tiles[i] = {"rectangle": [math.floor(tile_data["tiles"].rect().x()) * self.decimation, math.floor((self.port_image.size[1] - math.floor(tile_data["tiles"].rect().y())) / self.stretch + split_size * (self.selected_split - 1)), tile_data["tiles"].rect().width() * self.decimation, math.floor(math.floor(tile_data["tiles"].rect().height()) / self.stretch)]}
+                    tiles[i] = {"rectangle": [math.floor(tile_data["tiles"].rect().x()) * self.decimation, math.floor((self.port_image.size[1] - math.floor(tile_data["tiles"].rect().y())) / self.stretch), tile_data["tiles"].rect().width() * self.decimation, math.floor(math.floor(tile_data["tiles"].rect().height()) / self.stretch)]}
                     i += 1
 
             # Remove polygons from dict 
@@ -1150,7 +879,7 @@ class MyWindow(QMainWindow):
                     
                     for idx, polygon in enumerate(polygon_data["polygon"]._polygon_corners):
                         x = math.floor(polygon[0]) * self.decimation
-                        y = math.floor(self.port_image.size[1] / (self.stretch + split_size * (self.selected_split - 1)) - math.floor(polygon[1] / (self.stretch + split_size * (self.selected_split - 1))))
+                        y = math.floor(self.port_image.size[1] / self.stretch - math.floor(polygon[1] / self.stretch))
                         corners.append([x, y])
 
                     polygons[i] = {"label": polygon_data["polygon"].polygon_class,
@@ -1187,7 +916,7 @@ class MyWindow(QMainWindow):
             json.dump(data, f, indent=4)
 
     def crop_tiles(self):
-        if self.image is None:
+        if self.merged_image is None:
             return
         anns = {
         "info": {
@@ -1239,17 +968,15 @@ class MyWindow(QMainWindow):
         "annotations": []
         }
 
-        split_size = floor(self.full_image_height / self.splits)
-
         tile_idx = 0
         ann_idx = 0
         for tile_data in self.canvas._tiles:
             if tile_data == "del":
                 continue
             x_tile = tile_data["tiles"].rect().x() * self.decimation
-            y_tile = tile_data["tiles"].rect().y() / self.stretch + split_size * (self.splits - self.selected_split)
+            y_tile = tile_data["tiles"].rect().y() / self.stretch
             width_tile = ((tile_data["tiles"].rect().x() + tile_data["tiles"].rect().width()) * self.decimation) - x_tile
-            height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch + split_size * (self.selected_split - 1)) - y_tile
+            height_tile = ((self.port_image.size[1] - (tile_data["tiles"].rect().y() + tile_data["tiles"].rect().height())) / self.stretch) - y_tile
             
             xmin = math.floor(x_tile)
             xmax = math.floor(x_tile + tile_data["tiles"].rect().width() * self.decimation)
@@ -1325,9 +1052,6 @@ class MyWindow(QMainWindow):
         
         with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
             json.dump(anns, f, indent=4)
-    
-    def update_compute_bac(self):
-        self.compute_bac = self.sender().isChecked()
 
     def update_decimation(self):
         self.decimation = self.sender().value()
@@ -1358,356 +1082,156 @@ class MyWindow(QMainWindow):
     ################################################
     # Top toolbar port side parameters functions
     ################################################
-    def update_port_channel_min_step_textbox(self):
-        self.port_channel_min_step = float(self.sender().text())
+    def update_port_min(self):
+        sender = self.sender() if self.sender() == self.port_min_slider else self.port_min_slider
+        self.port_params["channel_min"] = self.port_params["channel_min_dict"][sender.value()]
+        self.port_min_slider_current.setText(f"{str(round(self.port_params['channel_min_dict'][sender.value()], 2))}")
 
-        for key in sorted(list(self.port_channel_min_dict))[1:-1]:
-            del self.port_channel_min_dict[key]
+    def update_port_min_slider_range(self):
+        min_val_text = float(self.port_min_slider_bottom.text())
+        current_val_text = float(self.port_min_slider_current.text()) if self.port_min_slider_current.text() != "" else 0
+        max_val_text = float(self.port_min_slider_top.text())
+        step_val_text = float(self.port_min_step.text())
 
-        count = 1
-        max = self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]
-        if self.port_channel_min_step < 1:
-            steps = 0
-            scope = (max - self.port_channel_min_dict[0]["val"]) / self.port_channel_min_step
-        else:
-            steps = self.port_channel_min_dict[0]["val"] + self.port_channel_min_step
-            scope = max
+        # First make sure appropriate min/max values are applied and that current val is within range
+        if min_val_text > max_val_text:
+            min_val_text = max_val_text
 
-        while steps < scope:
-            if self.port_channel_min_step < 1:
-                self.port_channel_min_dict[count] = {"val": self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step,
-                                        "scaled": (self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step) * self.port_channel_min_step}
-                if count > scope:
-                    self.port_channel_min_dict[count] = {"val": max,
-                                        "scaled": max * self.port_channel_min_step}
-                steps += 1
-            else:
-                self.port_channel_min_dict[count] = {"val": self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step,
-                                        "scaled": (self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step) / self.port_channel_min_step}
-                steps += self.port_channel_min_step
-            count += 1
-
-        closest_val = closest([self.port_channel_min_dict[x]["val"] for x in sorted(self.port_channel_min_dict)], self.port_channel_min)
+        if max_val_text < min_val_text:
+            max_val_text = min_val_text
         
-        self.port_channel_min_slider.setMinimum(0)
-        self.port_channel_min_slider.setMaximum(len(self.port_channel_min_dict) - 1)
-
-        for key in self.port_channel_min_dict:
-            if self.port_channel_min_dict[key]["val"] == closest_val:
-                self.port_channel_min = self.port_channel_min_dict[key]["val"]
-                self.port_channel_min_slider.setValue(int(key))
-                self.port_channel_min_slider_current.setText(str(round(self.port_channel_min_dict[key]["val"], 2)))
-                break
-
-        self.port_channel_min_step_textbox.setText(str(float(self.sender().text())))
-
-    def update_port_channel_min(self):
-        self.port_channel_min = self.sender().value()
-
-        self.port_channel_min = self.port_channel_min_dict[sorted(self.port_channel_min_dict)[self.sender().value()]]["val"]
-        self.port_channel_min_slider_current.setText(f"{str(round(self.port_channel_min_dict[sorted(self.port_channel_min_dict)[self.sender().value()]]['val'], 2))}")
-
-    def update_port_channel_min_slider_bottom(self):
-        if float(self.sender().text()) >= self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]:
-            self.port_channel_min_slider_bottom.setText(str(self.port_channel_min_dict[0]["val"]))
-            return
-
-        for key in sorted(list(self.port_channel_min_dict))[1:-1]:
-            del self.port_channel_min_dict[key]
-
-        self.port_channel_min_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.port_channel_min_step}
-        count = 1
-        max = self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]
-        if self.port_channel_min_step < 1:
-            steps = 0
-            scope = (max - self.port_channel_min_dict[0]["val"]) / self.port_channel_min_step
-        else:
-            steps = self.port_channel_min_dict[0]["val"] + self.port_channel_min_step
-            scope = max
-
-        while steps < scope:
-            if self.port_channel_min_step < 1:
-                self.port_channel_min_dict[count] = {"val": self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step,
-                                        "scaled": (self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step) * self.port_channel_min_step}
-                if count > scope:
-                    self.port_channel_min_dict[count] = {"val": max,
-                                        "scaled": max * self.port_channel_min_step}
-                steps += 1
-            else:
-                self.port_channel_min_dict[count] = {"val": self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step,
-                                        "scaled": (self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step) / self.port_channel_min_step}
-                steps += self.port_channel_min_step
-            count += 1
-
-        self.port_channel_min_slider.setMinimum(0)
-        self.port_channel_min_slider.setMaximum(len(self.port_channel_min_dict) - 1)
-
-        closest_val = closest([self.port_channel_min_dict[x]["val"] for x in sorted(self.port_channel_min_dict)], self.port_channel_min)
-        for key in self.port_channel_min_dict:
-            if self.port_channel_min_dict[key]["val"] == closest_val:
-                self.port_channel_min = self.port_channel_min_dict[key]["val"]
-                self.port_channel_min_slider.setValue(int(key))
-                self.port_channel_min_slider_current.setText(str(round(self.port_channel_min_dict[key]["val"], 2)))
-                break
+        if current_val_text < min_val_text:
+            current_val_text = min_val_text
         
-        self.port_channel_min_slider_bottom.setText(str(float(self.sender().text())))
+        if current_val_text > max_val_text:
+            current_val_text = max_val_text
 
-    def update_port_channel_min_slider_current(self):
-        if float(self.sender().text()) < self.port_channel_min_dict[0]["val"]:
-            self.port_channel_min = self.port_channel_min_dict[0]["val"]
-            self.port_channel_min_slider.setValue(sorted(self.port_channel_min_dict)[0])
-            return
-
-        if float(self.sender().text()) > self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]:
-            self.port_channel_min = self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]
-            self.port_channel_min_slider.setValue(sorted(self.port_channel_min_dict)[-1])
-            return
-
-        closest_val = closest([self.port_channel_min_dict[x]["val"] for x in sorted(self.port_channel_min_dict)], float(self.sender().text()))
-        for key in self.port_channel_min_dict:
-            if self.port_channel_min_dict[key]["val"] == closest_val:
-                self.port_channel_min_slider.setValue(int(key))
-                self.port_channel_min_slider_current.setText(str(round(self.port_channel_min_dict[key]["val"], 2)))
-                break
-
-    def update_port_channel_min_slider_top(self):
-        if float(self.sender().text()) <= self.port_channel_min_dict[0]["val"]:
-            self.port_channel_min_slider_top.setText(str(self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]))
-            return
+        if max_val_text - min_val_text == 0.0:
+            max_val_text = min_val_text + 1
         
-        for key in sorted(list(self.port_channel_min_dict))[1:]:
-            del self.port_channel_min_dict[key]
+        # Set maximum slider value first to ensure that slider is moved to the correct position when value is changed
+        self.port_min_slider.setMaximum(math.ceil((max_val_text - min_val_text) / step_val_text))
 
-        self.port_channel_min_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.port_channel_min_step}
-        count = 1
-        max = self.port_channel_min_dict[sorted(self.port_channel_min_dict)[-1]]["val"]
-        if self.port_channel_min_step < 1:
-            steps = 0
-            scope = (max - self.port_channel_min_dict[0]["val"]) / self.port_channel_min_step
-        else:
-            steps = self.port_channel_min_dict[0]["val"] + self.port_channel_min_step
-            scope = max
-
-        while steps < scope:
-            if self.port_channel_min_step < 1:
-                self.port_channel_min_dict[count] = {"val": self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step,
-                                        "scaled": (self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step) * self.port_channel_min_step}
-                if count > scope:
-                    self.port_channel_min_dict[count] = {"val": max,
-                                        "scaled": max * self.port_channel_min_step}
-                steps += 1
-            else:
-                self.port_channel_min_dict[count] = {"val": self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step,
-                                        "scaled": (self.port_channel_min_dict[count - 1]["val"] + self.port_channel_min_step) / self.port_channel_min_step}
-                steps += self.port_channel_min_step
-            count += 1
-
-        self.port_channel_min_slider.setMinimum(0)
-        self.port_channel_min_slider.setMaximum(len(self.port_channel_min_dict) - 1)
-
-        closest_val = closest([self.port_channel_min_dict[x]["val"] for x in sorted(self.port_channel_min_dict)], self.port_channel_min)
-        for key in self.port_channel_min_dict:
-            if self.port_channel_min_dict[key]["val"] == closest_val:
-                self.port_channel_min = self.port_channel_min_dict[key]["val"]
-                self.port_channel_min_slider.setValue(int(key))
-                self.port_channel_min_slider_current.setText(str(round(self.port_channel_min_dict[key]["val"], 2)))
-                break
-
-        self.port_channel_min_slider_top.setText(str(float(self.sender().text())))
-
-    def update_port_channel_scale_step_textbox(self):
-        self.port_channel_scale_step = float(self.sender().text())
-
-        for key in sorted(list(self.port_channel_scale_dict))[1:-1]:
-            del self.port_channel_scale_dict[key]
-
-        count = 1
-        max = self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]
-        if self.port_channel_scale_step < 1:
-            steps = 0
-            scope = (max - self.port_channel_scale_dict[0]["val"]) / self.port_channel_scale_step
-        else:
-            steps = self.port_channel_scale_dict[0]["val"] + self.port_channel_scale_step
-            scope = max
-
-        while steps < scope:
-            if self.port_channel_scale_step < 1:
-                self.port_channel_scale_dict[count] = {"val": self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step,
-                                        "scaled": (self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step) * self.port_channel_scale_step}
-                if count > scope:
-                    self.port_channel_scale_dict[count] = {"val": max,
-                                        "scaled": max * self.port_channel_scale_step}
-                steps += 1
-            else:
-                self.port_channel_scale_dict[count] = {"val": self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step,
-                                        "scaled": (self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step) / self.port_channel_scale_step}
-                steps += self.port_channel_scale_step
-            count += 1
-
-        closest_val = closest([self.port_channel_scale_dict[x]["val"] for x in sorted(self.port_channel_scale_dict)], self.port_channel_scale)
+        # Creat new dict of values for slider
+        self.port_params["channel_min_dict"] = {}
+        current = min_val_text
+        i = 1
+        self.port_params["channel_min_dict"][0] = current
+        while current + step_val_text <= max_val_text:  # Ensure we don’t overshoot with float values
+            current += step_val_text
+            self.port_params["channel_min_dict"][i] = round(current, 2)
+            i += 1
+        if current != math.ceil(max_val_text / step_val_text):  # If not exactly on target, append it as the last dict value
+            self.port_params["channel_min_dict"][i] = max_val_text
         
-        self.port_channel_scale_slider.setMinimum(0)
-        self.port_channel_scale_slider.setMaximum(len(self.port_channel_scale_dict) - 1)
-
-        for key in self.port_channel_scale_dict:
-            if self.port_channel_scale_dict[key]["val"] == closest_val:
-                self.port_channel_scale = self.port_channel_scale_dict[key]["val"]
-                self.port_channel_scale_slider.setValue(int(key))
-                self.port_channel_scale_slider_current.setText(str(round(self.port_channel_scale_dict[key]["val"], 2)))
-                break
-
-        self.port_channel_scale_step_textbox.setText(str(float(self.sender().text())))
-
-    def update_port_channel_scale(self):
-        self.port_channel_scale = self.sender().value()
-
-        self.port_channel_scale = self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[self.sender().value()]]["val"]
-        self.port_channel_scale_slider_current.setText(f"{str(round(self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[self.sender().value()]]['val'], 2))}")
-
-    def update_port_channel_scale_slider_bottom(self):
-        if float(self.sender().text()) >= self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]:
-            self.port_channel_scale_slider_bottom.setText(str(self.port_channel_scale_dict[0]["val"]))
-            return
-
-        for key in sorted(list(self.port_channel_scale_dict))[1:-1]:
-            del self.port_channel_scale_dict[key]
-
-        self.port_channel_scale_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.port_channel_scale_step}
-        count = 1
-        max = self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]
-        if self.port_channel_scale_step < 1:
-            steps = 0
-            scope = (max - self.port_channel_scale_dict[0]["val"]) / self.port_channel_scale_step
-        else:
-            steps = self.port_channel_scale_dict[0]["val"] + self.port_channel_scale_step
-            scope = max
-
-        while steps < scope:
-            if self.port_channel_scale_step < 1:
-                self.port_channel_scale_dict[count] = {"val": self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step,
-                                        "scaled": (self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step) * self.port_channel_scale_step}
-                if count > scope:
-                    self.port_channel_scale_dict[count] = {"val": max,
-                                        "scaled": max * self.port_channel_scale_step}
-                steps += 1
-            else:
-                self.port_channel_scale_dict[count] = {"val": self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step,
-                                        "scaled": (self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step) / self.port_channel_scale_step}
-                steps += self.port_channel_scale_step
-            count += 1
-
-        self.port_channel_scale_slider.setMinimum(0)
-        self.port_channel_scale_slider.setMaximum(len(self.port_channel_scale_dict) - 1)
-
-        closest_val = closest([self.port_channel_scale_dict[x]["val"] for x in sorted(self.port_channel_scale_dict)], self.port_channel_scale)
-        for key in self.port_channel_scale_dict:
-            if self.port_channel_scale_dict[key]["val"] == closest_val:
-                self.port_channel_scale = self.port_channel_scale_dict[key]["val"]
-                self.port_channel_scale_slider.setValue(int(key))
-                self.port_channel_scale_slider_current.setText(str(round(self.port_channel_scale_dict[key]["val"], 2)))
-                break
+        # Search for the current value in dict
+        val = next((key for key, val in self.port_params["channel_min_dict"].items() if val == current_val_text), None)
+        if val is not None: # If there is exact match then grab the key and value and set the slider
+            self.port_min_slider.setValue(val)
+            self.port_min_slider_current.setText(str(current_val_text))
+        else: # If no match then find the closest value in dict and update the slider
+            close = closest(list(self.port_params["channel_min_dict"].values()), current_val_text)
+            val = next((key for key, val in self.port_params["channel_min_dict"].items() if val == close), None)
+            self.port_min_slider.setValue(val)
+            self.port_min_slider_current.setText(str(close))
         
-        self.port_channel_scale_slider_bottom.setText(str(float(self.sender().text())))
+        # Update min/max text boxes
+        self.port_min_slider_bottom.setText(str(min_val_text))
+        self.port_min_slider_top.setText(str(max_val_text))
 
-    def update_port_channel_scale_slider_current(self):
-        if float(self.sender().text()) < self.port_channel_scale_dict[0]["val"]:
-            self.port_channel_scale = self.port_channel_scale_dict[0]["val"]
-            self.port_channel_scale_slider.setValue(sorted(self.port_channel_scale_dict)[0])
-            return
+    def update_port_max(self):
+        sender = self.sender() if self.sender() == self.port_max_slider else self.port_max_slider
+        self.port_params["channel_max"] = self.port_params["channel_max_dict"][sender.value()]
+        self.port_max_slider_current.setText(f"{str(round(self.port_params['channel_max_dict'][sender.value()], 2))}")
 
-        if float(self.sender().text()) > self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]:
-            self.port_channel_scale = self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]
-            self.port_channel_scale_slider.setValue(sorted(self.port_channel_scale_dict)[-1])
-            return
+    def update_port_max_slider_range(self):
+        min_val_text = float(self.port_max_slider_bottom.text())
+        current_val_text = float(self.port_max_slider_current.text()) if self.port_max_slider_current.text() != "" else 0
+        max_val_text = float(self.port_max_slider_top.text())
+        step_val_text = float(self.port_max_step.text())
 
-        closest_val = closest([self.port_channel_scale_dict[x]["val"] for x in sorted(self.port_channel_scale_dict)], float(self.sender().text()))
-        for key in self.port_channel_scale_dict:
-            if self.port_channel_scale_dict[key]["val"] == closest_val:
-                self.port_channel_scale_slider.setValue(int(key))
-                self.port_channel_scale_slider_current.setText(str(round(self.port_channel_scale_dict[key]["val"], 2)))
-                break
+        # First make sure appropriate min/max values are applied and that current val is within range
+        if min_val_text > max_val_text:
+            min_val_text = max_val_text
 
-    def update_port_channel_scale_slider_top(self):
-        if float(self.sender().text()) <= self.port_channel_scale_dict[0]["val"]:
-            self.port_channel_scale_slider_top.setText(str(self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]))
-            return
+        if max_val_text < min_val_text:
+            max_val_text = min_val_text
         
-        for key in sorted(list(self.port_channel_scale_dict))[1:]:
-            del self.port_channel_scale_dict[key]
+        if current_val_text < min_val_text:
+            current_val_text = min_val_text
+        
+        if current_val_text > max_val_text:
+            current_val_text = max_val_text
 
-        self.port_channel_scale_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.port_channel_scale_step}
-        count = 1
-        max = self.port_channel_scale_dict[sorted(self.port_channel_scale_dict)[-1]]["val"]
-        if self.port_channel_scale_step < 1:
-            steps = 0
-            scope = (max - self.port_channel_scale_dict[0]["val"]) / self.port_channel_scale_step
-        else:
-            steps = self.port_channel_scale_dict[0]["val"] + self.port_channel_scale_step
-            scope = max
+        if max_val_text - min_val_text == 0.0:
+            max_val_text = min_val_text + 1
+        
+        # Set maximum slider value first to ensure that slider is moved to the correct position when value is changed
+        self.port_max_slider.setMaximum(math.ceil((max_val_text - min_val_text) / step_val_text))
 
-        while steps < scope:
-            if self.port_channel_scale_step < 1:
-                self.port_channel_scale_dict[count] = {"val": self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step,
-                                        "scaled": (self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step) * self.port_channel_scale_step}
-                if count > scope:
-                    self.port_channel_scale_dict[count] = {"val": max,
-                                        "scaled": max * self.port_channel_scale_step}
-                steps += 1
-            else:
-                self.port_channel_scale_dict[count] = {"val": self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step,
-                                        "scaled": (self.port_channel_scale_dict[count - 1]["val"] + self.port_channel_scale_step) / self.port_channel_scale_step}
-                steps += self.port_channel_scale_step
-            count += 1
-
-        self.port_channel_scale_slider.setMinimum(0)
-        self.port_channel_scale_slider.setMaximum(len(self.port_channel_scale_dict) - 1)
-
-        closest_val = closest([self.port_channel_scale_dict[x]["val"] for x in sorted(self.port_channel_scale_dict)], self.port_channel_scale)
-        for key in self.port_channel_scale_dict:
-            if self.port_channel_scale_dict[key]["val"] == closest_val:
-                self.port_channel_scale = self.port_channel_scale_dict[key]["val"]
-                self.port_channel_scale_slider.setValue(int(key))
-                self.port_channel_scale_slider_current.setText(str(round(self.port_channel_scale_dict[key]["val"], 2)))
-                break
-
-        self.port_channel_scale_slider_top.setText(str(float(self.sender().text())))
+        # Creat new dict of values for slider
+        self.port_params["channel_max_dict"] = {}
+        current = min_val_text
+        i = 1
+        self.port_params["channel_max_dict"][0] = current
+        while current + step_val_text <= max_val_text:  # Ensure we don’t overshoot with float values
+            current += step_val_text
+            self.port_params["channel_max_dict"][i] = round(current, 2)
+            i += 1
+        if current != math.ceil(max_val_text / step_val_text):  # If not exactly on target, append it as the last dict value
+            self.port_params["channel_max_dict"][i] = max_val_text
+        
+        # Search for the current value in dict
+        val = next((key for key, val in self.port_params["channel_max_dict"].items() if val == current_val_text), None)
+        if val is not None: # If there is exact match then grab the key and value and set the slider
+            self.port_max_slider.setValue(val)
+            self.port_max_slider_current.setText(str(current_val_text))
+        else: # If no match then find the closest value in dict and update the slider
+            close = closest(list(self.port_params["channel_max_dict"].values()), current_val_text)
+            val = next((key for key, val in self.port_params["channel_max_dict"].items() if val == close), None)
+            self.port_max_slider.setValue(val)
+            self.port_max_slider_current.setText(str(close))
+        
+        # Update min/max text boxes
+        self.port_max_slider_bottom.setText(str(min_val_text))
+        self.port_max_slider_top.setText(str(max_val_text))
 
     def update_port_invert(self):
-        self.port_invert = self.sender().isChecked()
+        self.port_params["invert"] = self.sender().isChecked()
 
     def update_port_auto_min(self):
-        self.port_auto_min = self.sender().isChecked()
+        self.port_params["auto_min"] = self.sender().isChecked()
 
-        if self.port_auto_min:
-            self.port_channel_min_step_textbox.setEnabled(False)
-            self.port_channel_min_slider.setEnabled(False)
-            self.port_channel_min_slider_bottom.setEnabled(False)
-            self.port_channel_min_slider_current.setEnabled(False)
-            self.port_channel_min_slider_top.setEnabled(False)
+        if self.port_params["auto_min"]:
+            self.port_min_step.setEnabled(False)
+            self.port_min_slider.setEnabled(False)
+            self.port_min_slider_bottom.setEnabled(False)
+            self.port_min_slider_current.setEnabled(False)
+            self.port_min_slider_top.setEnabled(False)
         else:
-            self.port_channel_min_step_textbox.setEnabled(True)
-            self.port_channel_min_slider.setEnabled(True)
-            self.port_channel_min_slider_bottom.setEnabled(True)
-            self.port_channel_min_slider_current.setEnabled(True)
-            self.port_channel_min_slider_top.setEnabled(True)
+            self.port_min_step.setEnabled(True)
+            self.port_min_slider.setEnabled(True)
+            self.port_min_slider_bottom.setEnabled(True)
+            self.port_min_slider_current.setEnabled(True)
+            self.port_min_slider_top.setEnabled(True)
 
-    def update_port_auto_scale(self):
-        self.port_auto_scale = self.sender().isChecked()
-        if self.port_auto_scale:
-            self.port_channel_scale_step_textbox.setEnabled(False)
-            self.port_channel_scale_slider.setEnabled(False)
-            self.port_channel_scale_slider_bottom.setEnabled(False)
-            self.port_channel_scale_slider_current.setEnabled(False)
-            self.port_channel_scale_slider_top.setEnabled(False)
+    def update_port_auto_max(self):
+        self.port_params["auto_max"] = self.sender().isChecked()
+        if self.port_params["auto_max"]:
+            self.port_max_step.setEnabled(False)
+            self.port_max_slider.setEnabled(False)
+            self.port_max_slider_bottom.setEnabled(False)
+            self.port_max_slider_current.setEnabled(False)
+            self.port_max_slider_top.setEnabled(False)
         else:
-            self.port_channel_scale_step_textbox.setEnabled(True)
-            self.port_channel_scale_slider.setEnabled(True)
-            self.port_channel_scale_slider_bottom.setEnabled(True)
-            self.port_channel_scale_slider_current.setEnabled(True)
-            self.port_channel_scale_slider_top.setEnabled(True)
+            self.port_max_step.setEnabled(True)
+            self.port_max_slider.setEnabled(True)
+            self.port_max_slider_bottom.setEnabled(True)
+            self.port_max_slider_current.setEnabled(True)
+            self.port_max_slider_top.setEnabled(True)
 
     def update_port_color_scheme(self):
-        self.port_color_scheme = self.sender().currentText()
+        self.port_params["color_scheme"] = self.sender().currentText()
 
     @pyqtSlot()
     def upload_port_color_scheme(self):
@@ -1721,14 +1245,14 @@ class MyWindow(QMainWindow):
 
         if filepath:
             with open(filepath, "rb") as f:
-                self.port_cmap = pickle.load(f)
+                self.port_params["cmap"] = pickle.load(f)
         
     def apply_port_color_scheme(self):
-        if self.port_data is None:
+        if self.port_params is None:
             return
         
-        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
-
+        #self.port_image = convert_to_image(self.port_params, self.port_params["invert"], self.port_params["auto_min"], self.port_params["channel_min"], self.port_params["auto_max"], self.port_params["channel_max"], self.port_params["color_scheme"], self.port_params["cmap"])
+        self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
         if self.starboard_image is None:
             arr = np.full(np.array(self.port_image).shape, 255)
             starboard_image = Image.fromarray(arr.astype(np.uint8))
@@ -1736,360 +1260,160 @@ class MyWindow(QMainWindow):
             starboard_image = self.starboard_image
         
         # Display merged image
-        self.image = merge_images(self.port_image, starboard_image)
-        pixmap = toqpixmap(self.image)
+        self.merged_image = merge_images(self.port_image, starboard_image)
+        pixmap = toqpixmap(self.merged_image)
         self.canvas.set_image(False, pixmap)
 
     ################################################
     # Top toolbar starboard side parameters functions
     ################################################
-    def update_starboard_channel_min_step_textbox(self):
-        self.starboard_channel_min_step = float(self.sender().text())
+    def update_starboard_min(self):
+        sender = self.sender() if self.sender() == self.starboard_min_slider else self.starboard_min_slider
+        self.starboard_params["channel_min"] = self.starboard_params["channel_min_dict"][sender.value()]
+        self.starboard_min_slider_current.setText(f"{str(round(self.starboard_params['channel_min_dict'][sender.value()], 2))}")
 
-        for key in sorted(list(self.starboard_channel_min_dict))[1:-1]:
-            del self.starboard_channel_min_dict[key]
+    def update_starboard_min_slider_range(self):
+        min_val_text = float(self.starboard_min_slider_bottom.text())
+        current_val_text = float(self.starboard_min_slider_current.text()) if self.starboard_min_slider_current.text() != "" else 0
+        max_val_text = float(self.starboard_min_slider_top.text())
+        step_val_text = float(self.starboard_min_step.text())
 
-        count = 1
-        max = self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]
-        if self.starboard_channel_min_step < 1:
-            steps = 0
-            scope = (max - self.starboard_channel_min_dict[0]["val"]) / self.starboard_channel_min_step
-        else:
-            steps = self.starboard_channel_min_dict[0]["val"] + self.starboard_channel_min_step
-            scope = max
+        # First make sure appropriate min/max values are applied and that current val is within range
+        if min_val_text > max_val_text:
+            min_val_text = max_val_text
 
-        while steps < scope:
-            if self.starboard_channel_min_step < 1:
-                self.starboard_channel_min_dict[count] = {"val": self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step,
-                                        "scaled": (self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step) * self.starboard_channel_min_step}
-                if count > scope:
-                    self.starboard_channel_min_dict[count] = {"val": max,
-                                        "scaled": max * self.starboard_channel_min_step}
-                steps += 1
-            else:
-                self.starboard_channel_min_dict[count] = {"val": self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step,
-                                        "scaled": (self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step) / self.starboard_channel_min_step}
-                steps += self.starboard_channel_min_step
-            count += 1
-
-        closest_val = closest([self.starboard_channel_min_dict[x]["val"] for x in sorted(self.starboard_channel_min_dict)], self.starboard_channel_min)
+        if max_val_text < min_val_text:
+            max_val_text = min_val_text
         
-        self.starboard_channel_min_slider.setMinimum(0)
-        self.starboard_channel_min_slider.setMaximum(len(self.starboard_channel_min_dict) - 1)
-
-        for key in self.starboard_channel_min_dict:
-            if self.starboard_channel_min_dict[key]["val"] == closest_val:
-                self.starboard_channel_min = self.starboard_channel_min_dict[key]["val"]
-                self.starboard_channel_min_slider.setValue(int(key))
-                self.starboard_channel_min_slider_current.setText(str(round(self.starboard_channel_min_dict[key]["val"], 2)))
-                break
-
-        self.starboard_channel_min_step_textbox.setText(str(float(self.sender().text())))
-
-    def update_starboard_channel_min(self):
-        self.starboard_channel_min = self.sender().value()
-
-        self.starboard_channel_min = self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[self.sender().value()]]["val"]
-        self.starboard_channel_min_slider_current.setText(f"{str(round(self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[self.sender().value()]]['val'], 2))}")
-
-    def update_starboard_channel_min_slider_bottom(self):
-        if float(self.sender().text()) >= self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]:
-            self.starboard_channel_min_slider_bottom.setText(str(self.starboard_channel_min_dict[0]["val"]))
-            return
-
-        for key in sorted(list(self.starboard_channel_min_dict))[1:-1]:
-            del self.starboard_channel_min_dict[key]
-
-        self.starboard_channel_min_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.starboard_channel_min_step}
-        count = 1
-        max = self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]
-        if self.starboard_channel_min_step < 1:
-            steps = 0
-            scope = (max - self.starboard_channel_min_dict[0]["val"]) / self.starboard_channel_min_step
-        else:
-            steps = self.starboard_channel_min_dict[0]["val"] + self.starboard_channel_min_step
-            scope = max
-
-        while steps < scope:
-            if self.starboard_channel_min_step < 1:
-                self.starboard_channel_min_dict[count] = {"val": self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step,
-                                        "scaled": (self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step) * self.starboard_channel_min_step}
-                if count > scope:
-                    self.starboard_channel_min_dict[count] = {"val": max,
-                                        "scaled": max * self.starboard_channel_min_step}
-                steps += 1
-            else:
-                self.starboard_channel_min_dict[count] = {"val": self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step,
-                                        "scaled": (self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step) / self.starboard_channel_min_step}
-                steps += self.starboard_channel_min_step
-            count += 1
-
-        self.starboard_channel_min_slider.setMinimum(0)
-        self.starboard_channel_min_slider.setMaximum(len(self.starboard_channel_min_dict) - 1)
-
-        closest_val = closest([self.starboard_channel_min_dict[x]["val"] for x in sorted(self.starboard_channel_min_dict)], self.starboard_channel_min)
-        for key in self.starboard_channel_min_dict:
-            if self.starboard_channel_min_dict[key]["val"] == closest_val:
-                self.starboard_channel_min = self.starboard_channel_min_dict[key]["val"]
-                self.starboard_channel_min_slider.setValue(int(key))
-                self.starboard_channel_min_slider_current.setText(str(round(self.starboard_channel_min_dict[key]["val"], 2)))
-                break
+        if current_val_text < min_val_text:
+            current_val_text = min_val_text
         
-        self.starboard_channel_min_slider_bottom.setText(str(float(self.sender().text())))
+        if current_val_text > max_val_text:
+            current_val_text = max_val_text
 
-    def update_starboard_channel_min_slider_current(self):
-        if float(self.sender().text()) < self.starboard_channel_min_dict[0]["val"]:
-            self.starboard_channel_min = self.starboard_channel_min_dict[0]["val"]
-            self.starboard_channel_min_slider.setValue(sorted(self.starboard_channel_min_dict)[0])
-            return
-
-        if float(self.sender().text()) > self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]:
-            self.starboard_channel_min = self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]
-            self.starboard_channel_min_slider.setValue(sorted(self.starboard_channel_min_dict)[-1])
-            return
-
-        closest_val = closest([self.starboard_channel_min_dict[x]["val"] for x in sorted(self.starboard_channel_min_dict)], float(self.sender().text()))
-        for key in self.starboard_channel_min_dict:
-            if self.starboard_channel_min_dict[key]["val"] == closest_val:
-                self.starboard_channel_min_slider.setValue(int(key))
-                self.starboard_channel_min_slider_current.setText(str(round(self.starboard_channel_min_dict[key]["val"], 2)))
-                break
-
-    def update_starboard_channel_min_slider_top(self):
-        if float(self.sender().text()) <= self.starboard_channel_min_dict[0]["val"]:
-            self.starboard_channel_min_slider_top.setText(str(self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]))
-            return
+        if max_val_text - min_val_text == 0.0:
+            max_val_text = min_val_text + 1
         
-        for key in sorted(list(self.starboard_channel_min_dict))[1:]:
-            del self.starboard_channel_min_dict[key]
+        # Set maximum slider value first to ensure that slider is moved to the correct position when value is changed
+        self.starboard_min_slider.setMaximum(math.ceil((max_val_text - min_val_text) / step_val_text))
 
-        self.starboard_channel_min_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.starboard_channel_min_step}
-        count = 1
-        max = self.starboard_channel_min_dict[sorted(self.starboard_channel_min_dict)[-1]]["val"]
-        if self.starboard_channel_min_step < 1:
-            steps = 0
-            scope = (max - self.starboard_channel_min_dict[0]["val"]) / self.starboard_channel_min_step
-        else:
-            steps = self.starboard_channel_min_dict[0]["val"] + self.starboard_channel_min_step
-            scope = max
-
-        while steps < scope:
-            if self.starboard_channel_min_step < 1:
-                self.starboard_channel_min_dict[count] = {"val": self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step,
-                                        "scaled": (self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step) * self.starboard_channel_min_step}
-                if count > scope:
-                    self.starboard_channel_min_dict[count] = {"val": max,
-                                        "scaled": max * self.starboard_channel_min_step}
-                steps += 1
-            else:
-                self.starboard_channel_min_dict[count] = {"val": self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step,
-                                        "scaled": (self.starboard_channel_min_dict[count - 1]["val"] + self.starboard_channel_min_step) / self.starboard_channel_min_step}
-                steps += self.starboard_channel_min_step
-            count += 1
-
-        self.starboard_channel_min_slider.setMinimum(0)
-        self.starboard_channel_min_slider.setMaximum(len(self.starboard_channel_min_dict) - 1)
-
-        closest_val = closest([self.starboard_channel_min_dict[x]["val"] for x in sorted(self.starboard_channel_min_dict)], self.starboard_channel_min)
-        for key in self.starboard_channel_min_dict:
-            if self.starboard_channel_min_dict[key]["val"] == closest_val:
-                self.starboard_channel_min = self.starboard_channel_min_dict[key]["val"]
-                self.starboard_channel_min_slider.setValue(int(key))
-                self.starboard_channel_min_slider_current.setText(str(round(self.starboard_channel_min_dict[key]["val"], 2)))
-                break
-
-        self.starboard_channel_min_slider_top.setText(str(float(self.sender().text())))
-
-    def update_starboard_channel_scale_step_textbox(self):
-        self.starboard_channel_scale_step = float(self.sender().text())
-
-        for key in sorted(list(self.starboard_channel_scale_dict))[1:-1]:
-            del self.starboard_channel_scale_dict[key]
-
-        count = 1
-        max = self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]
-        if self.starboard_channel_scale_step < 1:
-            steps = 0
-            scope = (max - self.starboard_channel_scale_dict[0]["val"]) / self.starboard_channel_scale_step
-        else:
-            steps = self.starboard_channel_scale_dict[0]["val"] + self.starboard_channel_scale_step
-            scope = max
-
-        while steps < scope:
-            if self.starboard_channel_scale_step < 1:
-                self.starboard_channel_scale_dict[count] = {"val": self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step,
-                                        "scaled": (self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step) * self.starboard_channel_scale_step}
-                if count > scope:
-                    self.starboard_channel_scale_dict[count] = {"val": max,
-                                        "scaled": max * self.starboard_channel_scale_step}
-                steps += 1
-            else:
-                self.starboard_channel_scale_dict[count] = {"val": self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step,
-                                        "scaled": (self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step) / self.starboard_channel_scale_step}
-                steps += self.starboard_channel_scale_step
-            count += 1
-
-        closest_val = closest([self.starboard_channel_scale_dict[x]["val"] for x in sorted(self.starboard_channel_scale_dict)], self.starboard_channel_scale)
+        # Creat new dict of values for slider
+        self.starboard_params["channel_min_dict"] = {}
+        current = min_val_text
+        i = 1
+        self.starboard_params["channel_min_dict"][0] = current
+        while current + step_val_text <= max_val_text:  # Ensure we don’t overshoot with float values
+            current += step_val_text
+            self.starboard_params["channel_min_dict"][i] = round(current, 2)
+            i += 1
+        if current != math.ceil(max_val_text / step_val_text):  # If not exactly on target, append it as the last dict value
+            self.starboard_params["channel_min_dict"][i] = max_val_text
         
-        self.starboard_channel_scale_slider.setMinimum(0)
-        self.starboard_channel_scale_slider.setMaximum(len(self.starboard_channel_scale_dict) - 1)
-
-        for key in self.starboard_channel_scale_dict:
-            if self.starboard_channel_scale_dict[key]["val"] == closest_val:
-                self.starboard_channel_scale = self.starboard_channel_scale_dict[key]["val"]
-                self.starboard_channel_scale_slider.setValue(int(key))
-                self.starboard_channel_scale_slider_current.setText(str(round(self.starboard_channel_scale_dict[key]["val"], 2)))
-                break
-
-        self.starboard_channel_scale_step_textbox.setText(str(float(self.sender().text())))
-
-    def update_starboard_channel_scale(self):
-        self.starboard_channel_scale = self.sender().value()
-
-        self.starboard_channel_scale = self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[self.sender().value()]]["val"]
-        self.starboard_channel_scale_slider_current.setText(f"{str(round(self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[self.sender().value()]]['val'], 2))}")
-
-    def update_starboard_channel_scale_slider_bottom(self):
-        if float(self.sender().text()) >= self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]:
-            self.starboard_channel_scale_slider_bottom.setText(str(self.starboard_channel_scale_dict[0]["val"]))
-            return
-
-        for key in sorted(list(self.starboard_channel_scale_dict))[1:-1]:
-            del self.starboard_channel_scale_dict[key]
-
-        self.starboard_channel_scale_dict[0] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.starboard_channel_scale_step}
-        count = 1
-        max = self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]
-        if self.starboard_channel_scale_step < 1:
-            steps = 0
-            scope = (max - self.starboard_channel_scale_dict[0]["val"]) / self.starboard_channel_scale_step
-        else:
-            steps = self.starboard_channel_scale_dict[0]["val"] + self.starboard_channel_scale_step
-            scope = max
-
-        while steps < scope:
-            if self.starboard_channel_scale_step < 1:
-                self.starboard_channel_scale_dict[count] = {"val": self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step,
-                                        "scaled": (self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step) * self.starboard_channel_scale_step}
-                if count > scope:
-                    self.starboard_channel_scale_dict[count] = {"val": max,
-                                        "scaled": max * self.starboard_channel_scale_step}
-                steps += 1
-            else:
-                self.starboard_channel_scale_dict[count] = {"val": self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step,
-                                        "scaled": (self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step) / self.starboard_channel_scale_step}
-                steps += self.starboard_channel_scale_step
-            count += 1
-
-        self.starboard_channel_scale_slider.setMinimum(0)
-        self.starboard_channel_scale_slider.setMaximum(len(self.starboard_channel_scale_dict) - 1)
-
-        closest_val = closest([self.starboard_channel_scale_dict[x]["val"] for x in sorted(self.starboard_channel_scale_dict)], self.starboard_channel_scale)
-        for key in self.starboard_channel_scale_dict:
-            if self.starboard_channel_scale_dict[key]["val"] == closest_val:
-                self.starboard_channel_scale = self.starboard_channel_scale_dict[key]["val"]
-                self.starboard_channel_scale_slider.setValue(int(key))
-                self.starboard_channel_scale_slider_current.setText(str(round(self.starboard_channel_scale_dict[key]["val"], 2)))
-                break
+        # Search for the current value in dict
+        val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == current_val_text), None)
+        if val is not None: # If there is exact match then grab the key and value and set the slider
+            self.starboard_min_slider.setValue(val)
+            self.starboard_min_slider_current.setText(str(current_val_text))
+        else: # If no match then find the closest value in dict and update the slider
+            close = closest(list(self.starboard_params["channel_min_dict"].values()), current_val_text)
+            val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == close), None)
+            self.starboard_min_slider.setValue(val)
+            self.starboard_min_slider_current.setText(str(close))
         
-        self.starboard_channel_scale_slider_bottom.setText(str(float(self.sender().text())))
+        # Update min/max text boxes
+        self.starboard_min_slider_bottom.setText(str(min_val_text))
+        self.starboard_min_slider_top.setText(str(max_val_text))
 
-    def update_starboard_channel_scale_slider_current(self):
-        if float(self.sender().text()) < self.starboard_channel_scale_dict[0]["val"]:
-            self.starboard_channel_scale = self.starboard_channel_scale_dict[0]["val"]
-            self.starboard_channel_scale_slider.setValue(sorted(self.starboard_channel_scale_dict)[0])
-            return
+    def update_starboard_max(self):
+        sender = self.sender() if self.sender() == self.starboard_max_slider else self.starboard_max_slider
+        self.starboard_params["channel_max"] = self.starboard_params["channel_max_dict"][sender.value()]
+        print(self.starboard_params["channel_max"])
+        self.starboard_max_slider_current.setText(f"{str(round(self.starboard_params['channel_max_dict'][sender.value()], 2))}")
 
-        if float(self.sender().text()) > self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]:
-            self.starboard_channel_scale = self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]
-            self.starboard_channel_scale_slider.setValue(sorted(self.starboard_channel_scale_dict)[-1])
-            return
+    def update_starboard_max_slider_range(self):
+        min_val_text = float(self.starboard_max_slider_bottom.text())
+        current_val_text = float(self.starboard_max_slider_current.text()) if self.starboard_max_slider_current.text() != "" else 0
+        max_val_text = float(self.starboard_max_slider_top.text())
+        step_val_text = float(self.starboard_max_step.text())
 
-        closest_val = closest([self.starboard_channel_scale_dict[x]["val"] for x in sorted(self.starboard_channel_scale_dict)], float(self.sender().text()))
-        for key in self.starboard_channel_scale_dict:
-            if self.starboard_channel_scale_dict[key]["val"] == closest_val:
-                self.starboard_channel_scale_slider.setValue(int(key))
-                self.starboard_channel_scale_slider_current.setText(str(round(self.starboard_channel_scale_dict[key]["val"], 2)))
-                break
+        # First make sure appropriate min/max values are applied and that current val is within range
+        if min_val_text > max_val_text:
+            min_val_text = max_val_text
 
-    def update_starboard_channel_scale_slider_top(self):
-        if float(self.sender().text()) <= self.starboard_channel_scale_dict[0]["val"]:
-            self.starboard_channel_scale_slider_top.setText(str(self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]))
-            return
+        if max_val_text < min_val_text:
+            max_val_text = min_val_text
         
-        for key in sorted(list(self.starboard_channel_scale_dict))[1:]:
-            del self.starboard_channel_scale_dict[key]
+        if current_val_text < min_val_text:
+            current_val_text = min_val_text
+        
+        if current_val_text > max_val_text:
+            current_val_text = max_val_text
 
-        self.starboard_channel_scale_dict[float(self.sender().text())] = {"val": float(self.sender().text()), "scaled": float(self.sender().text()) / self.starboard_channel_scale_step}
-        count = 1
-        max = self.starboard_channel_scale_dict[sorted(self.starboard_channel_scale_dict)[-1]]["val"]
-        if self.starboard_channel_scale_step < 1:
-            steps = 0
-            scope = (max - self.starboard_channel_scale_dict[0]["val"]) / self.starboard_channel_scale_step
-        else:
-            steps = self.starboard_channel_scale_dict[0]["val"] + self.starboard_channel_scale_step
-            scope = max
+        if max_val_text - min_val_text == 0.0:
+            max_val_text = min_val_text + 1
+        
+        # Set maximum slider value first to ensure that slider is moved to the correct position when value is changed
+        self.starboard_max_slider.setMaximum(math.ceil((max_val_text - min_val_text) / step_val_text))
 
-        while steps < scope:
-            if self.starboard_channel_scale_step < 1:
-                self.starboard_channel_scale_dict[count] = {"val": self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step,
-                                        "scaled": (self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step) * self.starboard_channel_scale_step}
-                if count > scope:
-                    self.starboard_channel_scale_dict[count] = {"val": max,
-                                        "scaled": max * self.starboard_channel_scale_step}
-                steps += 1
-            else:
-                self.starboard_channel_scale_dict[count] = {"val": self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step,
-                                        "scaled": (self.starboard_channel_scale_dict[count - 1]["val"] + self.starboard_channel_scale_step) / self.starboard_channel_scale_step}
-                steps += self.starboard_channel_scale_step
-            count += 1
-
-        self.starboard_channel_scale_slider.setMinimum(0)
-        self.starboard_channel_scale_slider.setMaximum(len(self.starboard_channel_scale_dict) - 1)
-
-        closest_val = closest([self.starboard_channel_scale_dict[x]["val"] for x in sorted(self.starboard_channel_scale_dict)], self.starboard_channel_scale)
-        for key in self.starboard_channel_scale_dict:
-            if self.starboard_channel_scale_dict[key]["val"] == closest_val:
-                self.starboard_channel_scale = self.starboard_channel_scale_dict[key]["val"]
-                self.starboard_channel_scale_slider.setValue(int(key))
-                self.starboard_channel_scale_slider_current.setText(str(round(self.starboard_channel_scale_dict[key]["val"], 2)))
-                break
-
-        self.starboard_channel_scale_slider_top.setText(str(float(self.sender().text())))
+        # Creat new dict of values for slider
+        self.starboard_params["channel_max_dict"] = {}
+        current = min_val_text
+        i = 1
+        self.starboard_params["channel_max_dict"][0] = current
+        while current + step_val_text <= max_val_text:  # Ensure we don’t overshoot with float values
+            current += step_val_text
+            self.starboard_params["channel_max_dict"][i] = round(current, 2)
+            i += 1
+        if current != math.ceil(max_val_text / step_val_text):  # If not exactly on target, append it as the last dict value
+            self.starboard_params["channel_max_dict"][i] = max_val_text
+        
+        # Search for the current value in dict
+        val = next((key for key, val in self.starboard_params["channel_max_dict"].items() if val == current_val_text), None)
+        if val is not None: # If there is exact match then grab the key and value and set the slider
+            self.starboard_max_slider.setValue(val)
+            self.starboard_max_slider_current.setText(str(current_val_text))
+        else: # If no match then find the closest value in dict and update the slider
+            close = closest(list(self.starboard_params["channel_max_dict"].values()), current_val_text)
+            val = next((key for key, val in self.starboard_params["channel_max_dict"].items() if val == close), None)
+            self.starboard_max_slider.setValue(val)
+            self.starboard_max_slider_current.setText(str(close))
+        
+        # Update min/max text boxes
+        self.starboard_max_slider_bottom.setText(str(min_val_text))
+        self.starboard_max_slider_top.setText(str(max_val_text))
 
     def update_starboard_invert(self):
         self.starboard_invert = self.sender().isChecked()
 
     def update_starboard_auto_min(self):
-        self.starboard_auto_min = self.sender().isChecked()
-
-        if self.starboard_auto_min:
-            self.starboard_channel_min_step_textbox.setEnabled(False)
-            self.starboard_channel_min_slider.setEnabled(False)
-            self.starboard_channel_min_slider_bottom.setEnabled(False)
-            self.starboard_channel_min_slider_current.setEnabled(False)
-            self.starboard_channel_min_slider_top.setEnabled(False)
+        self.starboard_params["auto_min"] = self.sender().isChecked()
+        if self.starboard_params["auto_min"]:
+            self.starboard_min_step.setEnabled(False)
+            self.starboard_min_slider.setEnabled(False)
+            self.starboard_min_slider_bottom.setEnabled(False)
+            self.starboard_min_slider_current.setEnabled(False)
+            self.starboard_min_slider_top.setEnabled(False)
         else:
-            self.starboard_channel_min_step_textbox.setEnabled(True)
-            self.starboard_channel_min_slider.setEnabled(True)
-            self.starboard_channel_min_slider_bottom.setEnabled(True)
-            self.starboard_channel_min_slider_current.setEnabled(True)
-            self.starboard_channel_min_slider_top.setEnabled(True)
+            self.starboard_min_step.setEnabled(True)
+            self.starboard_min_slider.setEnabled(True)
+            self.starboard_min_slider_bottom.setEnabled(True)
+            self.starboard_min_slider_current.setEnabled(True)
+            self.starboard_min_slider_top.setEnabled(True)
 
-    def update_starboard_auto_scale(self):
-        self.starboard_auto_scale = self.sender().isChecked()
-        if self.starboard_auto_scale:
-            self.starboard_channel_scale_step_textbox.setEnabled(False)
-            self.starboard_channel_scale_slider.setEnabled(False)
-            self.starboard_channel_scale_slider_bottom.setEnabled(False)
-            self.starboard_channel_scale_slider_current.setEnabled(False)
-            self.starboard_channel_scale_slider_top.setEnabled(False)
+    def update_starboard_auto_max(self):
+        self.starboard_params["auto_max"] = self.sender().isChecked()
+        if self.starboard_params["auto_max"]:
+            self.starboard_max_step.setEnabled(False)
+            self.starboard_max_slider.setEnabled(False)
+            self.starboard_max_slider_bottom.setEnabled(False)
+            self.starboard_max_slider_current.setEnabled(False)
+            self.starboard_max_slider_top.setEnabled(False)
         else:
-            self.starboard_channel_scale_step_textbox.setEnabled(True)
-            self.starboard_channel_scale_slider.setEnabled(True)
-            self.starboard_channel_scale_slider_bottom.setEnabled(True)
-            self.starboard_channel_scale_slider_current.setEnabled(True)
-            self.starboard_channel_scale_slider_top.setEnabled(True)
+            self.starboard_max_step.setEnabled(True)
+            self.starboard_max_slider.setEnabled(True)
+            self.starboard_max_slider_bottom.setEnabled(True)
+            self.starboard_max_slider_current.setEnabled(True)
+            self.starboard_max_slider_top.setEnabled(True)
 
     def update_starboard_color_scheme(self):
         self.starboard_color_scheme = self.sender().currentText()
@@ -2112,8 +1436,10 @@ class MyWindow(QMainWindow):
         if self.starboard_data is None:
             return
 
-        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
-        
+        #self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_min, self.starboard_auto_max, self.starboard_max, self.starboard_color_scheme, self.starboard_cmap)
+        self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
+        print(self.starboard_params)
+
         if self.port_image is None:
             arr = np.full(np.array(self.starboard_image).shape, 255)
             port_image = Image.fromarray(arr.astype(np.uint8))
@@ -2121,9 +1447,30 @@ class MyWindow(QMainWindow):
             port_image = self.port_image
 
         # Display merged image
-        self.image = merge_images(port_image, self.starboard_image)
-        pixmap = toqpixmap(self.image)
+        self.merged_image = merge_images(port_image, self.starboard_image)
+        pixmap = toqpixmap(self.merged_image)
         self.canvas.set_image(False, pixmap)
+
+    def update_params(self):
+        self.port_min_step.setText(str(round(0.1, 2)))
+        self.port_min_slider_top.setText(str(round(self.port_params["channel_min"], 2)))
+        self.port_min_slider_current.setText(str(round(self.port_params["channel_min"], 2)))
+        self.update_port_min_slider_range()
+
+        self.port_max_step.setText(str(round(0.1, 2)))
+        self.port_max_slider_top.setText(str(round(self.port_params["channel_max"], 2)))
+        self.port_max_slider_current.setText(str(round(self.port_params["channel_max"], 2)))
+        self.update_port_max_slider_range()
+
+        self.starboard_min_step.setText(str(round(0.1, 2)))
+        self.starboard_min_slider_top.setText(str(round(self.starboard_params["channel_min"], 2)))
+        self.starboard_min_slider_current.setText(str(round(self.starboard_params["channel_min"], 2)))
+        self.update_starboard_min_slider_range()
+
+        self.starboard_max_step.setText(str(round(0.1, 2)))
+        self.starboard_max_slider_top.setText(str(round(self.starboard_params["channel_max"], 2)))
+        self.starboard_max_slider_current.setText(str(round(self.starboard_params["channel_max"], 2)))
+        self.update_starboard_max_slider_range()
 
     ################################################
     # Initiate side toolbox and canvas
@@ -2141,72 +1488,36 @@ class MyWindow(QMainWindow):
         self.side_toolbox_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 0px 1px 1px 1px; }")
         
         ################################################
-        # Splits group box
+        # Drawing buttons tool box
         ################################################
-        self.splits_groupbox = QGroupBox(self.side_toolbox_groupbox)
-        self.splits_groupbox.setGeometry(0, 0, 320, 90)
-        self.splits_groupbox.setMinimumWidth(320)
+        self.drawing_groupbox = QGroupBox(self.side_toolbox_groupbox)
+        self.drawing_groupbox.setGeometry(0, 0, 320, 90)
+        self.drawing_groupbox.setMinimumWidth(320)
 
-        """self.splits_label = QLabel(self.splits_groupbox)
-        self.splits_label.setGeometry(10, 10, 80, 22)
-        self.splits_label.setText("Max splits")
-
-        self.splits_textbox = QLineEdit(self.splits_groupbox)
-        self.splits_textbox.setGeometry(90, 10, 50, 22)
-        self.splits_textbox.setValidator(zero_int_validator)
-        self.splits_textbox.setText("1")
-        self.splits_textbox.editingFinished.connect(self.update_splits_textbox)
-
-        self.selected_split_label = QLabel(self.splits_groupbox)
-        self.selected_split_label.setGeometry(10, 35, 80, 22)
-        self.selected_split_label.setText("Selected split")
-
-        self.selected_split_spinbox = QSpinBox(self.splits_groupbox)
-        self.selected_split_spinbox.setGeometry(90, 35, 50, 22)
-        self.selected_split_spinbox.setMinimum(1)
-        self.selected_split_spinbox.setMaximum(1)
-        self.selected_split_spinbox.setValue(self.selected_split)
-        self.selected_split_spinbox.valueChanged.connect(self.update_selected_split)
-
-        self.shift_label = QLabel(self.splits_groupbox)
-        self.shift_label.setGeometry(10, 60, 80, 22)
-        self.shift_label.setText("Shift")
-
-        self.shift_textbox = QLineEdit(self.splits_groupbox)
-        self.shift_textbox.setGeometry(90, 60, 50, 22)
-        self.shift_textbox.setValidator(zero_int_validator)
-        self.shift_textbox.setText("0")
-        self.shift_textbox.editingFinished.connect(self.update_shift_textbox)
-        
-        self.load_split_btn = QPushButton(self.splits_groupbox)
-        self.load_split_btn.setGeometry(30, 110, 100, 22)
-        self.load_split_btn.setText("Show split")
-        self.load_split_btn.clicked.connect(self.load_split)"""
-
-        self.draw_polygons_btn = QPushButton(self.splits_groupbox)
+        self.draw_polygons_btn = QPushButton(self.drawing_groupbox)
         self.draw_polygons_btn.setGeometry(10, 10, 100, 22)
         self.draw_polygons_btn.setText("Draw polygons")
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
         self.draw_polygons_btn.setEnabled(False)
 
-        self.edit_polygons_btn = QPushButton(self.splits_groupbox)
+        self.edit_polygons_btn = QPushButton(self.drawing_groupbox)
         self.edit_polygons_btn.setGeometry(10, 35, 100, 22)
         self.edit_polygons_btn.setText("Edit polygons")
         self.edit_polygons_btn.clicked.connect(self.edit_polygons)
 
-        self.delete_polygons_btn = QPushButton(self.splits_groupbox)
+        self.delete_polygons_btn = QPushButton(self.drawing_groupbox)
         self.delete_polygons_btn.setGeometry(10, 60, 100, 22)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
         self.delete_polygons_btn.setEnabled(False)
 
-        self.draw_crop_tile_btn = QPushButton(self.splits_groupbox)
+        self.draw_crop_tile_btn = QPushButton(self.drawing_groupbox)
         self.draw_crop_tile_btn.setGeometry(210, 10, 100, 22)
         self.draw_crop_tile_btn.setText("Draw crop tile")
         self.draw_crop_tile_btn.clicked.connect(self.draw_tile_mode)
         self.draw_crop_tile_btn.setEnabled(False)
 
-        self.delete_crop_tile_btn = QPushButton(self.splits_groupbox)
+        self.delete_crop_tile_btn = QPushButton(self.drawing_groupbox)
         self.delete_crop_tile_btn.setGeometry(210, 35, 100, 22)
         self.delete_crop_tile_btn.setText("Delete crop tile")
         self.delete_crop_tile_btn.clicked.connect(self.delete_tiles)
@@ -2252,8 +1563,6 @@ class MyWindow(QMainWindow):
         self.tiles_list_widget.setGeometry(85, 245, 140, 145)
         self.tiles_list_widget.itemChanged.connect(self.on_tile_item_changed)
 
-
-
         ################################################
         # Coords group box
         ################################################
@@ -2278,80 +1587,8 @@ class MyWindow(QMainWindow):
         self.utm_zone_textbox.editingFinished.connect(self.update_utm_zone)
 
     ################################################
-    # Side toolbox split selection settings
+    # Side toolbox drawing settings
     ################################################
-    def update_selected_split(self):
-        if "QSpinBox" not in str(type(self.sender())):
-            return
-        self.selected_split = self.sender().value()
-
-    def update_splits_textbox(self):
-        if int(self.sender().text()) == 0:
-            self.splits = 1
-            self.sender().setText(str(self.splits))
-        else:
-            self.splits = int(self.sender().text())
-        self.selected_split_spinbox.setMaximum(self.splits)
-
-    def update_shift_textbox(self):
-        if int(self.sender().text()) > 5000:
-            self.sender().setText("5000")
-            self.shift = 5000
-            return
-        self.shift = int(self.sender().text())
-
-    def load_split(self):
-        if self.port_data is None and self.starboard_data is None:
-            return
-
-        # Clear list of polygons
-        for i in range(self.polygons_list_widget.count()):
-            self.polygons_list_widget.takeItem(0)
-
-        for i in range(self.tiles_list_widget.count()):
-            self.tiles_list_widget.takeItem(0)
-
-        # Load port and starboarrd data
-        start = time.perf_counter()
-        if self.auto_stretch:
-            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.stretch_auto, self.shift, self.packet_size, self.splits, self.selected_split)
-        else:
-            self.port_data, self.starboard_data, self.coords, self.splits, self.stretch, self.full_image_height, self.full_image_width = load_selected_split(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.stretch, self.shift, self.packet_size, self.splits, self.selected_split)
-        end = time.perf_counter()
-        
-        self.selected_split_spinbox.setMaximum(self.splits)
-
-        start = time.perf_counter()
-        
-        # Convert port and starboard data to image
-        self.port_image = convert_to_image(self.port_data, self.port_invert, self.port_auto_min, self.port_channel_min, self.port_auto_scale, self.port_channel_scale, self.port_color_scheme, self.port_cmap)
-        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_channel_min, self.starboard_auto_scale, self.starboard_channel_scale, self.starboard_color_scheme, self.starboard_cmap)
-
-        # 
-        try:
-            self.load_data()
-        except:
-            print("no data")
-        
-        bottom = floor(self.full_image_height / self.splits) * (self.selected_split - 1) - self.shift
-        top = floor(self.full_image_height / self.splits) * self.selected_split + self.shift
-        if self.selected_split == self.splits:
-            top = self.full_image_height
-        if self.polygons_data:
-            self.image = merge_images(self.port_image, self.starboard_image)
-            pixmap = toqpixmap(self.image)
-            self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
-            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
-        else:
-            self.image = merge_images(self.port_image, self.starboard_image)
-            pixmap = toqpixmap(self.image)
-            self.canvas.set_image(True, pixmap)
-            self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, bottom, top)
-            self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, bottom, top)
-        end = time.perf_counter()
-        print("draw data", end-start)
-
     def draw_polygons(self):
         self.canvas._draw_tile_mode = False
         self.canvas._draw_mode = True
@@ -2572,7 +1809,6 @@ class MyWindow(QMainWindow):
 ################################################
 def closest(arr, val):
     return arr[min(range(len(arr)), key = lambda i: abs(arr[i] - val))]
-
 
 def intersection(box1, box2):
     x1, y1, w1, h1 = box1
