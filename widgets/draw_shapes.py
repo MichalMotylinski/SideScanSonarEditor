@@ -14,7 +14,6 @@ class Ellipse(QGraphicsEllipseItem):
         self.setBrush(QBrush(QColor(*self.color)))
         self.setPen(QPen(QColor(*self.color), 1))
         self.setRect(rect.x() - shift, rect.y() - shift, shift * 2, shift * 2)
-        #self.setRect(rect.x(), rect.y(), shift, shift)
         self.setAcceptHoverEvents(True)
 
     def hoverEnterEvent(self, event):
