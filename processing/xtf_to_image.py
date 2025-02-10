@@ -121,7 +121,7 @@ def read_xtf(filepath, decimation, auto_stretch, stretch):
 
     return port_channel, stbd_channel, coords, stretch, image_height, image_width, across_track_sample_interval, along_track_sample_interval
 
-def convert_to_image(channel, params):#invert, auto_min_max, channel_min=None, auto_scale=True, scale=None, color_scheme="greylog", cmap=None):
+def convert_to_image(channel, params):
     gs_min = 0
     gs_max = 255 
     channel_max = params["channel_max"]
