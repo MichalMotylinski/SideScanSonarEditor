@@ -47,13 +47,7 @@ class MyWindow(QMainWindow):
         self._tile_size = 128
         
         # Image load parameters
-        self._decimation = 1
-        self._auto_stretch = True
-        self._stretch = 1
-        self._stretch_max = 10
-        self._coords = []
-
-        self.load_params = {"decimation": 1, "stretch": 1, "auto_stretch": True, "stretch_max": 10,
+        self._load_params = {"decimation": 1, "stretch": 1, "auto_stretch": True, "stretch_max": 10,
                             "coords": [], "full_image_height": 0, "full_image_width": 0, "slant_range_correct": False,
                             "across_track_sample_interval": 0, "along_track_sample_interval": 0
                            }
@@ -221,24 +215,6 @@ class MyWindow(QMainWindow):
         self._old_classes = val
 
     @property
-    def across_track_sample_interval(self):
-        """The across_track_sample_interval property."""
-        return self._across_track_sample_interval
-    
-    @across_track_sample_interval.setter
-    def across_track_sample_interval(self, val):
-        self._across_track_sample_interval = val
-
-    @property
-    def along_track_sample_interval(self):
-        """The along_track_sample_interval property."""
-        return self._along_track_sample_interval
-    
-    @along_track_sample_interval.setter
-    def along_track_sample_interval(self, val):
-        self._along_track_sample_interval = val
-
-    @property
     def tile_size(self):
         """The tile_size property."""
         return self._tile_size
@@ -249,49 +225,13 @@ class MyWindow(QMainWindow):
 
     # Image load parameters encapsulation
     @property
-    def decimation(self):
-        """The decimation property."""
-        return self._decimation
+    def load_params(self):
+        """The load_params property."""
+        return self._load_params
     
-    @decimation.setter
-    def decimation(self, val):
-        self._decimation = val
-
-    @property
-    def auto_stretch(self):
-        """The auto_stretch property."""
-        return self._auto_stretch
-    
-    @auto_stretch.setter
-    def auto_stretch(self, val):
-        self._auto_stretch = val
-
-    @property
-    def stretch(self):
-        """The stretch property."""
-        return self._stretch
-    
-    @stretch.setter
-    def stretch(self, val):
-        self._stretch = val
-
-    @property
-    def stretch_max(self):
-        """The stretch_max property."""
-        return self._stretch_max
-    
-    @stretch_max.setter
-    def stretch_max(self, val):
-        self._stretch_max = val
-    
-    @property
-    def coords(self):
-        """The coords property."""
-        return self._coords
-    
-    @coords.setter
-    def coords(self, val):
-        self._coords = val
+    @load_params.setter
+    def load_params(self, val):
+        self._load_params = val
 
     # Map projection parameters encapsulation
     @property

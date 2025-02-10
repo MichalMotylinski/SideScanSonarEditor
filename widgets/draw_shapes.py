@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QLineF, QPointF,  Qt
-from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygonF, QPainterPath, QVector2D
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem, QComboBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, QCheckBox, QWidget, QLabel, QHBoxLayout, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
+from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygonF, QPainterPath
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem, QComboBox, QDialog, QLineEdit, QPushButton, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
     def __init__(self, rect, shift, polygon_idx, ellipse_idx, color):
