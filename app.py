@@ -25,9 +25,7 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__()
         
         # Set window properties
-        self.setGeometry(1000, 400, 1180, 780)
-        self.window_title = "Side Scan Sonar Editor"
-        self.setWindowTitle(self.window_title)
+        self._window_title = "Side Scan Sonar Editor"
         
         # File info parameters
         self._input_filepath = None
@@ -45,11 +43,12 @@ class MyWindow(QMainWindow):
         self._polygons_data = None
         self._tiles_data = None
         self._old_classes = {}
-        self.across_track_sample_interval = None
-        self.along_track_sample_interval = None
+        self._across_track_sample_interval = None
+        self._along_track_sample_interval = None
+        self._tile_size = 128
         
         # Image load parameters
-        self._decimation = 4
+        self._decimation = 1
         self._auto_stretch = True
         self._stretch = 1
         self._stretch_max = 10
@@ -63,8 +62,8 @@ class MyWindow(QMainWindow):
         # Port channel parameters
         self._port_params = {"channel_min": 0, "channel_min_step": 1, 
                              "channel_max": 1, "channel_max_step": 1,
-                             "channel_min_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
-                             "channel_max_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
+                             "channel_min_dict": {int(x): float(x) for x in range(101)},
+                             "channel_max_dict": {int(x): float(x) for x in range(101)},
                              "auto_min": True, "auto_max": True, 
                              "invert": False, "color_scheme": "greylog",
                              "cmap": None
@@ -73,18 +72,31 @@ class MyWindow(QMainWindow):
         # Starboard channel parameters
         self._starboard_params = {"channel_min": 0, "channel_min_step": 1, 
                                   "channel_max": 1, "channel_max_step": 1,
-                                  "channel_min_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
-                                  "channel_max_dict": {float(x): {"val": float(x), "scaled": float(x)} for x in range(101)},
+                                  "channel_min_dict": {int(x): float(x) for x in range(101)},
+                                  "channel_max_dict": {int(x): float(x) for x in range(101)},
                                   "auto_min": True, "auto_max": True, 
                                   "invert": False, "color_scheme": "greylog",
                                   "cmap": None
                                  }
         
+        # Initialise GUI
+        self.setGeometry(1000, 400, 1180, 780)
+        self.setWindowTitle(self.window_title)
         self.initialise_ui()
 
     ################################################
     # Set properties
     ################################################
+
+    # Window parameters encapsulation
+    @property
+    def window_title(self):
+        """The window_title property."""
+        return self._window_title
+    
+    @window_title.setter
+    def window_title(self, val):
+        self._window_title = val
 
     # File info parameters encapsulation
     @property
@@ -204,6 +216,33 @@ class MyWindow(QMainWindow):
     @old_classes.setter
     def old_classes(self, val):
         self._old_classes = val
+
+    @property
+    def across_track_sample_interval(self):
+        """The across_track_sample_interval property."""
+        return self._across_track_sample_interval
+    
+    @across_track_sample_interval.setter
+    def across_track_sample_interval(self, val):
+        self._across_track_sample_interval = val
+
+    @property
+    def along_track_sample_interval(self):
+        """The along_track_sample_interval property."""
+        return self._along_track_sample_interval
+    
+    @along_track_sample_interval.setter
+    def along_track_sample_interval(self, val):
+        self._along_track_sample_interval = val
+
+    @property
+    def tile_size(self):
+        """The tile_size property."""
+        return self._tile_size
+    
+    @tile_size.setter
+    def tile_size(self, val):
+        self._tile_size = val
 
     # Image load parameters encapsulation
     @property
@@ -657,11 +696,6 @@ class MyWindow(QMainWindow):
         self.starboard_color_scheme_combobox.addItems(["greylog", "grey"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
-        """self.upload_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_groupbox)
-        self.upload_starboard_color_scheme_btn.setGeometry(320, 150, 100, 22)
-        self.upload_starboard_color_scheme_btn.setText("Upload cmap")
-        self.upload_starboard_color_scheme_btn.clicked.connect(self.upload_starboard_color_scheme)"""
-
         # Apply selected display parameter values
         self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_groupbox)
         self.apply_starboard_color_scheme_btn.setGeometry(320, 180, 100, 22)
@@ -688,17 +722,10 @@ class MyWindow(QMainWindow):
             self.tiles_filename = f"{self.input_filename.rsplit('.', 1)[0]}_tiles.json"
             self.coco_anns_filename = f"{self.input_filename.rsplit('.', 1)[0]}.json"
 
-            arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
-            pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
-
+            pixmap = toqpixmap(Image.fromarray(np.full((self.canvas.size().height(), self.canvas.size().width()), 255).astype(np.uint8)))
             self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width, self.across_track_sample_interval, self.along_track_sample_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
-            
-            #self.port_image = convert_to_image(self.port_params, self.port_params["invert"], self.port_params["auto_min"], self.port_params["channel_min"], self.port_params["auto_max"], self.port_params["channel_max"], self.port_params["color_scheme"], self.port_params["cmap"])
-            #self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_min, self.starboard_auto_max, self.starboard_max, self.starboard_color_scheme, self.starboard_cmap)
             self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
             self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
-            #self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
-            #self.starboard_image = self.port_image
 
             self.polygons_data = []
             self.tiles_data = []
@@ -728,13 +755,10 @@ class MyWindow(QMainWindow):
         if self.input_filepath is None:
             return
         
-        arr = np.full((self.canvas.size().height(), self.canvas.size().width()), 255)
-        pixmap = toqpixmap(Image.fromarray(arr.astype(np.uint8)))
-        
-        self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
-        
-        self.port_image = convert_to_image(self.port_data, self.port_params["invert"], self.port_params["auto_min"], self.port_params["channel_min"], self.port_params["auto_max"], self.port_params["channel_max"], self.port_params["color_scheme"], self.port_params["cmap"])
-        self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_min, self.starboard_auto_max, self.starboard_max, self.starboard_color_scheme, self.starboard_cmap)
+        pixmap = toqpixmap(Image.fromarray(np.full((self.canvas.size().height(), self.canvas.size().width()), 255).astype(np.uint8)))
+        self.port_data, self.starboard_data, self.coords, self.stretch, self.full_image_height, self.full_image_width, self.across_track_sample_interval, self.along_track_sample_interval = read_xtf(os.path.join(self.input_filepath, self.input_filename), self.decimation, self.auto_stretch, self.stretch)
+        self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
+        self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
 
         self.polygons_data = []
         self.tiles_data = []
@@ -752,10 +776,13 @@ class MyWindow(QMainWindow):
             self.canvas.set_image(True, pixmap)
             self.canvas.load_polygons(self.polygons_data, self.decimation, self.stretch, self.full_image_height)
             self.canvas.load_tiles(self.tiles_data, self.decimation, self.stretch, self.full_image_height)
-
+        
+        self.update_params()
         self.stretch_auto = self.stretch
         self.stretch_slider.setValue(self.stretch)
         self.stretch_label.setText(f"Stretch: {self.stretch}")
+        self.setWindowTitle(f"{self.window_title} - {self.input_filename}")
+        self.draw_crop_tile_btn.setEnabled(True)
 
     def load_data(self):
         self.clear_labels()
@@ -799,9 +826,6 @@ class MyWindow(QMainWindow):
 
         tiles = data["shapes"]
         self.tiles_data = tiles
-        #for key in tiles:
-
-            #if tiles[key]["rectangle"] not in set(self.canvas.classes.values()):
 
         # Clear list of selected polygons
         self.canvas.selected_polygons = []
@@ -998,13 +1022,13 @@ class MyWindow(QMainWindow):
  
             image = {
                 "id": tile_idx,
-                "width": TILE_SHAPE[0],
-                "height": TILE_SHAPE[1],
+                "width": tile_data["tiles"].rect().width(),
+                "height": tile_data["tiles"].rect().height(),
                 "file_name": f"{str(tile_idx).zfill(5)}.png",
                 "rectangle": [xmin, ymin, xmax - xmin, ymax - ymin],
                 "side": side
             }
-            tile_idx += 1
+            
             anns["images"].append(image)
 
             for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
@@ -1038,7 +1062,7 @@ class MyWindow(QMainWindow):
                 }
                 ann_idx += 1
                 
-                xmin = 128 - ann["bbox"][0]-ann["bbox"][2]
+                xmin = (tiler_xmax-tiler_xmin) - ann["bbox"][0]-ann["bbox"][2]
                 ymin = ann["bbox"][1]
                 xmax = xmin + ann["bbox"][2]
                 ymax = ann["bbox"][1] + ann["bbox"][3]
@@ -1049,6 +1073,7 @@ class MyWindow(QMainWindow):
                     ann["bbox"] = [xmin, ymin, ann["bbox"][2], ann["bbox"][3]]
 
                 anns["annotations"].append(ann)
+            tile_idx += 1
         
         with open(os.path.join(self.input_filepath, self.coco_anns_filename), "w") as f:
             json.dump(anns, f, indent=4)
@@ -1327,7 +1352,6 @@ class MyWindow(QMainWindow):
     def update_starboard_max(self):
         sender = self.sender() if self.sender() == self.starboard_max_slider else self.starboard_max_slider
         self.starboard_params["channel_max"] = self.starboard_params["channel_max_dict"][sender.value()]
-        print(self.starboard_params["channel_max"])
         self.starboard_max_slider_current.setText(f"{str(round(self.starboard_params['channel_max_dict'][sender.value()], 2))}")
 
     def update_starboard_max_slider_range(self):
@@ -1436,9 +1460,7 @@ class MyWindow(QMainWindow):
         if self.starboard_data is None:
             return
 
-        #self.starboard_image = convert_to_image(self.starboard_data, self.starboard_invert, self.starboard_auto_min, self.starboard_min, self.starboard_auto_max, self.starboard_max, self.starboard_color_scheme, self.starboard_cmap)
         self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
-        print(self.starboard_params)
 
         if self.port_image is None:
             arr = np.full(np.array(self.starboard_image).shape, 255)
@@ -1476,8 +1498,6 @@ class MyWindow(QMainWindow):
     # Initiate side toolbox and canvas
     ################################################
     def init_side_toolbox_and_canvas(self):
-        zero_int_validator = QIntValidator(0, 2**31 - 1)
-
         font = QFont()
         font.setBold(True)
 
@@ -1500,13 +1520,8 @@ class MyWindow(QMainWindow):
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
         self.draw_polygons_btn.setEnabled(False)
 
-        self.edit_polygons_btn = QPushButton(self.drawing_groupbox)
-        self.edit_polygons_btn.setGeometry(10, 35, 100, 22)
-        self.edit_polygons_btn.setText("Edit polygons")
-        self.edit_polygons_btn.clicked.connect(self.edit_polygons)
-
         self.delete_polygons_btn = QPushButton(self.drawing_groupbox)
-        self.delete_polygons_btn.setGeometry(10, 60, 100, 22)
+        self.delete_polygons_btn.setGeometry(10, 35, 100, 22)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
         self.delete_polygons_btn.setEnabled(False)
@@ -1522,6 +1537,11 @@ class MyWindow(QMainWindow):
         self.delete_crop_tile_btn.setText("Delete crop tile")
         self.delete_crop_tile_btn.clicked.connect(self.delete_tiles)
         self.delete_crop_tile_btn.setEnabled(False)
+
+        self.edit_polygons_btn = QPushButton(self.drawing_groupbox)
+        self.edit_polygons_btn.setGeometry(110, 60, 100, 22)
+        self.edit_polygons_btn.setText("Edit")
+        self.edit_polygons_btn.clicked.connect(self.edit_polygons)
 
         ################################################
         # Labels group box
@@ -1560,8 +1580,19 @@ class MyWindow(QMainWindow):
         self.polygons_list_widget.itemChanged.connect(self.on_polygon_item_changed)
 
         self.tiles_list_widget = QListWidget(self.labels_groupbox)
-        self.tiles_list_widget.setGeometry(85, 245, 140, 145)
+        self.tiles_list_widget.setGeometry(10, 245, 140, 145)
         self.tiles_list_widget.itemChanged.connect(self.on_tile_item_changed)
+
+        self.tile_size_label = QLabel(self.labels_groupbox)
+        self.tile_size_label.setGeometry(195, 300, 140, 10)
+        self.tile_size_label.setText(f"Tile size: 128")
+        self.tile_size_label.adjustSize()
+
+        self.tile_size_slider = QSlider(Qt.Orientation.Horizontal, self.labels_groupbox)
+        self.tile_size_slider.setGeometry(160, 255, 140, 145)
+        self.tile_size_slider.setMinimum(0)
+        self.tile_size_slider.setMaximum(56)
+        self.tile_size_slider.valueChanged.connect(self.update_tile_size)
 
         ################################################
         # Coords group box
@@ -1750,6 +1781,11 @@ class MyWindow(QMainWindow):
         self.tiles_list_widget.setCurrentItem(item)
         if self.tiles_list_widget.currentItem() != None:
             self.canvas.hide_tile(self.tiles_list_widget.currentItem().polygon_idx, item.checkState())
+
+    def update_tile_size(self):
+        self.tile_size = 128 + self.sender().value()*16
+        self.tile_size_label.setText(f"Tile size: {str(128 + self.sender().value()*16)}")
+        self.tile_size_label.adjustSize()
 
     ################################################
     # Side toolbar map projections
