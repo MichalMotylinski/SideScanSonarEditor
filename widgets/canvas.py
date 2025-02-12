@@ -958,8 +958,8 @@ class Canvas(QGraphicsView):
                 rotated_y = diff_x * math.sin(angle_rad) + diff_y * math.cos(angle_rad)
 
                 # Convert rotated pixel coordinate into UTM and add to to the center point
-                converted_northing = self.parent().parent().load_params["coords"][math.floor(y)]['x'] + (self.parent().parent().load_params["across_track_sample_interval"] * rotated_x) / self.parent().parent().load_params["decimation"]
-                converted_easting = self.parent().parent().load_params["coords"][math.floor(y)]['y'] - (self.parent().parent().load_params["across_track_sample_interval"] * rotated_y) / self.parent().parent().load_params["decimation"]
+                converted_northing = self.parent().parent().load_params["coords"][math.floor(y)]['x'] + (self.parent().parent().load_params["coords"][math.floor(y)]["across_interval"] * rotated_x) / self.parent().parent().load_params["decimation"]
+                converted_easting = self.parent().parent().load_params["coords"][math.floor(y)]['y'] - (self.parent().parent().load_params["coords"][math.floor(y)]["across_interval"] * rotated_y) / self.parent().parent().load_params["decimation"]
                 
                 self.parent().parent().location_label.setText(f"N: {round(converted_northing, 4): .4f}, E: {round(converted_easting, 4): .4f}")
 

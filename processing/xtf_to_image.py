@@ -1,8 +1,6 @@
 from datetime import datetime
 import numpy as np
 import math
-import matplotlib as mpl
-import pandas as pd
 from PIL import Image
 import pyxtf
 from scipy.interpolate import interp1d
@@ -20,38 +18,27 @@ def slant_range_correction(ping_data, slant_range, depth):
     corrected_ping_data (numpy array): Intensity values interpolated to horizontal distances.
     horizontal_ranges (numpy array): Corrected horizontal ranges for each return.
     """
-    N = len(ping_data)
-    
     # Compute slant range for each return
-    slant_ranges = np.linspace(0, slant_range, N)
-    
-    # Compute horizontal ranges using slant range correction
+    slant_ranges = np.linspace(0, slant_range, len(ping_data))
     horizontal_ranges = np.sqrt(np.clip(np.square(slant_ranges) - np.square(depth), 0, None))
     
-    # Interpolation: map the ping data from slant range to horizontal range
+    # Interpolate the data
     interp_func = interp1d(horizontal_ranges, ping_data, bounds_error=False, fill_value=0)
-    
-    # Create a uniform grid in horizontal range
-    uniform_horizontal_range = np.linspace(0, np.max(horizontal_ranges), N)
-    
-    # Interpolate the ping data to the new horizontal range grid
-    corrected_ping_data = interp_func(uniform_horizontal_range)
-    
-    return corrected_ping_data
+    uniform_horizontal_range = np.linspace(0, np.max(horizontal_ranges), len(ping_data))
+    return interp_func(uniform_horizontal_range)
 
-def calculate_distance(easting1, northing1, easting2, northing2):
-    return math.sqrt((easting2 - easting1)**2 + (northing2 - northing1)**2)
-
-def read_xtf(filepath, params):#decimation, auto_stretch, stretch):
+def read_xtf(filepath, params):
     (file_header, packets) = pyxtf.xtf_read(filepath)
     ping = packets[pyxtf.XTFHeaderType.sonar]
 
     coords, speeds = [], []
     prev_x, prev_y, prev_time, time_first, time_last = None, None, None, None, None
 
+    # Load port and starboard channels data
     port_channel = pyxtf.concatenate_channel(packets[pyxtf.XTFHeaderType.sonar], file_header=file_header, channel=0, weighted=True).astype(np.float64)
     stbd_channel = pyxtf.concatenate_channel(packets[pyxtf.XTFHeaderType.sonar], file_header=file_header, channel=1, weighted=True).astype(np.float64)
     
+    # Loop through pings and grab navigation data
     for i in range(len(ping)):
         across_track_sample_interval = (ping[i].ping_chan_headers[0].SlantRange / ping[i].ping_chan_headers[0].NumSamples)
         coords.insert(0, {"x": ping[i].ShipXcoordinate, "y": ping[i].ShipYcoordinate, "gyro": ping[i].ShipGyro, "across_interval": across_track_sample_interval, "slant_range":ping[i].ping_chan_headers[0].SlantRange, "num_samples": ping[i].ping_chan_headers[0].NumSamples, "altitude": ping[i].SensorPrimaryAltitude})
@@ -77,18 +64,13 @@ def read_xtf(filepath, params):#decimation, auto_stretch, stretch):
     params["full_image_height"] = port_channel.shape[0]
     params["full_image_width"] = port_channel.shape[1] + stbd_channel.shape[1]
 
-    # Sample interval in metres
-    params["across_track_sample_interval"] *= params["decimation"] 
-
-    # To make the image more isometric, we can compute the stretch factor based on the alongtrack sample interval.
+    # To make the image more isometric, we can compute the stretch factor using relation of the mean along and across track sample interval
     mean_speed = float(np.mean(speeds))
-    ping_count = i
     time_last = current_time
     distance = mean_speed * (time_last - time_first)
-    params["along_track_sample_interval"] = (distance / ping_count)
 
     if params["auto_stretch"]:
-        params["stretch"] = math.ceil(params["along_track_sample_interval"] / params["across_track_sample_interval"])
+        params["stretch"] = math.ceil((distance / i) / np.mean([coords[x]["across_interval"] for x in range(len(params))]))
 
     # Apply slant range correction
     if params["slant_range_correct"]:
@@ -130,10 +112,11 @@ def convert_to_image(channel, params):
     params["channel_min"] = channel_min
     params["channel_max"] = channel_max
 
-    # this scales from the range of image values to the range of output grey levels
+    # This scales from the range of image values to the range of output grey levels
     if (channel_max - channel_min) != 0:
         scale = (gs_max - gs_min) / (channel_max - channel_min)
     
+    # Apply log scaling if greylog scheme chosen
     if params["color_scheme"] == "greylog":
         channel = np.log10(channel + 0.00001, dtype=np.float32)
     

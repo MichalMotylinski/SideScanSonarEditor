@@ -2,7 +2,6 @@ import cv2
 import json
 import numpy as np
 import os
-import pickle
 from PIL import Image
 from PIL.ImageQt import toqpixmap
 import platform
