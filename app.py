@@ -62,8 +62,7 @@ class MyWindow(QMainWindow):
                              "channel_min_dict": {int(x): float(x) for x in range(101)},
                              "channel_max_dict": {int(x): float(x) for x in range(101)},
                              "auto_min": True, "auto_max": True, 
-                             "invert": False, "color_scheme": "greylog",
-                             "cmap": None
+                             "invert": False, "color_scheme": "greylog"
                             }
 
         # Starboard channel parameters
@@ -72,12 +71,11 @@ class MyWindow(QMainWindow):
                                   "channel_min_dict": {int(x): float(x) for x in range(101)},
                                   "channel_max_dict": {int(x): float(x) for x in range(101)},
                                   "auto_min": True, "auto_max": True, 
-                                  "invert": False, "color_scheme": "greylog",
-                                  "cmap": None
+                                  "invert": False, "color_scheme": "greylog"
                                  }
         
         # Initialise GUI
-        self.setGeometry(1000, 400, 1180, 780)
+        self.setGeometry(50, 50, 1180, 770)
         self.setWindowTitle(self.window_title)
         self.initialise_ui()
 
@@ -292,30 +290,30 @@ class MyWindow(QMainWindow):
 
         # Open file button
         self.open_file_btn = QPushButton(self.load_data_groupbox)
-        self.open_file_btn.setGeometry(50, 10, 100, 22)
+        self.open_file_btn.setGeometry(40, 10, 100, 24)
         self.open_file_btn.setText("Open file")
         self.open_file_btn.clicked.connect(self.open_dialog)
 
         # Reload file button
         self.reload_file_btn = QtWidgets.QPushButton(self.load_data_groupbox)
-        self.reload_file_btn.setGeometry(180, 10, 100, 22)
+        self.reload_file_btn.setGeometry(180, 10, 100, 24)
         self.reload_file_btn.setText("Reload")
         self.reload_file_btn.clicked.connect(self.reload)
 
         # Save labels button
         self.save_btn = QtWidgets.QPushButton(self.load_data_groupbox)
-        self.save_btn.setGeometry(50, 40, 100, 22)
+        self.save_btn.setGeometry(40, 35, 100, 24)
         self.save_btn.setText("Save labels")
         self.save_btn.clicked.connect(self.save_labels)
 
         # Crop tiles button
         self.crop_tiles_btn = QtWidgets.QPushButton(self.load_data_groupbox)
-        self.crop_tiles_btn.setGeometry(180, 40, 100, 22)
+        self.crop_tiles_btn.setGeometry(180, 35, 100, 24)
         self.crop_tiles_btn.setText("Crop tiles")
         self.crop_tiles_btn.clicked.connect(self.crop_tiles)
 
         self.slant_range_correct_checkbox = QCheckBox(self.load_data_groupbox)
-        self.slant_range_correct_checkbox.setGeometry(180, 70, 100, 25)
+        self.slant_range_correct_checkbox.setGeometry(180, 65, 100, 27)
         self.slant_range_correct_checkbox.setText(f"slant range \ncorrect")
         self.slant_range_correct_checkbox.stateChanged.connect(self.update_slant_range_correct)
 
@@ -348,14 +346,14 @@ class MyWindow(QMainWindow):
         self.stretch_slider.valueChanged.connect(self.update_stretch)
 
         self.stretch_max_textbox = QLineEdit(self.load_data_groupbox)
-        self.stretch_max_textbox.setGeometry(260, 180, 50, 22)
+        self.stretch_max_textbox.setGeometry(260, 180, 50, 24)
         self.stretch_max_textbox.setValidator(non_zero_int_validator)
         self.stretch_max_textbox.setEnabled(False)
         self.stretch_max_textbox.editingFinished.connect(self.update_stretch_max_textbox)
         self.stretch_max_textbox.setText(str(self.load_params["stretch_max"]))
 
         self.stretch_checkbox = QCheckBox(self.load_data_groupbox)
-        self.stretch_checkbox.setGeometry(10, 180, 100, 22)
+        self.stretch_checkbox.setGeometry(10, 180, 100, 24)
         self.stretch_checkbox.setText(f"auto stretch")
         self.stretch_checkbox.stateChanged.connect(self.update_auto_stretch)
         self.stretch_checkbox.setChecked(True)
@@ -370,22 +368,22 @@ class MyWindow(QMainWindow):
 
 
         self.port_title_label = QLabel(self.port_groupbox)
-        self.port_title_label.setGeometry(165, 10, 100, 22)
+        self.port_title_label.setGeometry(165, 10, 100, 24)
         self.port_title_label.setText(f"PORT SIDE")
         self.port_title_label.setFont(font)
 
         self.port_min_label = QLabel(self.port_groupbox)
-        self.port_min_label.setGeometry(10, 40, 100, 22)
+        self.port_min_label.setGeometry(10, 40, 100, 24)
         self.port_min_label.setText(f"Map range min")
         self.port_min_label.adjustSize()
 
         self.port_min_step_label = QLabel(self.port_groupbox)
-        self.port_min_step_label.setGeometry(220, 40, 100, 22)
+        self.port_min_step_label.setGeometry(220, 40, 100, 24)
         self.port_min_step_label.setText(f"step")
         self.port_min_step_label.adjustSize()
         
         self.port_min_step = QLineEdit(self.port_groupbox)
-        self.port_min_step.setGeometry(250, 40, 60, 22)
+        self.port_min_step.setGeometry(250, 40, 60, 24)
         self.port_min_step.setValidator(non_zero_double_validator)
         self.port_min_step.setEnabled(False)
         self.port_min_step.editingFinished.connect(self.update_port_min_slider_range)
@@ -401,20 +399,20 @@ class MyWindow(QMainWindow):
         self.port_min_slider.setEnabled(False)
 
         self.port_min_slider_bottom = QLineEdit(self.port_groupbox)
-        self.port_min_slider_bottom.setGeometry(10, 90, 60, 22)
+        self.port_min_slider_bottom.setGeometry(10, 90, 60, 24)
         self.port_min_slider_bottom.setPlaceholderText("min")
         self.port_min_slider_bottom.setValidator(zero_double_validator)
         self.port_min_slider_bottom.setText("0.0")
         self.port_min_slider_bottom.setEnabled(False)
         self.port_min_slider_bottom.editingFinished.connect(self.update_port_min_slider_range)
         self.port_min_slider_current = QLineEdit(self.port_groupbox)
-        self.port_min_slider_current.setGeometry(130, 90, 60, 22)
+        self.port_min_slider_current.setGeometry(130, 90, 60, 24)
         self.port_min_slider_current.setPlaceholderText("current")
         self.port_min_slider_current.setValidator(zero_double_validator)
         self.port_min_slider_current.setEnabled(False)
         self.port_min_slider_current.editingFinished.connect(self.update_port_min_slider_range)
         self.port_min_slider_top = QLineEdit(self.port_groupbox)
-        self.port_min_slider_top.setGeometry(250, 90, 60, 22)
+        self.port_min_slider_top.setGeometry(250, 90, 60, 24)
         self.port_min_slider_top.setPlaceholderText("max")
         self.port_min_slider_top.setValidator(zero_double_validator)
         self.port_min_slider_top.setText("100.0")
@@ -423,17 +421,17 @@ class MyWindow(QMainWindow):
 
         # Channel max value slider
         self.port_max_label = QLabel(self.port_groupbox)
-        self.port_max_label.setGeometry(10, 130, 60, 22)
+        self.port_max_label.setGeometry(10, 130, 60, 24)
         self.port_max_label.setText(f"Map range max")
         self.port_max_label.adjustSize()
 
         self.port_max_step_label = QLabel(self.port_groupbox)
-        self.port_max_step_label.setGeometry(220, 130, 60, 22)
+        self.port_max_step_label.setGeometry(220, 130, 60, 24)
         self.port_max_step_label.setText(f"step")
         self.port_max_step_label.adjustSize()
 
         self.port_max_step = QLineEdit(self.port_groupbox)
-        self.port_max_step.setGeometry(250, 130, 60, 22)
+        self.port_max_step.setGeometry(250, 130, 60, 24)
         self.port_max_step.setValidator(non_zero_double_validator)
         self.port_max_step.setEnabled(False)
         self.port_max_step.editingFinished.connect(self.update_port_max_slider_range)
@@ -449,20 +447,20 @@ class MyWindow(QMainWindow):
         self.port_max_slider.setEnabled(False)
 
         self.port_max_slider_bottom = QLineEdit(self.port_groupbox)
-        self.port_max_slider_bottom.setGeometry(10, 180, 60, 22)
+        self.port_max_slider_bottom.setGeometry(10, 180, 60, 24)
         self.port_max_slider_bottom.setPlaceholderText("min")
         self.port_max_slider_bottom.setValidator(zero_double_validator)
         self.port_max_slider_bottom.setText("0.0")
         self.port_max_slider_bottom.setEnabled(False)
         self.port_max_slider_bottom.editingFinished.connect(self.update_port_max_slider_range)
         self.port_max_slider_current = QLineEdit(self.port_groupbox)
-        self.port_max_slider_current.setGeometry(130, 180, 60, 22)
+        self.port_max_slider_current.setGeometry(130, 180, 60, 24)
         self.port_max_slider_current.setPlaceholderText("current")
         self.port_max_slider_current.setValidator(zero_double_validator)
         self.port_max_slider_current.setEnabled(False)
         self.port_max_slider_current.editingFinished.connect(self.update_port_max_slider_range)
         self.port_max_slider_top = QLineEdit(self.port_groupbox)
-        self.port_max_slider_top.setGeometry(250, 180, 60, 22)
+        self.port_max_slider_top.setGeometry(250, 180, 60, 24)
         self.port_max_slider_top.setPlaceholderText("max")
         self.port_max_slider_top.setValidator(zero_double_validator)
         self.port_max_slider_top.setText("100.0")
@@ -491,14 +489,14 @@ class MyWindow(QMainWindow):
 
         # Color scheme selection box
         self.port_color_scheme_combobox = QComboBox(self.port_groupbox)
-        self.port_color_scheme_combobox.setGeometry(320, 120, 100, 22)
+        self.port_color_scheme_combobox.setGeometry(320, 120, 100, 24)
         #self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.port_color_scheme_combobox.addItems(["greylog", "grey"])
         self.port_color_scheme_combobox.currentIndexChanged.connect(self.update_port_color_scheme)
 
         # Apply selected display parameter values
         self.apply_port_color_scheme_btn = QtWidgets.QPushButton(self.port_groupbox)
-        self.apply_port_color_scheme_btn.setGeometry(320, 180, 100, 22)
+        self.apply_port_color_scheme_btn.setGeometry(320, 180, 100, 24)
         self.apply_port_color_scheme_btn.setText("Apply")
         self.apply_port_color_scheme_btn.clicked.connect(self.apply_port_color_scheme)
         
@@ -510,22 +508,22 @@ class MyWindow(QMainWindow):
         self.starboard_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
 
         self.starboard_title_label = QLabel(self.starboard_groupbox)
-        self.starboard_title_label.setGeometry(165, 10, 100, 22)
+        self.starboard_title_label.setGeometry(165, 10, 100, 24)
         self.starboard_title_label.setText(f"STARBOARD SIDE")
         self.starboard_title_label.setFont(font)
 
         self.starboard_min_label = QLabel(self.starboard_groupbox)
-        self.starboard_min_label.setGeometry(10, 40, 100, 22)
+        self.starboard_min_label.setGeometry(10, 40, 100, 24)
         self.starboard_min_label.setText(f"Map range min")
         self.starboard_min_label.adjustSize()
 
         self.starboard_min_step_label = QLabel(self.starboard_groupbox)
-        self.starboard_min_step_label.setGeometry(220, 40, 100, 22)
+        self.starboard_min_step_label.setGeometry(220, 40, 100, 24)
         self.starboard_min_step_label.setText(f"step")
         self.starboard_min_step_label.adjustSize()
 
         self.starboard_min_step = QLineEdit(self.starboard_groupbox)
-        self.starboard_min_step.setGeometry(250, 40, 60, 22)
+        self.starboard_min_step.setGeometry(250, 40, 60, 24)
         self.starboard_min_step.setValidator(non_zero_double_validator)
         self.starboard_min_step.setEnabled(False)
         self.starboard_min_step.editingFinished.connect(self.update_starboard_min_slider_range)
@@ -541,20 +539,20 @@ class MyWindow(QMainWindow):
         self.starboard_min_slider.setEnabled(False)
 
         self.starboard_min_slider_bottom = QLineEdit(self.starboard_groupbox)
-        self.starboard_min_slider_bottom.setGeometry(10, 90, 60, 22)
+        self.starboard_min_slider_bottom.setGeometry(10, 90, 60, 24)
         self.starboard_min_slider_bottom.setPlaceholderText("min")
         self.starboard_min_slider_bottom.setValidator(zero_double_validator)
         self.starboard_min_slider_bottom.setText("0.0")
         self.starboard_min_slider_bottom.setEnabled(False)
         self.starboard_min_slider_bottom.editingFinished.connect(self.update_starboard_min_slider_range)
         self.starboard_min_slider_current = QLineEdit(self.starboard_groupbox)
-        self.starboard_min_slider_current.setGeometry(130, 90, 60, 22)
+        self.starboard_min_slider_current.setGeometry(130, 90, 60, 24)
         self.starboard_min_slider_current.setPlaceholderText("current")
         self.starboard_min_slider_current.setValidator(zero_double_validator)
         self.starboard_min_slider_current.setEnabled(False)
         self.starboard_min_slider_current.editingFinished.connect(self.update_starboard_min_slider_range)
         self.starboard_min_slider_top = QLineEdit(self.starboard_groupbox)
-        self.starboard_min_slider_top.setGeometry(250, 90, 60, 22)
+        self.starboard_min_slider_top.setGeometry(250, 90, 60, 24)
         self.starboard_min_slider_top.setPlaceholderText("max")
         self.starboard_min_slider_top.setValidator(zero_double_validator)
         self.starboard_min_slider_top.setText("100.0")
@@ -563,17 +561,17 @@ class MyWindow(QMainWindow):
 
         # Channel max value slider
         self.starboard_max_label = QLabel(self.starboard_groupbox)
-        self.starboard_max_label.setGeometry(10, 130, 60, 22)
+        self.starboard_max_label.setGeometry(10, 130, 60, 24)
         self.starboard_max_label.setText(f"Map range max")
         self.starboard_max_label.adjustSize()
 
         self.starboard_max_step_label = QLabel(self.starboard_groupbox)
-        self.starboard_max_step_label.setGeometry(220, 130, 60, 22)
+        self.starboard_max_step_label.setGeometry(220, 130, 60, 24)
         self.starboard_max_step_label.setText(f"step")
         self.starboard_max_step_label.adjustSize()
 
         self.starboard_max_step = QLineEdit(self.starboard_groupbox)
-        self.starboard_max_step.setGeometry(250, 130, 60, 22)
+        self.starboard_max_step.setGeometry(250, 130, 60, 24)
         self.starboard_max_step.setValidator(non_zero_double_validator)
         self.starboard_max_step.setEnabled(False)
         self.starboard_max_step.editingFinished.connect(self.update_starboard_max_slider_range)
@@ -589,20 +587,20 @@ class MyWindow(QMainWindow):
         self.starboard_max_slider.setEnabled(False)
 
         self.starboard_max_slider_bottom = QLineEdit(self.starboard_groupbox)
-        self.starboard_max_slider_bottom.setGeometry(10, 180, 60, 22)
+        self.starboard_max_slider_bottom.setGeometry(10, 180, 60, 24)
         self.starboard_max_slider_bottom.setPlaceholderText("min")
         self.starboard_max_slider_bottom.setValidator(zero_double_validator)
         self.starboard_max_slider_bottom.setText("0.0")
         self.starboard_max_slider_bottom.setEnabled(False)
         self.starboard_max_slider_bottom.editingFinished.connect(self.update_starboard_max_slider_range)
         self.starboard_max_slider_current = QLineEdit(self.starboard_groupbox)
-        self.starboard_max_slider_current.setGeometry(130, 180, 60, 22)
+        self.starboard_max_slider_current.setGeometry(130, 180, 60, 24)
         self.starboard_max_slider_current.setPlaceholderText("current")
         self.starboard_max_slider_current.setValidator(zero_double_validator)
         self.starboard_max_slider_current.setEnabled(False)
         self.starboard_max_slider_current.editingFinished.connect(self.update_starboard_max_slider_range)
         self.starboard_max_slider_top = QLineEdit(self.starboard_groupbox)
-        self.starboard_max_slider_top.setGeometry(250, 180, 60, 22)
+        self.starboard_max_slider_top.setGeometry(250, 180, 60, 24)
         self.starboard_max_slider_top.setPlaceholderText("max")
         self.starboard_max_slider_top.setValidator(zero_double_validator)
         self.starboard_max_slider_top.setText("100.0")
@@ -631,14 +629,14 @@ class MyWindow(QMainWindow):
 
         # Color scheme selection box
         self.starboard_color_scheme_combobox = QComboBox(self.starboard_groupbox)
-        self.starboard_color_scheme_combobox.setGeometry(320, 120, 100, 22)
+        self.starboard_color_scheme_combobox.setGeometry(320, 120, 100, 24)
         #self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.starboard_color_scheme_combobox.addItems(["greylog", "grey"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
         # Apply selected display parameter values
         self.apply_starboard_color_scheme_btn = QtWidgets.QPushButton(self.starboard_groupbox)
-        self.apply_starboard_color_scheme_btn.setGeometry(320, 180, 100, 22)
+        self.apply_starboard_color_scheme_btn.setGeometry(320, 180, 100, 24)
         self.apply_starboard_color_scheme_btn.setText("Apply")
         self.apply_starboard_color_scheme_btn.clicked.connect(self.apply_starboard_color_scheme)
 
@@ -1196,26 +1194,11 @@ class MyWindow(QMainWindow):
 
     def update_port_color_scheme(self):
         self.port_params["color_scheme"] = self.sender().currentText()
-
-    @pyqtSlot()
-    def upload_port_color_scheme(self):
-        filepath = ""
-        filepath = QFileDialog.getOpenFileName(
-            self,
-            "Open File",
-            "",
-            "Pickle Format (*.pickle)",
-        )[0]
-
-        if filepath:
-            with open(filepath, "rb") as f:
-                self.port_params["cmap"] = pickle.load(f)
         
     def apply_port_color_scheme(self):
         if self.port_params is None:
             return
         
-        #self.port_image = convert_to_image(self.port_params, self.port_params["invert"], self.port_params["auto_min"], self.port_params["channel_min"], self.port_params["auto_max"], self.port_params["channel_max"], self.port_params["color_scheme"], self.port_params["cmap"])
         self.port_image, self.port_params = convert_to_image(self.port_data, self.port_params)
         if self.starboard_image is None:
             arr = np.full(np.array(self.port_image).shape, 255)
@@ -1275,10 +1258,10 @@ class MyWindow(QMainWindow):
         
         # Search for the current value in dict
         val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == current_val_text), None)
-        if val is not None: # If there is exact match then grab the key and value and set the slider
+        if val is not None:
             self.starboard_min_slider.setValue(val)
             self.starboard_min_slider_current.setText(str(current_val_text))
-        else: # If no match then find the closest value in dict and update the slider
+        else:
             close = closest(list(self.starboard_params["channel_min_dict"].values()), current_val_text)
             val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == close), None)
             self.starboard_min_slider.setValue(val)
@@ -1380,20 +1363,6 @@ class MyWindow(QMainWindow):
 
     def update_starboard_color_scheme(self):
         self.starboard_color_scheme = self.sender().currentText()
-
-    @pyqtSlot()
-    def upload_starboard_color_scheme(self):
-        filepath = ""
-        filepath = QFileDialog.getOpenFileName(
-            self,
-            "Open File",
-            "",
-            "Pickle Format (*.pickle)",
-        )[0]
-
-        if filepath:
-            with open(filepath, "rb") as f:
-                self.starboard_cmap = pickle.load(f)
         
     def apply_starboard_color_scheme(self):
         if self.starboard_data is None:
@@ -1454,31 +1423,31 @@ class MyWindow(QMainWindow):
         self.drawing_groupbox.setMinimumWidth(320)
 
         self.draw_polygons_btn = QPushButton(self.drawing_groupbox)
-        self.draw_polygons_btn.setGeometry(10, 10, 100, 22)
+        self.draw_polygons_btn.setGeometry(40, 10, 100, 24)
         self.draw_polygons_btn.setText("Draw polygons")
         self.draw_polygons_btn.clicked.connect(self.draw_polygons)
         self.draw_polygons_btn.setEnabled(False)
 
         self.delete_polygons_btn = QPushButton(self.drawing_groupbox)
-        self.delete_polygons_btn.setGeometry(10, 35, 100, 22)
+        self.delete_polygons_btn.setGeometry(40, 35, 100, 24)
         self.delete_polygons_btn.setText("Delete polygons")
         self.delete_polygons_btn.clicked.connect(self.delete_polygons)
         self.delete_polygons_btn.setEnabled(False)
 
         self.draw_crop_tile_btn = QPushButton(self.drawing_groupbox)
-        self.draw_crop_tile_btn.setGeometry(210, 10, 100, 22)
+        self.draw_crop_tile_btn.setGeometry(180, 10, 100, 24)
         self.draw_crop_tile_btn.setText("Draw crop tile")
         self.draw_crop_tile_btn.clicked.connect(self.draw_tile_mode)
         self.draw_crop_tile_btn.setEnabled(False)
 
         self.delete_crop_tile_btn = QPushButton(self.drawing_groupbox)
-        self.delete_crop_tile_btn.setGeometry(210, 35, 100, 22)
+        self.delete_crop_tile_btn.setGeometry(180, 35, 100, 24)
         self.delete_crop_tile_btn.setText("Delete crop tile")
         self.delete_crop_tile_btn.clicked.connect(self.delete_tiles)
         self.delete_crop_tile_btn.setEnabled(False)
 
         self.edit_polygons_btn = QPushButton(self.drawing_groupbox)
-        self.edit_polygons_btn.setGeometry(110, 60, 100, 22)
+        self.edit_polygons_btn.setGeometry(110, 60, 100, 24)
         self.edit_polygons_btn.setText("Edit")
         self.edit_polygons_btn.clicked.connect(self.edit_polygons)
 
@@ -1490,22 +1459,22 @@ class MyWindow(QMainWindow):
         self.labels_groupbox.setMinimumWidth(330)
 
         self.load_labels_btn = QPushButton(self.labels_groupbox)
-        self.load_labels_btn.setGeometry(50, 10, 100, 22)
+        self.load_labels_btn.setGeometry(40, 10, 100, 24)
         self.load_labels_btn.setText("Load labels")
         self.load_labels_btn.clicked.connect(self.load_labels)
 
         self.remove_label_btn = QPushButton(self.labels_groupbox)
-        self.remove_label_btn.setGeometry(170, 10, 100, 22)
+        self.remove_label_btn.setGeometry(180, 10, 100, 24)
         self.remove_label_btn.setText("Remove label")
         self.remove_label_btn.clicked.connect(self.remove_label)
 
         self.add_label_btn = QPushButton(self.labels_groupbox)
-        self.add_label_btn.setGeometry(50, 35, 100, 22)
+        self.add_label_btn.setGeometry(40, 35, 100, 24)
         self.add_label_btn.setText("Add label")
         self.add_label_btn.clicked.connect(self.add_label)
 
         self.edit_label_btn = QPushButton(self.labels_groupbox)
-        self.edit_label_btn.setGeometry(170, 35, 100, 22)
+        self.edit_label_btn.setGeometry(180, 35, 100, 24)
         self.edit_label_btn.setText("Edit label")
         self.edit_label_btn.clicked.connect(self.edit_label)
 
@@ -1528,7 +1497,7 @@ class MyWindow(QMainWindow):
         self.tile_size_label.adjustSize()
 
         self.tile_size_slider = QSlider(Qt.Orientation.Horizontal, self.labels_groupbox)
-        self.tile_size_slider.setGeometry(160, 255, 140, 145)
+        self.tile_size_slider.setGeometry(160, 320, 140, 15)
         self.tile_size_slider.setMinimum(0)
         self.tile_size_slider.setMaximum(56)
         self.tile_size_slider.valueChanged.connect(self.update_tile_size)

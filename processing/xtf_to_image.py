@@ -4,7 +4,6 @@ import math
 import matplotlib as mpl
 import pandas as pd
 from PIL import Image
-from processing import geodetic
 import pyxtf
 from scipy.interpolate import interp1d
 
@@ -46,65 +45,52 @@ def calculate_distance(easting1, northing1, easting2, northing2):
 def read_xtf(filepath, params):#decimation, auto_stretch, stretch):
     (file_header, packets) = pyxtf.xtf_read(filepath)
     ping = packets[pyxtf.XTFHeaderType.sonar]
-    
-    geographicals = False
-    speeds = []
-    prev_x_coordinate = None
-    prev_y_coordinate = None
-    prev_datetime = None
-    time_first = 0
-    time_last = 0
+
+    coords, speeds = [], []
+    prev_x, prev_y, prev_time, time_first, time_last = None, None, None, None, None
 
     port_channel = pyxtf.concatenate_channel(packets[pyxtf.XTFHeaderType.sonar], file_header=file_header, channel=0, weighted=True).astype(np.float64)
     stbd_channel = pyxtf.concatenate_channel(packets[pyxtf.XTFHeaderType.sonar], file_header=file_header, channel=1, weighted=True).astype(np.float64)
     
-    coords = []
     for i in range(len(ping)):
         across_track_sample_interval = (ping[i].ping_chan_headers[0].SlantRange / ping[i].ping_chan_headers[0].NumSamples)
         coords.insert(0, {"x": ping[i].ShipXcoordinate, "y": ping[i].ShipYcoordinate, "gyro": ping[i].ShipGyro, "across_interval": across_track_sample_interval, "slant_range":ping[i].ping_chan_headers[0].SlantRange, "num_samples": ping[i].ping_chan_headers[0].NumSamples, "altitude": ping[i].SensorPrimaryAltitude})
         
-        current_x_coordinate, current_y_coordinate= ping[i].SensorXcoordinate, ping[i].SensorYcoordinate
-        current_datetime = datetime(ping[i].Year, ping[i].Month, ping[i].Day, ping[i].Hour, ping[i].Minute, ping[i].Second, ping[i].HSeconds * 10000).timestamp()
-        
-        if i == 0:
-            time_first = current_datetime
-            previous_x = ping[i].ShipXcoordinate
-            previous_y = ping[i].ShipYcoordinate
-        
-        distance = calculate_distance(previous_x, previous_y, ping[i].ShipXcoordinate, ping[i].ShipYcoordinate)
+        current_x, current_y = ping[i].SensorXcoordinate, ping[i].SensorYcoordinate
+        current_time = datetime(
+            ping[i].Year, ping[i].Month, ping[i].Day,
+            ping[i].Hour, ping[i].Minute, ping[i].Second,
+            ping[i].HSeconds * 10000
+        ).timestamp()
 
-        if i == 0 and (ping[i].SensorXcoordinate <= 180) & (ping[i].SensorYcoordinate <= 90): 
-            geographicals = True
-        if i % 2 == 0:
-            prev_x_coordinate, prev_y_coordinate = ping[i].SensorXcoordinate, ping[i].SensorYcoordinate
-            prev_datetime = datetime(ping[i].Year, ping[i].Month, ping[i].Day, ping[i].Hour, ping[i].Minute, ping[i].Second, ping[i].HSeconds * 10000).timestamp()
-        else:
-            if geographicals:
-                s, _, _ = geodetic.calculateRangeBearingFromGeographicals(prev_x_coordinate, prev_y_coordinate, current_x_coordinate, current_y_coordinate)
-                # now we have the range, comput the speed in metres/second. where speed = distance/time
-                speeds.append(s / (current_datetime - prev_datetime))
-            else:
-                s, _ = geodetic.calculateRangeBearingFromGridPosition(prev_x_coordinate, prev_y_coordinate, current_x_coordinate, current_y_coordinate)
-                # now we have the range, comput the speed in metres/second. where speed = distance/time
-                speeds.append(s / (current_datetime - prev_datetime))
+        if time_first is None:
+            time_first = current_time
+        
+        if prev_x is not None and prev_y is not None:
+            dx, dy = current_x - prev_x, current_y - prev_y
+            dt = current_time - prev_time
+            if dt > 0:
+                speeds.append(math.sqrt(dx**2 + dy**2) / dt)
+        prev_x, prev_y, prev_time = current_x, current_y, current_time
     
-    mean_speed = float(np.mean(speeds))
-    ping_count = i
-    time_last = current_datetime
-
     # Get full spatial size of the data before stretching and decimation
     params["full_image_height"] = port_channel.shape[0]
     params["full_image_width"] = port_channel.shape[1] + stbd_channel.shape[1]
 
     # Sample interval in metres
     params["across_track_sample_interval"] *= params["decimation"] 
-    
-    # To make the image somewhat isometric, we need to compute the alongtrack sample interval.  this is based on the ping times, number of pings and mean speed  where distance = speed * duration
+
+    # To make the image more isometric, we can compute the stretch factor based on the alongtrack sample interval.
+    mean_speed = float(np.mean(speeds))
+    ping_count = i
+    time_last = current_time
     distance = mean_speed * (time_last - time_first)
-    
-    #distance = mean_speed * (navigation[-1].dateTime.timestamp() - navigation[0].dateTime.timestamp())
     params["along_track_sample_interval"] = (distance / ping_count)
 
+    if params["auto_stretch"]:
+        params["stretch"] = math.ceil(params["along_track_sample_interval"] / params["across_track_sample_interval"])
+
+    # Apply slant range correction
     if params["slant_range_correct"]:
         port_channel = np.fliplr(port_channel)
         for i, _ in enumerate(port_channel):
@@ -112,15 +98,11 @@ def read_xtf(filepath, params):#decimation, auto_stretch, stretch):
             stbd_channel[i] = slant_range_correction(stbd_channel[i], coords[i]["slant_range"], coords[i]["altitude"])
         port_channel = np.fliplr(port_channel)
 
-    # Automatic calculation of stretch that needs to be applied to the data
-    if params["auto_stretch"]:
-        params["stretch"] = math.ceil(params["along_track_sample_interval"] / params["across_track_sample_interval"])
-
+    # Apply stretching (vertically) and decimation (horizontally) to the data
     port_channel = np.repeat(port_channel, params["stretch"], axis=0)[:, ::params["decimation"]]
     stbd_channel = np.repeat(stbd_channel, params["stretch"], axis=0)[:, ::params["decimation"]]
 
     params["coords"] = coords
-
     return port_channel, stbd_channel, params
 
 def convert_to_image(channel, params):
@@ -132,9 +114,7 @@ def convert_to_image(channel, params):
     upper_limit = 2 ** 14
     channel.clip(0, upper_limit-1, out=channel)
     if params["auto_min"]:
-        # compute the clips
         channel_min = channel.min()
-
         if channel_min > 0:
             channel_min = math.log10(channel_min)
         else:
@@ -142,7 +122,6 @@ def convert_to_image(channel, params):
 
     if params["auto_max"]:
         channel_max = channel.max()
-        
         if channel_max > 0:
             channel_max = math.log10(channel_max)
         else:
@@ -166,44 +145,8 @@ def convert_to_image(channel, params):
     else:
         channel = np.add(gs_min, channel)
     
-    if params["color_scheme"] == "color":
-        if cmap is None:
-            cmap = mpl.colors.ListedColormap({
-                'black': (
-                    (0.0, 0.0, 0.0),
-                    (0.5, 0.0, 0.1),
-                    (1.0, 1.0, 1.0),
-                ),
-                'white': (
-                    (0.0, 0.0, 0.0),
-                    (1.0, 0.0, 0.0),
-                    (1.0, 1.0, 1.0),
-                ),
-                'yellow': (
-                    (0.0, 0.0, 0.0),
-                    (1.0, 0.0, 0.0),
-                    (1.0, 1.0, 1.0),
-                )})
-        else:
-            cmap = mpl.colors.ListedColormap(cmap)
-        image = Image.fromarray(np.uint8(cmap(channel)*255))
-    else:
-        image = Image.fromarray(channel).convert('L')
+    image = Image.fromarray(channel).convert('L')
     return image, params
-
-def load_color_map(path):
-    df = pd.read_csv(path, delim_whitespace=True)
-    cmap = mpl.colors.ListedColormap({
-        'black': (
-            (0.0, 0.0, 0.0),
-            (0.5, 0.0, 0.1),
-            (1.0, 1.0, 1.0),
-        ),
-        'yellow': (
-            (0.0, 0.0, 0.0),
-            (1.0, 0.0, 0.0),
-        )})
-    return
 
 def merge_images(image1, image2):
     """Merge two images into one, displayed side by side
