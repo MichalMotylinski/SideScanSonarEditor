@@ -3,6 +3,20 @@ from PyQt6.QtGui import QColor, QBrush, QIcon, QPen, QPainter, QPixmap, QPolygon
 from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem, QComboBox, QDialog, QLineEdit, QPushButton, QListWidgetItem, QGraphicsLineItem, QGraphicsPolygonItem
 
 class Ellipse(QGraphicsEllipseItem):
+    """
+    A custom QGraphicsEllipseItem class for drawing an ellipse object.
+
+    :param rect: A QRectF object
+    :type rect: PyQt6.QtCore.QRectF
+    :param shift: A value applied to the ellipse while drawing to ensure that object's central point is drawn at cursor position.
+    :type shift: float
+    :param polygon_idx: A unique id number of the polygon to which the ellipse belongs.
+    :type polygon_idx: int
+    :param ellipse_idx: A unique id of the ellipse.
+    :type ellipse_idx: int
+    :param color: A list containing RGB values used to paint the object.
+    :type color: list
+    """
     def __init__(self, rect, shift, polygon_idx, ellipse_idx, color):
         super().__init__(rect)
         self.position = QPointF(rect.x(), rect.y())
@@ -30,17 +44,37 @@ class Ellipse(QGraphicsEllipseItem):
         self.setBrush(QBrush(QColor(*self.color)))
 
 class Line(QGraphicsLineItem):
+    """
+    A custom QGraphicsLineItem class for drawing a line object.
+
+    :param start_point: A QPointF object containing coordinates of the line's starting point.
+    :type start_point: PyQt6.QtCore.QPointF
+    :param end_point: A QPointF object containing coordinates of the line's ending point.
+    :type end_point: PyQt6.QtCore.QPointF
+    """
     def __init__(self, start_point, end_point):
         super().__init__(QLineF(start_point, end_point))
         self.setPen(QPen(QColor(255, 0, 0), 1))
 
 class Polygon(QGraphicsPolygonItem):
+    """
+    A custom QGraphicsPolygonItem class for drawing a polygon object.
+
+    :param parent: A QPolygonF object
+    :type parent: PyQt6.QtGui.QPolygonF
+    :param polygon_idx: A unique id number of the polygon object.
+    :type polygon_idx: int
+    :param polygon_class: A class label of the polygon object.
+    :type polygon_class: str
+    :param color: A list containing RGB values used to paint the object.
+    :type color: list
+    """
     def __init__(self, parent, polygon_idx, polygon_class, color):
         # Ensure the polygon is closed
         if not parent.isClosed():
             parent = QPolygonF(parent)
             parent.append(parent[0])
-
+        
         super().__init__(parent)
         self.polygon_class = polygon_class
         self.color = color
@@ -113,6 +147,18 @@ class Polygon(QGraphicsPolygonItem):
         self.setPen(QPen(QColor(*self.color[:-1])))
 
 class Rectangle(QGraphicsRectItem):
+    """
+    A custom QGraphicsRectItem class for drawing a polygon object.
+
+    :param parent: A QRectF object
+    :type parent: PyQt6.QtCore.QRectF
+    :param rect_idx: A unique id number of the rectangle object.
+    :type rect_idx: int
+    :param polygons_inside: A list containing polygon objects that fall within borders of the drawn rectangle.
+    :type polygons_inside: list
+    :param color: A list containing RGB values used to paint the object.
+    :type color: list
+    """
     def __init__(self, parent, rect_idx, polygons_inside, color):
         super().__init__(parent)
 
@@ -160,7 +206,20 @@ class Rectangle(QGraphicsRectItem):
 
 class ListWidgetItem(QListWidgetItem):
     """
-    Create ListWidgetItem with a checkbox, circle icon and a label name.
+    A custom ListWidgetItem class creating an item with a checkbox, circle icon and a label name.
+
+    :param text: A class name to be displayed by the widget.
+    :type text: str
+    :param label_idx: A label id number.
+    :type label_idx: int
+    :param color: A list containing RGB values used to paint the object.
+    :type color: list
+    :param polygon_idx: A unique id number of the polygon object.
+    :type polygon_idx: int
+    :param checked: A boolean value indicating whether a widget item or group of items should be displayed or hidden.
+    :type checked: bool
+    :param parent: A QListWidget object.
+    :type parent: PyQt6.QtWidgets.QListWidget
     """
     def __init__(self, text, label_idx, color, polygon_idx=None, checked=False, parent=None):
         super().__init__(parent)
@@ -170,7 +229,7 @@ class ListWidgetItem(QListWidgetItem):
         self.circle_size = 13
         self.circle_pixmap = QPixmap(self.circle_size+1, self.circle_size+1)
         self.circle_pixmap.fill(Qt.GlobalColor.transparent)
- 
+        
         self.setText(text)
         self.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
         self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
@@ -178,7 +237,6 @@ class ListWidgetItem(QListWidgetItem):
         self.setToolTip(text)
 
     def set_color(self, color):
-        # Set color of the ListWidgetItem circle
         self.color = color
         painter = QPainter(self.circle_pixmap)
         painter.setBrush(QColor(*self.color))
@@ -189,7 +247,10 @@ class ListWidgetItem(QListWidgetItem):
         
 class AddLabelDialog(QDialog):
     """
-    Context dialog used for adding a new class label.
+    Context dialog used for adding a new class label to the list of labels.
+
+    :param parent: A MyWindow object.
+    :type parent: __main__.MyWindow
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -210,9 +271,38 @@ class AddLabelDialog(QDialog):
         self.cancel_button.setGeometry(120, 45, 70, 25)
         self.cancel_button.clicked.connect(self.reject)
 
-class EditPolygonLabelDialog(QDialog):
+class EditLabelDialog(QDialog):
     """
-    Context dialog used for selection of a new label for the polygons.
+    Context dialog used for editing of a existing class label.
+
+    :param parent: A MyWindow object.
+    :type parent: __main__.MyWindow
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Edit label")
+        self.setMinimumSize(200, 80)
+        self.setMaximumSize(200, 80)
+
+        # Textbox for new label name input
+        self.textbox = QLineEdit(self)
+        self.textbox.setGeometry(10, 10, 180, 25)
+
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.setGeometry(10, 45, 70, 25)
+        self.ok_button.clicked.connect(self.accept)
+
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.setGeometry(120, 45, 70, 25)
+        self.cancel_button.clicked.connect(self.reject)
+
+class ChangePolygonLabelDialog(QDialog):
+    """
+    Context dialog used for selection of a new label for the polygon.
+
+    :param parent: A parent Canvas object
+    :type parent: widgets.canvas.Canvas
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -225,7 +315,7 @@ class EditPolygonLabelDialog(QDialog):
         items = []
         for i in range(self.parent().parent().parent().label_list_widget.count()):
             items.append(self.parent().parent().parent().label_list_widget.item(i).text())
-
+        
         # Label selection box
         self.combobox = QComboBox(self)
         self.combobox.addItems(items)

@@ -1353,7 +1353,7 @@ class Canvas(QGraphicsView):
         
     def on_edit_polygon_label_action(self):
         # Edit polygon's label
-        dialog = EditPolygonLabelDialog(self)
+        dialog = ChangePolygonLabelDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             new_label = dialog.combobox.currentText()
             

@@ -7,27 +7,37 @@ from scipy.interpolate import interp1d
 
 def slant_range_correction(ping_data, slant_range, depth):
     """
-    Apply slant range correction for a single ping of side-scan sonar data.
+    Apply slant range correction to a single ping array of side-scan sonar data.
     
-    Parameters:
-    ping_data (numpy array): Array of return intensities for the ping.
-    slant_range (float): Maximum slant range for this ping.
-    depth (float): Water depth or sonar height above the seabed.
-    
-    Returns:
-    corrected_ping_data (numpy array): Intensity values interpolated to horizontal distances.
-    horizontal_ranges (numpy array): Corrected horizontal ranges for each return.
+    :param ping_data: Array of return intensities for the ping.
+    :type ping_data: numpy.ndarray
+    :param slant_range: Maximum slant range for input ping.
+    :type slant_range: float
+    :param depth: Water depth or sonar height above the seabed.
+    :type depth: float
+    :return: Intensity values interpolated to match the new grid.
+    :rtype: numpy.ndarray
     """
     # Compute slant range for each return
     slant_ranges = np.linspace(0, slant_range, len(ping_data))
     horizontal_ranges = np.sqrt(np.clip(np.square(slant_ranges) - np.square(depth), 0, None))
-    
-    # Interpolate the data
-    interp_func = interp1d(horizontal_ranges, ping_data, bounds_error=False, fill_value=0)
+    # Create a uniform grid of the ranges
     uniform_horizontal_range = np.linspace(0, np.max(horizontal_ranges), len(ping_data))
+    # Define interpolation function
+    interp_func = interp1d(horizontal_ranges, ping_data, bounds_error=False, fill_value=0)
     return interp_func(uniform_horizontal_range)
 
 def read_xtf(filepath, params):
+    """
+    Read side-scan sonar data from XTF file and perform initial processing that includes rescaling of the data in horizontal and vertical plane.
+    
+    :param filepath: A path to the XTF file.
+    :type filepath: str
+    :param params: A dictionary containing parameters used in the initial processing of the data.
+    :type params: dict
+    :return: Returns a tuple consisting of two numpy arrays where first is a port channel data and second is a starboard channel data as well as updated dictionary of parameters.
+    :rtype: A tuple of (numpy.ndarray, numpy.ndarray, dict)
+    """
     (file_header, packets) = pyxtf.xtf_read(filepath)
     ping = packets[pyxtf.XTFHeaderType.sonar]
 
@@ -88,6 +98,16 @@ def read_xtf(filepath, params):
     return port_channel, stbd_channel, params
 
 def convert_to_image(channel, params):
+    """
+    Convert channel data to an image by scaling values to a 0-255 range and apply additional processing according to the parameter values from dictionary.
+    
+    :param channel: Numpy array containing side-scan sonar channel data.
+    :type channel: numpy.ndarray
+    :param params: A dictionary containing parameters used in the processing of the channel data.
+    :type params: dict
+    :return: Returns a tuple consisting of a an image object and an updated dictionary of parameters for that channel.
+    :rtype: A tuple of (PIL.Image.Image, dict)
+    """
     gs_min = 0
     gs_max = 255 
     channel_max = params["channel_max"]
@@ -132,10 +152,14 @@ def convert_to_image(channel, params):
     return image, params
 
 def merge_images(image1, image2):
-    """Merge two images into one, displayed side by side
-    :param file1: path to first image file
-    :param file2: path to second image file
-    :return: the merged Image object
+    """Merge two images horizontally.
+
+    :param image1: First image object (Port side).
+    :type image1: PIL.Image.Image
+    :param image2: Second image object (Starboard side).
+    :type image2: PIL.Image.Image
+    :return: The merged image object.
+    :rtype: PIL.Image.Image
     """
 
     (width1, height1) = image1.size

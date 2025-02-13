@@ -1641,7 +1641,7 @@ class MyWindow(QMainWindow):
         label_idx = self.canvas.get_label_idx(old_label)
 
         # Open AddLabelDialog for user to provide a new label name
-        dialog = AddLabelDialog(self)
+        dialog = EditLabelDialog(self)
         dialog.textbox.setText(self.label_list_widget.currentItem().text())
         if dialog.exec() == QDialog.DialogCode.Accepted:
             new_label = dialog.textbox.text()
