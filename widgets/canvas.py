@@ -9,6 +9,7 @@ from widgets.draw_shapes import *
 ZOOM_NUM = 0
 X_POS = 0
 Y_POS = 0
+ZOOM_FACTOR = 0.8
 POLY_COLORS = [[255, 0, 0], [0, 0, 255], [255, 255, 0],
                 [255, 0, 255], [0, 255, 255], [128, 0, 0], [0, 128, 0],
                 [0, 0, 128], [128, 128, 0], [128, 0, 128], [0, 128, 128]]
@@ -329,9 +330,12 @@ class Canvas(QGraphicsView):
         self._previous_cursor_position = val
 
     def delete_polygons(self):
+        """
+        Remove polygon items requested by the user.
+        """
         for polygon in self.selected_polygons:
             k = 0
-            for j, item in enumerate(self._polygons):
+            for _, item in enumerate(self._polygons):
                 if item == None:
                     continue
                 if item != "del":
@@ -348,9 +352,12 @@ class Canvas(QGraphicsView):
         self.selected_polygons = []
 
     def delete_tiles(self):
+        """
+        Remove tile items requested by the user.
+        """
         for tile in self.selected_tiles:
             k = 0
-            for j, item in enumerate(self._tiles):
+            for _, item in enumerate(self._tiles):
                 if item == None:
                     continue
                 if item != "del":
@@ -363,6 +370,9 @@ class Canvas(QGraphicsView):
             self.parent().parent().tiles_list_widget.takeItem(k - 1)
 
     def clear_canvas(self):
+        """
+        Remove all drawn shapes from the canvas.
+        """
         for item in self.scene().items():
             if isinstance(item, Polygon) or isinstance(item, Ellipse) or isinstance(item, Rectangle):
                 self.scene().removeItem(item)
@@ -370,6 +380,14 @@ class Canvas(QGraphicsView):
         self._tiles = []
 
     def hide_polygons(self, label, state):
+        """
+        Set visibility of all polygons under the given label.
+
+        :param label: Label name associated with the drawn polygons.
+        :type label: str
+        :param state: The visibility state to apply. Instance of the PyQt6 CheckState enum.
+        :type state: CheckState
+        """
         # Loop over polygons of selected label and hide them from user's view
         for polygon in self._polygons:
             # Ignore if not in current split
@@ -386,6 +404,14 @@ class Canvas(QGraphicsView):
                         point.setVisible(False)
     
     def hide_polygon(self, idx, state):
+        """
+        Set visibility of a singular polygon.
+
+        :param idx: Label name associated with the drawn polygon.
+        :type idx: int
+        :param state: The visibility state to apply. Instance of the PyQt6 CheckState enum.
+        :type state: CheckState
+        """
         # Hide a singular polygon
         if idx >= len(self._polygons):
             return
@@ -399,6 +425,14 @@ class Canvas(QGraphicsView):
                 point.setVisible(False)
 
     def hide_tile(self, idx, state):
+        """
+        Set visibility of a singular tile.
+
+        :param idx: Label name associated with the drawn tile.
+        :type idx: int
+        :param state: The visibility state to apply. Instance of the PyQt6 CheckState enum.
+        :type state: CheckState
+        """
         # Hide a singular tile
         if idx >= len(self._tiles):
             return
@@ -416,6 +450,9 @@ class Canvas(QGraphicsView):
         Y_POS = self.sender().value()
     
     def fitInView(self):
+        """
+        Modified QGraphicsView method scaling the view matrix and scroll bars to ensure that the scene rectangle fits inside the viewport.
+        """
         rect = QRectF(self._pixmap_item.pixmap().rect())
         if not rect.isNull():
             self.setSceneRect(rect)
@@ -424,6 +461,14 @@ class Canvas(QGraphicsView):
                 self.scale(1 / unity.width(), 1 / unity.height())
 
     def set_image(self, initial=False, pixmap=None):
+        """
+        Set desired image as a pixmap and display in a viewport.
+
+        :param initial: Label name associated with the drawn tile.
+        :type initial: bool
+        :param pixmap: PyQt6 QPixmap object containing an image to display.
+        :type pixmap: PyQt6.QtGui.QPixmap
+        """
         global ZOOM_NUM, X_POS, Y_POS
 
         if pixmap and not pixmap.isNull():
@@ -445,16 +490,28 @@ class Canvas(QGraphicsView):
         
         # Get padding width and height
         rect_view_width = self.scene().items()[-1].boundingRect().width()
-        self.x_padding = (self.viewport().width() - rect_view_width / (0.8 ** self._zoom))
+        self.x_padding = (self.viewport().width() - rect_view_width / (ZOOM_FACTOR ** self._zoom))
         if self.x_padding <= 0:
             self.x_padding = 0
         
         rect_view_height = self.scene().items()[-1].boundingRect().height()
-        self.y_padding = (self.viewport().height() - rect_view_height / (0.8 ** self._zoom))
+        self.y_padding = (self.viewport().height() - rect_view_height / (ZOOM_FACTOR ** self._zoom))
         if self.y_padding <= 0:
             self.y_padding = 0
 
-    def load_polygons(self, polygons, decimation, stretch, top):
+    def load_polygons(self, polygons, decimation, stretch, image_height):
+        """
+        Draw polygon objects using position coordinates from the provided dictionary.
+
+        :param polygons: Dictionary containing polygon data.
+        :type polygons: dict
+        :param decimation: Decimation value for horizontal scaling of the polygon position on image.
+        :type decimation: int
+        :param stretch: Stretch value for vertical scaling of the polygon position on image.
+        :type stretch: int
+        :param image_height: Image height used to calculate the vertical position starting from image_height left corner as (0,0)
+        :type image_height: int
+        """
         # Clean the canvas before drawing the polygons
         self.clear_canvas()
         self._polygons = []
@@ -470,13 +527,13 @@ class Canvas(QGraphicsView):
             # If in range draw polygon and its corners
             label_idx = self.get_label_idx(polygons[key]["label"])
 
-            polygon = Polygon(QPolygonF([QPointF(math.floor(x[0]) / decimation, ((top - math.floor(x[1])) * stretch)) for x in polygons[key]["points"]]), idx, polygons[key]["label"], [*POLY_COLORS[label_idx], 120])
+            polygon = Polygon(QPolygonF([QPointF(math.floor(x[0]) / decimation, ((image_height - math.floor(x[1])) * stretch)) for x in polygons[key]["points"]]), idx, polygons[key]["label"], [*POLY_COLORS[label_idx], 120])
             self.scene().addItem(polygon)
 
             self._polygons.append({"polygon": self.scene().items()[0], "corners": []})
             
             for i, item in enumerate(polygons[key]["points"]):
-                rect = Ellipse(QRectF(QPointF(math.floor(item[0]) / decimation, ((top - math.floor(item[1])) * stretch)), self.ellipse_size), self.ellipse_shift, idx, i, POLY_COLORS[label_idx])
+                rect = Ellipse(QRectF(QPointF(math.floor(item[0]) / decimation, ((image_height - math.floor(item[1])) * stretch)), self.ellipse_size), self.ellipse_shift, idx, i, POLY_COLORS[label_idx])
                 self.scene().addItem(rect)
                 self._polygons[-1]["corners"].append(self.scene().items()[0])
             
@@ -485,7 +542,19 @@ class Canvas(QGraphicsView):
             self.parent().parent().polygons_list_widget.setCurrentRow(0)
             idx += 1
 
-    def load_tiles(self, tiles, decimation, stretch, top):
+    def load_tiles(self, tiles, decimation, stretch, image_height):
+        """
+        Draw tile objects using position coordinates from the provided dictionary.
+
+        :param tiles: Dictionary containing tile data.
+        :type tiles: dict
+        :param decimation: Decimation value for horizontal scaling of the tile position on image.
+        :type decimation: int
+        :param stretch: Stretch value for vertical scaling of the tile position on image.
+        :type stretch: int
+        :param image_height: Image height used to calculate the vertical position starting from image_height left corner as (0,0)
+        :type image_height: int
+        """
         self._tiles = []
         if tiles == None:
             return
@@ -494,7 +563,7 @@ class Canvas(QGraphicsView):
             x = math.floor(x)
             y = math.floor(y)
             
-            rectangle = Rectangle(QRectF(math.floor(x / decimation), ((top - math.floor(y)) * stretch), width / decimation, height *  stretch), len(self._tiles), [], [255, 128, 64, 120])
+            rectangle = Rectangle(QRectF(math.floor(x / decimation), ((image_height - math.floor(y)) * stretch), width / decimation, height * stretch), len(self._tiles), [], [255, 128, 64, 120])
             self.scene().addItem(rectangle)
             self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
@@ -507,6 +576,14 @@ class Canvas(QGraphicsView):
             self._tiles.append({"tiles": rectangle})
 
     def wheelEvent(self, event):
+        """
+        Modified wheelEvent method handling input from the mouse wheel.
+        The implementation allows for horizontal and vertical scrolling action and
+        zoom in/zoom out action with additional key input.
+
+        :param event: PyQt6 QWheelEvent action when mouse wheel is used within the canvas borders.
+        :type event: PyQt6.QtGui.QWheelEvent
+        """
         global ZOOM_NUM, X_POS, Y_POS
 
         if not self._canvas_empty:
@@ -516,7 +593,7 @@ class Canvas(QGraphicsView):
                     self.global_factor = self.global_factor + self.global_factor * 0.25
                     self._zoom += 1
                 else:
-                    factor = 0.8
+                    factor = ZOOM_FACTOR
                     self.global_factor = self.global_factor - self.global_factor * 0.20
                     self._zoom -= 1
                 
@@ -532,12 +609,12 @@ class Canvas(QGraphicsView):
                 else:
                     self._zoom = 0
                 rect_view_width = self.scene().items()[-1].boundingRect().width()
-                self.x_padding = (self.viewport().width() - rect_view_width / (0.8 ** self._zoom))
+                self.x_padding = (self.viewport().width() - rect_view_width / (ZOOM_FACTOR ** self._zoom))
                 if self.x_padding <= 0:
                     self.x_padding = 0
 
                 rect_view_height = self.scene().items()[-1].boundingRect().height()
-                self.y_padding = (self.viewport().height() - rect_view_height / (0.8 ** self._zoom))
+                self.y_padding = (self.viewport().height() - rect_view_height / (ZOOM_FACTOR ** self._zoom))
                 if self.y_padding <= 0:
                     self.y_padding = 0
             elif event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
@@ -561,8 +638,19 @@ class Canvas(QGraphicsView):
     # Mouse Press event
     ################################################
     def mousePressEvent(self, event):
+        """
+        Modified mousePressEvent method handling input from the mouse buttons being pressed.
+        The middle button press action triggers dragging mode which allows for scrolling while mouse wheel is pressed.
+        The left button press controls majority of the actions and depending on the item clicked on it can:
+         - Trigger drawing of a new polygon if in polygon drawing mode,
+         - Trigger drawing of a new tile if in tile drawing mode,
+         - Trigger selection event allowing user to select one or more items previously drawn.
+
+        :param event: PyQt6 QMouseEvent action when mouse buttons are pressed.
+        :type event: PyQt6.QtGui.QMouseEvent
+        """
         global X_POS, Y_POS
-        
+
         if event.button() == Qt.MouseButton.MiddleButton:
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
             
@@ -573,10 +661,8 @@ class Canvas(QGraphicsView):
             # Drawing polygons if in drawing mode
             if self._draw_mode:
                 # Calculate position of the point on image.
-                #x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)) + 0.5
-                #y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().stretch) + 0.5) * self.parent().parent().stretch
-                x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom))
-                y_point = math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().load_params["stretch"])
+                x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom))
+                y_point = math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)))
 
                 # Starting just add a single point, then draw point and a line connecting it with a previous point
                 if len(self.active_draw["points"]) == 0:
@@ -633,10 +719,10 @@ class Canvas(QGraphicsView):
                         # Reset list of currently drawn objects
                         self.active_draw = {"points": [], "corners": [], "lines": []}
             elif self._draw_tile_mode:
-                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
                 
-                rectangle = Rectangle(QRectF(x_point - (self.parent().parent().tile_size / self.parent().parent().load_params["decimation"] / 2),  y_point - (self.parent().parent().tile_size / self.parent().parent().load_params["stretch"] / 2), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), len(self._tiles), [], [255, 128, 64, 120])
+                rectangle = Rectangle(QRectF(x_point - (self.parent().parent().tile_size / self.parent().parent().load_params["decimation"] / 2),  y_point - (self.parent().parent().tile_size * self.parent().parent().load_params["stretch"] / 2), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), len(self._tiles), [], [255, 128, 64, 120])
                 self.scene().addItem(rectangle)
                 self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
@@ -700,8 +786,8 @@ class Canvas(QGraphicsView):
                     self.parent().parent().delete_polygons_btn.setEnabled(True)
 
                     added = False
-                    x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                    y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                    x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                    y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
                     
                     polygon_item = self._polygons[self.items(event.position().toPoint())[0].polygon_idx]
                     polygon = polygon_item["polygon"].polygon()
@@ -791,6 +877,15 @@ class Canvas(QGraphicsView):
     # Mouse Realase event
     ################################################
     def mouseReleaseEvent(self, event):
+        """
+        Modified mouseReleaseEvent method handling input from the mouse buttons being released.
+        The middle button release action deactivates dragging mode.
+        The left button release action has effect only if user was moving objects.
+        The action triggers redrawing of all moved objects at the current cursor position.
+
+        :param event: PyQt6 QMouseEvent action when mouse buttons are released.
+        :type event: PyQt6.QtGui.QMouseEvent
+        """
         if event.button() == Qt.MouseButton.MiddleButton:
             self._panning = False
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
@@ -800,8 +895,8 @@ class Canvas(QGraphicsView):
                 return
             
             if self.was_moving_corner:
-                x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom))
-                y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"])
+                x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom))
+                y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"])
 
                 # Get index of the polygon to which point belongs and its own index in that polygon
                 ellipse_idx = self.selected_corner.ellipse_idx
@@ -931,6 +1026,19 @@ class Canvas(QGraphicsView):
     # Mouse move event
     ################################################
     def mouseMoveEvent(self, event) -> None:
+        """
+        Modified mouseMoveEvent method handling input from the mouse cursor being moved.
+         - If the image is small enough that padding was applied then when cursor moves over the padded area the
+           displayed position coordinates update beyond image borders,
+         - If panning with a middle mouse button pressed then only scrolling bars update as the cursor remain static in relation to the displayed image,
+         - If in a drawing mode a line is being drawn between the last created point and a cursor,
+         - Moving with selected corner allows to change it's position while simultaneously updating the polygon shape triggering redraw action,
+         - Moving with selected polygon allows to change it's position triggering redraw action,
+         - Moving with selected tile allows to change it's position triggering redraw action,
+
+        :param event: PyQt6 QMouseEvent action when mouse cursor is moved within canvas boundries.
+        :type event: PyQt6.QtGui.QMouseEvent
+        """
         super(Canvas, self).mouseMoveEvent(event)
         global X_POS, Y_POS
 
@@ -938,8 +1046,8 @@ class Canvas(QGraphicsView):
             self.parent().parent().mouse_coords = event.position()
             
             # Get position of the cursor and calculate its position on a full size data
-            x = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom) * self.parent().parent().load_params["decimation"]
-            y = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom) / self.parent().parent().load_params["stretch"]
+            x = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom) * self.parent().parent().load_params["decimation"]
+            y = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom) / self.parent().parent().load_params["stretch"]
             self.parent().parent().location_label3.setText(f"X: {round(x, 2)}, Y: {round(y, 2)}")
 
             # Get vertical middle point of the image in reference to a cursor current position
@@ -988,8 +1096,8 @@ class Canvas(QGraphicsView):
                 if self.line != None:
                     self.scene().removeItem(self.line)
                 
-                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
 
                 self.line = Line(self.active_draw["points"][-1], QPointF(x_point, y_point))
                 self.line.setPen(QPen(QColor(0, 255, 0), 0))
@@ -999,8 +1107,8 @@ class Canvas(QGraphicsView):
             if self.mouse_pressed:
                 self.was_moving_corner = True
                 # Calculate new coordinates
-                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
 
                 # Get index of the polygon to which point belongs and its own index in that polygon
                 ellipse_idx = self.selected_corner.ellipse_idx
@@ -1054,10 +1162,10 @@ class Canvas(QGraphicsView):
             if self.mouse_pressed == True:
                 self.was_moving_polygons = True
                 # Calculate mouse movement
-                x_point = (self.previous_cursor_position.x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                y_point = (self.previous_cursor_position.y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
-                new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                x_point = (self.previous_cursor_position.x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (self.previous_cursor_position.y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
 
                 x_change = new_x_point - x_point
                 y_change = new_y_point - y_point
@@ -1093,10 +1201,10 @@ class Canvas(QGraphicsView):
             if self.mouse_pressed == True:
                 self.was_moving_tiles = True
                 # Calculate mouse movement
-                x_point = (self.previous_cursor_position.x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                y_point = (self.previous_cursor_position.y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
-                new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (0.8 ** self._zoom)
-                new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (0.8 ** self._zoom)
+                x_point = (self.previous_cursor_position.x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (self.previous_cursor_position.y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                new_x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                new_y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
 
                 x_change = new_x_point - x_point
                 y_change = new_y_point - y_point
@@ -1126,6 +1234,14 @@ class Canvas(QGraphicsView):
     # Right mouse click Context Menu actions
     ################################################
     def contextMenuEvent(self, event):
+        """
+        Modified contextMenuEvent method handling triggering of the context menu when right mouse button is released.
+        The action creates a context menu at cursor position and depending on the item over which the cursor is currently at
+        different options can be activated or deactivated.
+        
+        :param event: PyQt6 QContextMenuEvent action activating/deactivating a context menu.
+        :type event: PyQt6.QtGui.QContextMenuEvent
+        """
         if self.items(event.pos()) == []:
             return
 
@@ -1268,9 +1384,31 @@ class Canvas(QGraphicsView):
                 self.parent().parent().polygons_list_widget.item(polygon.polygon_idx - none_index).setText(polygon.polygon_class)
 
     def distance(self, x1, y1, x2, y2):
+        """
+        Calculate Euclidean distance between two points.
+        
+        :param x1: X-axis position of the first point.
+        :type x1: int
+        :param y1: Y-axis position of the first point.
+        :type y1: int
+        :param x2: X-axis position of the second point.
+        :type x2: int
+        :param y2: Y-axis position of the second point.
+        :type y2: int
+        :return: The Euclidean distance between two points.
+        :rtype: float
+        """
         return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
     def get_label_idx(self, label):
+        """
+        Get index of a label stored in a dictionary.
+        
+        :param label: Name of the label.
+        :type label: str
+        :return: Index of the label in a dictionary.
+        :rtype: int
+        """
         for j, value in self.classes.items():
             if value == label:
                 return j
