@@ -1,4 +1,5 @@
 import cv2
+from datetime import datetime
 import json
 import numpy as np
 import os
@@ -316,7 +317,6 @@ class MyWindow(QMainWindow):
         self.slant_range_correct_checkbox.setText(f"slant range \ncorrect")
         self.slant_range_correct_checkbox.stateChanged.connect(self.update_slant_range_correct)
 
-
         # Loading data parameters
         self.decimation_label = QLabel(self.load_data_groupbox)
         self.decimation_label.setGeometry(10, 90, 200, 10)
@@ -364,7 +364,6 @@ class MyWindow(QMainWindow):
         self.port_groupbox.setGeometry(320, 0, 430, 300)
         self.port_groupbox.setProperty("border", "none")
         self.port_groupbox.setStyleSheet("QGroupBox { border-style: solid; border-color: rgb(220,220,220); border-width: 1px 1px 1px 0px; }")
-
 
         self.port_title_label = QLabel(self.port_groupbox)
         self.port_title_label.setGeometry(165, 10, 100, 24)
@@ -489,7 +488,6 @@ class MyWindow(QMainWindow):
         # Color scheme selection box
         self.port_color_scheme_combobox = QComboBox(self.port_groupbox)
         self.port_color_scheme_combobox.setGeometry(320, 120, 100, 24)
-        #self.port_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.port_color_scheme_combobox.addItems(["greylog", "grey"])
         self.port_color_scheme_combobox.currentIndexChanged.connect(self.update_port_color_scheme)
 
@@ -629,7 +627,6 @@ class MyWindow(QMainWindow):
         # Color scheme selection box
         self.starboard_color_scheme_combobox = QComboBox(self.starboard_groupbox)
         self.starboard_color_scheme_combobox.setGeometry(320, 120, 100, 24)
-        #self.starboard_color_scheme_combobox.addItems(["greylog", "grey", "color"])
         self.starboard_color_scheme_combobox.addItems(["greylog", "grey"])
         self.starboard_color_scheme_combobox.currentIndexChanged.connect(self.update_starboard_color_scheme)
 
@@ -644,6 +641,9 @@ class MyWindow(QMainWindow):
     ################################################
     @pyqtSlot()
     def open_dialog(self):
+        """
+        Opens a file dialog to select an XTF file and processes it for sonar image visualization.
+        """
         filepath = QFileDialog.getOpenFileName(
             self,
             "Open File",
@@ -688,6 +688,9 @@ class MyWindow(QMainWindow):
             self.draw_crop_tile_btn.setEnabled(True)
 
     def reload(self):
+        """
+        Reload data from xtf file using already provided file path by the user.
+        """
         if self.input_filepath is None:
             return
         
@@ -720,6 +723,9 @@ class MyWindow(QMainWindow):
         self.draw_crop_tile_btn.setEnabled(True)
 
     def load_data(self):
+        """
+        Load existing annotation data from JSON format files (Only for app use).
+        """
         self.clear_labels()
 
         self.stretch_slider.setValue(self.load_params["stretch"])
@@ -767,6 +773,9 @@ class MyWindow(QMainWindow):
         self.canvas.selected_tiles = []
 
     def save_labels(self):
+        """
+        Save annotation data to JSON format (Only for app use).
+        """
         if self.merged_image is None:
             return
 
@@ -875,16 +884,18 @@ class MyWindow(QMainWindow):
             json.dump(data, f, indent=4)
 
     def crop_tiles(self):
+        """
+        Create a JSON file in a COCO format with tile and annotation coordinates relative to the original size of the data.
+        """
         if self.merged_image is None:
             return
         anns = {
         "info": {
-            "description": "SSS 2024 Dataset",
+            "description": "SSS Dataset",
             "url": "",
             "version": "1.0",
-            "year": 2024,
-            "contributor": "Michal Motylinski",
-            "date_created": "2024-01-01"
+            "year": datetime.now().year,
+            "date_created": f"{datetime.now().strftime('%Y-%m-%d')}"
         },
         "categories": [
             {
@@ -972,10 +983,9 @@ class MyWindow(QMainWindow):
                 x_list = np.array(polygon.polygon_corners).T[0] * self.load_params["decimation"]
                 y_list = np.array(polygon.polygon_corners).T[1] / self.load_params["stretch"]
 
-                iou = calculate_iou([tiler_xmin,tiler_ymin,tiler_xmax,tiler_ymax], [min(x_list),min(y_list),max(x_list),max(y_list)])
-                inter = intersection([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
+                intersection = calc_intersection_ratio([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
                 
-                if inter < 50:
+                if intersection < 0.5:
                     continue        
 
                 x_list = x_list - x_tile
@@ -1090,11 +1100,11 @@ class MyWindow(QMainWindow):
         if val is not None: # If there is exact match then grab the key and value and set the slider
             self.port_min_slider.setValue(val)
             self.port_min_slider_current.setText(str(current_val_text))
-        else: # If no match then find the closest value in dict and update the slider
-            close = closest(list(self.port_params["channel_min_dict"].values()), current_val_text)
-            val = next((key for key, val in self.port_params["channel_min_dict"].items() if val == close), None)
+        else: # If no match then find the find_closest_val value in dict and update the slider
+            closest = find_closest_val(list(self.port_params["channel_min_dict"].values()), current_val_text)
+            val = next((key for key, val in self.port_params["channel_min_dict"].items() if val == closest), None)
             self.port_min_slider.setValue(val)
-            self.port_min_slider_current.setText(str(close))
+            self.port_min_slider_current.setText(str(closest))
         
         # Update min/max text boxes
         self.port_min_slider_bottom.setText(str(min_val_text))
@@ -1147,11 +1157,11 @@ class MyWindow(QMainWindow):
         if val is not None: # If there is exact match then grab the key and value and set the slider
             self.port_max_slider.setValue(val)
             self.port_max_slider_current.setText(str(current_val_text))
-        else: # If no match then find the closest value in dict and update the slider
-            close = closest(list(self.port_params["channel_max_dict"].values()), current_val_text)
-            val = next((key for key, val in self.port_params["channel_max_dict"].items() if val == close), None)
+        else: # If no match then find the find_closest_val value in dict and update the slider
+            closest = find_closest_val(list(self.port_params["channel_max_dict"].values()), current_val_text)
+            val = next((key for key, val in self.port_params["channel_max_dict"].items() if val == closest), None)
             self.port_max_slider.setValue(val)
-            self.port_max_slider_current.setText(str(close))
+            self.port_max_slider_current.setText(str(closest))
         
         # Update min/max text boxes
         self.port_max_slider_bottom.setText(str(min_val_text))
@@ -1261,10 +1271,10 @@ class MyWindow(QMainWindow):
             self.starboard_min_slider.setValue(val)
             self.starboard_min_slider_current.setText(str(current_val_text))
         else:
-            close = closest(list(self.starboard_params["channel_min_dict"].values()), current_val_text)
-            val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == close), None)
+            closest = find_closest_val(list(self.starboard_params["channel_min_dict"].values()), current_val_text)
+            val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == closest), None)
             self.starboard_min_slider.setValue(val)
-            self.starboard_min_slider_current.setText(str(close))
+            self.starboard_min_slider_current.setText(str(closest))
         
         # Update min/max text boxes
         self.starboard_min_slider_bottom.setText(str(min_val_text))
@@ -1317,11 +1327,11 @@ class MyWindow(QMainWindow):
         if val is not None: # If there is exact match then grab the key and value and set the slider
             self.starboard_max_slider.setValue(val)
             self.starboard_max_slider_current.setText(str(current_val_text))
-        else: # If no match then find the closest value in dict and update the slider
-            close = closest(list(self.starboard_params["channel_max_dict"].values()), current_val_text)
-            val = next((key for key, val in self.starboard_params["channel_max_dict"].items() if val == close), None)
+        else: # If no match then find the find_closest_val value in dict and update the slider
+            closest = find_closest_val(list(self.starboard_params["channel_max_dict"].values()), current_val_text)
+            val = next((key for key, val in self.starboard_params["channel_max_dict"].items() if val == closest), None)
             self.starboard_max_slider.setValue(val)
-            self.starboard_max_slider_current.setText(str(close))
+            self.starboard_max_slider_current.setText(str(closest))
         
         # Update min/max text boxes
         self.starboard_max_slider_bottom.setText(str(min_val_text))
@@ -1750,12 +1760,32 @@ class MyWindow(QMainWindow):
 ################################################
 # Other functions
 ################################################
-def closest(arr, val):
+def find_closest_val(arr, val):
+    """
+    Find closest value in an array.
+
+    :param arr: List of the values to search.
+    :type arr: list
+    :param val: Target value.
+    :type val: float
+    :return: Value from array closest to the target.
+    :rtype: float
+    """
     return arr[min(range(len(arr)), key = lambda i: abs(arr[i] - val))]
 
-def intersection(box1, box2):
-    x1, y1, w1, h1 = box1
-    x2, y2, w2, h2 = box2
+def calc_intersection_ratio(rect1, rect2):
+    """
+    Calculate intersection ratio between two rectes.
+
+    :param rect1: List of the first rectangle coordinates in [x, y, width, length] format.
+    :type rect1: list
+    :param rect2: List of the second rectangle coordinates in [x, y, width, length] format.
+    :type rect2: list
+    :return: Percentage of a smaller rectangle area within larger rectangle
+    :rtype: float
+    """
+    x1, y1, w1, h1 = rect1
+    x2, y2, w2, h2 = rect2
 
     x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
     y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
@@ -1766,17 +1796,8 @@ def intersection(box1, box2):
     # Calculate area of smaller rectangle
     smaller_rect_area = min(w1 * h1, w2 * h2)
 
-    # Calculate percentage of smaller rectangle inside the other rectangle
-    percentage_inside = (intersection_area / smaller_rect_area) * 100 if smaller_rect_area != 0 else 0
-
-    return percentage_inside
-def calculate_iou(box1, box2):
-    # Calculate intersection and union areas
-    intersection = max(0, min(box1[2], box2[2]) - max(box1[0], box2[0])) * max(0, min(box1[3], box2[3]) - max(box1[1], box2[1]))
-    union = (box1[2] - box1[0]) * (box1[3] - box1[1]) + (box2[2] - box2[0]) * (box2[3] - box2[1]) - intersection
-    # Calculate IoU
-    iou = intersection / union if union > 0 else 0
-    return iou
+    # Return percentage of smaller rectangle inside the larger rectangle
+    return intersection_area / smaller_rect_area if smaller_rect_area != 0 else 0
 
 def window():
     app = QApplication(sys.argv)
