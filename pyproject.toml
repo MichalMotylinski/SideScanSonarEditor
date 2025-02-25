@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SideScanSonarEditor"
+version = "0.0.3"
+description = "A Python package for editing side-scan sonar data."
+authors = [
+    {name = "Michal Motylinski", email = "motylm66@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "pillow",
+    "pyproj",
+    "PyQt6",
+    "PyQt6-Qt6",
+    "PyQt6_sip",
+    "pyxtf",
+    "scipy",
+]
+
+[project.urls]
+Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
