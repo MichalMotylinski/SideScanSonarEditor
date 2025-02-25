@@ -1807,4 +1807,5 @@ def window():
 
     sys.exit(app.exec())
 
-window()
+if __name__ == "__main__":
+    window()
