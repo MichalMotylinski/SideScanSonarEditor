@@ -29,5 +29,5 @@ dependencies = [
 Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
 
 [tool.setuptools]
-packages = ["widgets", "processing", "app"]
+packages = ["widgets", "processing"]
 include-package-data = true
