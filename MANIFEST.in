@@ -1,0 +1,4 @@
+include app.py
+recursive-include widgets *
+recursive-include processing *
+exclude manuscript/*
