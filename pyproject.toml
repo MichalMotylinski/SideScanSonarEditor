@@ -29,5 +29,5 @@ dependencies = [
 Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
 
 [tool.setuptools]
-packages = [{find = {where = ["widgets", "processing", "manuscript"]}}]
+packages = ["widgets", "processing", "manuscript"]
 py_modules = ["app"]
