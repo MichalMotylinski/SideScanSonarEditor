@@ -15,6 +15,7 @@ affiliations:
    index: 1
 
 date: 25 February 2025
+bibliography: bibliography.bib
 ---
 
 # Summary
@@ -59,14 +60,6 @@ More output formats may be added in the future including PASCAL VOC and YOLO.
 This work was supported by the Port City Innovation Hub (European Regional Development Fund).
 
 # References
-
-[1] P. Blondel, ‘The Handbook of Sidescan Sonar’, Handb. Sidescan Sonar, 2009, doi: 10.1007/978-3-540-49886-5.
-[2] “XTF file format information,” Exail. Accessed: Feb. 25, 2025. [Online]. Available: https://www.exail.com/resources/knowledge-center/xtf-file-format-information
-[3] Y.-C. Chang, S.-K. Hsu, and C.-H. Tsai, “SIDESCAN SONAR IMAGE PROCESSING:CORRECTING BRIGHTNESS VARIATION AND PATCHING GAPS,” Journal of Marine Science and Technology, vol. 18, no. 6, Dec. 2010, doi: 10.51400/2709-6998.1935.
-[4] ‘Chesapeake Technology - Makers of SonarWiz’. Accessed: Dec. 06, 2024. [Online]. Available: https://chesapeaketech.com/
-[5] ‘EdgeTech’. Accessed: Dec. 06, 2024. [Online]. Available: https://www.edgetech.com/
-[6] Ø. Sture, oysstu/pyxtf. 2025. Accessed: Feb. 25, 2025. [Online]. Available: https://github.com/oysstu/pyxtf
-[7] T.-Y. Lin et al., ‘Microsoft COCO: Common Objects in Context’, in Computer Vision – ECCV 2014, D. Fleet, T. Pajdla, B. Schiele, and T. Tuytelaars, Eds., Cham: Springer International Publishing, 2014, pp. 740–755. doi: 10.1007/978-3-319-10602-1_48.
 
 \pagebreak
 \appendix
