@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=60",
+    "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "SideScanSonarEditor"
-version = "0.0.5"
+version = "0.0.8" 
 description = "A Python package for editing side-scan sonar data."
 authors = [
     {name = "Michal Motylinski", email = "motylm66@gmail.com"}
@@ -28,5 +29,9 @@ dependencies = [
 Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
 
 [tool.setuptools]
-packages = [{find = {where = ["widgets", "processing", "manuscript"]}}]
-py_modules = ["app"]
+packages = ["widgets", "processing"]
+py-modules = ["app"]
+include-package-data = true
+
+[project.scripts]
+sidescansonareditor = "app:window"  
