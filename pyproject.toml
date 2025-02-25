@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SideScanSonarEditor"
-version = "0.0.7" 
+version = "0.0.8" 
 description = "A Python package for editing side-scan sonar data."
 authors = [
     {name = "Michal Motylinski", email = "motylm66@gmail.com"}
@@ -30,6 +30,7 @@ Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
 
 [tool.setuptools]
 packages = ["widgets", "processing"]
+py-modules = ["app"]
 include-package-data = true
 
 [project.scripts]
