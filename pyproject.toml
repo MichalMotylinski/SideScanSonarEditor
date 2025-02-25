@@ -32,7 +32,5 @@ Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
 packages = ["widgets", "processing"]
 include-package-data = true
 
-[tool.setuptools.entry_points]
-console_scripts = [
-    "sidescansonareditor = app:window"  # This will call the `run_gui()` function in app.py to start the GUI
-]
+[project.scripts]
+sidescansonareditor = "app:window"  
