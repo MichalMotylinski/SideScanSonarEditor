@@ -1,4 +1,4 @@
-[![PyPI version](https://badge.fury.io/py/SideScanSonarEditor.svg)](https://badge.fury.io/py/SideScanSonarEditor)
+[![PyPI version](https://badge.fury.io/py/SideScanSonarEditor.svg)](https://badge.fury.io/py/SideScanSonarEditor)[![DOI](https://zenodo.org/badge/612189759.svg)](https://doi.org/10.5281/zenodo.14928907)
 
 # SideScanSonarEditor
 SideScanSonarEditor is an open-source application designed for annotation of side-scan sonar data.
