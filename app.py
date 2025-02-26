@@ -966,8 +966,8 @@ class MyWindow(QMainWindow):
  
             image = {
                 "id": tile_idx,
-                "width": tile_data["tiles"].rect().width(),
-                "height": tile_data["tiles"].rect().height(),
+                "width": tile_data["tiles"].rect().width() * self.load_params["decimation"],
+                "height": tile_data["tiles"].rect().height() / self.load_params["stretch"],
                 "file_name": f"{str(tile_idx).zfill(5)}.png",
                 "rectangle": [xmin, ymin, xmax - xmin, ymax - ymin],
                 "side": side
@@ -1338,7 +1338,7 @@ class MyWindow(QMainWindow):
         self.starboard_max_slider_top.setText(str(max_val_text))
 
     def update_starboard_invert(self):
-        self.starboard_invert = self.sender().isChecked()
+        self.starboard_params["invert"] = self.sender().isChecked()
 
     def update_starboard_auto_min(self):
         self.starboard_params["auto_min"] = self.sender().isChecked()
@@ -1371,14 +1371,13 @@ class MyWindow(QMainWindow):
             self.starboard_max_slider_top.setEnabled(True)
 
     def update_starboard_color_scheme(self):
-        self.starboard_color_scheme = self.sender().currentText()
+        self.starboard_params["color_scheme"] = self.sender().currentText()
         
     def apply_starboard_color_scheme(self):
         if self.starboard_data is None:
             return
 
         self.starboard_image, self.starboard_params = convert_to_image(self.starboard_data, self.starboard_params)
-
         if self.port_image is None:
             arr = np.full(np.array(self.starboard_image).shape, 255)
             port_image = Image.fromarray(arr.astype(np.uint8))
@@ -1476,6 +1475,7 @@ class MyWindow(QMainWindow):
         self.remove_label_btn.setGeometry(180, 10, 100, 24)
         self.remove_label_btn.setText("Remove label")
         self.remove_label_btn.clicked.connect(self.remove_label)
+        self.remove_label_btn.setEnabled(False)
 
         self.add_label_btn = QPushButton(self.labels_groupbox)
         self.add_label_btn.setGeometry(40, 35, 100, 24)
@@ -1486,6 +1486,7 @@ class MyWindow(QMainWindow):
         self.edit_label_btn.setGeometry(180, 35, 100, 24)
         self.edit_label_btn.setText("Edit label")
         self.edit_label_btn.clicked.connect(self.edit_label)
+        self.edit_label_btn.setEnabled(False)
 
         self.label_list_widget = QListWidget(self.labels_groupbox)
         self.label_list_widget.setGeometry(10, 70, 140, 145)
@@ -1592,9 +1593,13 @@ class MyWindow(QMainWindow):
         if self.label_list_widget.currentItem() == None:
             self.canvas.selected_class = None
             self.draw_polygons_btn.setEnabled(False)
+            self.remove_label_btn.setEnabled(False)
+            self.edit_label_btn.setEnabled(False)
         else:
             self.canvas.selected_class = self.label_list_widget.currentItem().text()
             self.draw_polygons_btn.setEnabled(True)
+            self.remove_label_btn.setEnabled(True)
+            self.edit_label_btn.setEnabled(True)
 
     def on_label_item_changed(self, item):
         self.canvas.hide_polygons(item.text(), item.checkState())
@@ -1619,6 +1624,9 @@ class MyWindow(QMainWindow):
                 self.canvas.classes[label_idx] = dialog.textbox.text()
 
     def remove_label(self):
+        if self.label_list_widget.currentItem() is None:
+            return
+        
         labels_used = []
         for polygon in self.canvas._polygons:
             if polygon == "del":
@@ -1637,6 +1645,9 @@ class MyWindow(QMainWindow):
         self.canvas.classes[label_idx] = None
 
     def edit_label(self):
+        if self.label_list_widget.currentItem() is None:
+            return
+        
         old_label = self.label_list_widget.currentItem().text()
         label_idx = self.canvas.get_label_idx(old_label)
 
