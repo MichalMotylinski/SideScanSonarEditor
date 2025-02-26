@@ -2,11 +2,9 @@ name: Code Coverage
 
 on:
   push:
-    branches:
-      - [ master, actions-tests ]
+    branches: [ master, actions-tests ]
   pull_request:
-    branches:
-      - [ master, actions-tests ]
+    branches: [ master, actions-tests ]
 
 jobs:
   test:
