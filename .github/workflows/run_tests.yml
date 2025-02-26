@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -28,6 +27,7 @@ jobs:
       run: |
         pytest --cov-branch --cov-report=xml
     - name: Upload coverage reports to Codecov
-    	uses: codecov/codecov-action@v5
-    	with:
-	  token: ${{ secrets.CODECOV_TOKEN }}
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
