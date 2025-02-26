@@ -154,17 +154,20 @@ class Rectangle(QGraphicsRectItem):
     :type parent: PyQt6.QtCore.QRectF
     :param rect_idx: A unique id number of the rectangle object.
     :type rect_idx: int
+    :param tile_size: An integer for size of the tile.
+    :type tile_size: int
     :param polygons_inside: A list containing polygon objects that fall within borders of the drawn rectangle.
     :type polygons_inside: list
     :param color: A list containing RGB values used to paint the object.
     :type color: list
     """
-    def __init__(self, parent, rect_idx, polygons_inside, color):
+    def __init__(self, parent, rect_idx, tile_size, polygons_inside, color):
         super().__init__(parent)
 
         self._rect_idx = rect_idx
         self._polygons_inside = polygons_inside
         self.color = color
+        self.tile_size = tile_size
         self.setBrush(QBrush(QColor(*color)))      
         self.setPen(QPen(QColor(*color[:-1]), 1))
         self.setAcceptHoverEvents(True)

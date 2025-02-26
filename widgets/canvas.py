@@ -563,7 +563,7 @@ class Canvas(QGraphicsView):
             x = math.floor(x)
             y = math.floor(y)
             
-            rectangle = Rectangle(QRectF(math.floor(x / decimation), ((image_height - math.floor(y)) * stretch), width / decimation, height * stretch), len(self._tiles), [], [255, 128, 64, 120])
+            rectangle = Rectangle(QRectF(math.floor(x / decimation), ((image_height - math.floor(y)) * stretch), width / decimation, height * stretch), len(self._tiles), width, [], [255, 128, 64, 120])
             self.scene().addItem(rectangle)
             self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
@@ -722,7 +722,7 @@ class Canvas(QGraphicsView):
                 x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
                 y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
                 
-                rectangle = Rectangle(QRectF(x_point - (self.parent().parent().tile_size / self.parent().parent().load_params["decimation"] / 2),  y_point - (self.parent().parent().tile_size * self.parent().parent().load_params["stretch"] / 2), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), len(self._tiles), [], [255, 128, 64, 120])
+                rectangle = Rectangle(QRectF(x_point - (self.parent().parent().tile_size / self.parent().parent().load_params["decimation"] / 2),  y_point - (self.parent().parent().tile_size * self.parent().parent().load_params["stretch"] / 2), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), len(self._tiles), self.parent().parent().tile_size, [], [255, 128, 64, 120])
                 self.scene().addItem(rectangle)
                 self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
@@ -980,7 +980,7 @@ class Canvas(QGraphicsView):
             if self.was_moving_tiles:
                 new_selected_tiles = []
                 for tile in self.selected_tiles:
-                    new_tile = Rectangle(QRectF(math.floor(tile.rect().x()), (math.floor(math.floor(tile.rect().y()) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"]), self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), tile._rect_idx, [], [255, 128, 64, 120])
+                    new_tile = Rectangle(QRectF(math.floor(tile.rect().x()), (math.floor(math.floor(tile.rect().y()) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"]), tile.tile_size / self.parent().parent().load_params["decimation"], tile.tile_size * self.parent().parent().load_params["stretch"]), tile.rect_idx, tile.tile_size, [], [255, 128, 64, 120])
                     new_tile.setPen(QPen(QColor(255, 255, 255)))
                     self.scene().addItem(new_tile)
                     self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]
@@ -1211,7 +1211,7 @@ class Canvas(QGraphicsView):
                 
                 new_selected_tiles = []
                 for tile in self.selected_tiles:
-                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, self.parent().parent().tile_size / self.parent().parent().load_params["decimation"], self.parent().parent().tile_size * self.parent().parent().load_params["stretch"]), tile._rect_idx, [], [255, 128, 64, 120])
+                    new_tile = Rectangle(QRectF(tile.rect().x() + x_change, tile.rect().y() + y_change, tile.tile_size / self.parent().parent().load_params["decimation"], tile.tile_size * self.parent().parent().load_params["stretch"]), tile.rect_idx, tile.tile_size, [], [255, 128, 64, 120])
                     new_tile.setPen(QPen(QColor(255, 255, 255)))
                     self.scene().addItem(new_tile)
                     self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]
