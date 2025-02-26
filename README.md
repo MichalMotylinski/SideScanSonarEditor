@@ -1,4 +1,4 @@
-![tests][![PyPI version](https://img.shields.io/pypi/v/SideScanSonarEditor](https://pypi.org/project/SideScanSonarEditor/)
+[![PyPI version](https://badge.fury.io/py/SideScanSonarEditor.svg)](https://badge.fury.io/py/SideScanSonarEditor)
 
 # SideScanSonarEditor
 SideScanSonarEditor is an open-source application designed for annotation of side-scan sonar data.
