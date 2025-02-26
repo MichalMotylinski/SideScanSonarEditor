@@ -28,7 +28,7 @@ jobs:
       uses: snok/install-poetry@v1
     - name: Install test dependencies
       run: |
-        poetry install --no-root
+        poetry install --no-root --with dev
     - name: Test with pytest
       run: |
         poetry run pytest --cov-report xml --cov=SideScanSonarEditor/
