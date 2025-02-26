@@ -2,9 +2,9 @@ name: tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master, actions-tests ]
   pull_request:
-    branches: [ main ]
+    branches: [ master, actions-tests ]
   workflow_dispatch:
 
 permissions:
@@ -32,5 +32,7 @@ jobs:
     - name: Test with pytest
       run: |
         poetry run pytest --cov-report xml --cov=SideScanSonarEditor/
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+    - name: Upload coverage reports to Codecov
+    	uses: codecov/codecov-action@v5
+    	with:
+	  token: ${{ secrets.CODECOV_TOKEN }}
