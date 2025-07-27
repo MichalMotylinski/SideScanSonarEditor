@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsItem, QMenu, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFrame, QGraphicsLineItem
 
-from widgets.draw_shapes import *
+from .draw_shapes import *
 
 ZOOM_NUM = 0
 X_POS = 0
