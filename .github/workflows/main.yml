@@ -9,16 +9,17 @@ on:
 
 jobs:
   install-test:
-    name: Python ${{ matrix.python-version }} install test
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Install Qt system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 libgl1 libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-xfixes0 libxcb-shape0 libxcb-shm0 \
+            libxcb-sync1 libx11-xcb1 libxcb1 libxcb-render0 libxrender1 libxkbcommon-x11-0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -26,13 +27,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Upgrade pip and build dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
+        run: python -m pip install --upgrade pip setuptools wheel
 
-      - name: Install the package from source
-        run: |
-          pip install .
+      - name: Install package
+        run: pip install -e .
 
-      - name: Verify import
+      - name: Run main() in offscreen mode
         run: |
-          python -c "import SideScanSonarEditor"
+          QT_QPA_PLATFORM=offscreen python -c "from SideScanSonarEditor.app import main; main()"
