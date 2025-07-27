@@ -35,4 +35,4 @@ jobs:
 
       - name: Verify import
         run: |
-          python -c "import SideScanSonarEditor"
+          python -c "from SideScanSonarEditor.app import main; main()"
