@@ -9,7 +9,13 @@ on:
 
 jobs:
   install-test:
+    name: Python ${{ matrix.python-version }} Install Test
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -35,4 +41,3 @@ jobs:
       - name: Run headless GUI test
         run: |
           QT_QPA_PLATFORM=offscreen python .github/workflows/headless_check.py
-
