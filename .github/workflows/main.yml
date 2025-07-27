@@ -18,7 +18,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libegl1 libgl1 libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-render-util0 libxcb-xfixes0 libx11-xcb1 libxcb1 libxcb-render0 libxrender1
+            libxcb-keysyms1 libxcb-render-util0 libxcb-xfixes0 libxcb-shape0 libxcb-shm0 \
+            libxcb-sync1 libx11-xcb1 libxcb1 libxcb-render0 libxrender1 libxkbcommon-x11-0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -31,5 +32,6 @@ jobs:
       - name: Install package
         run: pip install -e .
 
-      - name: Run main()
-        run: python -c "from SideScanSonarEditor.app import main; main()"
+      - name: Run main() in offscreen mode
+        run: |
+          QT_QPA_PLATFORM=offscreen python -c "from SideScanSonarEditor.app import main; main()"
