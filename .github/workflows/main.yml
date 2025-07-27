@@ -32,6 +32,7 @@ jobs:
       - name: Install package
         run: pip install -e .
 
-      - name: Run main() in offscreen mode
+      - name: Run headless GUI test
         run: |
-          QT_QPA_PLATFORM=offscreen python -c "from SideScanSonarEditor.app import main; main()"
+          QT_QPA_PLATFORM=offscreen python .github/workflows/headless_check.py
+
