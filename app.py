@@ -1,3 +1,5 @@
+# sidescansonareditor/app.py
+
 import cv2
 from datetime import datetime
 import json
@@ -15,9 +17,9 @@ from PyQt6.QtWidgets import QGroupBox, QApplication, QListWidget, QComboBox, QCh
 from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont
 from PyQt6.QtCore import pyqtSlot, Qt
 
-from processing.xtf_to_image import *
-from widgets.canvas import *
-from widgets.draw_shapes import *
+from .processing.xtf_to_image import *
+from .widgets.canvas import *
+from .widgets.draw_shapes import *
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -1810,12 +1812,11 @@ def calc_intersection_ratio(rect1, rect2):
     # Return percentage of smaller rectangle inside the larger rectangle
     return intersection_area / smaller_rect_area if smaller_rect_area != 0 else 0
 
-def window():
+def main():
     app = QApplication(sys.argv)
     win = MyWindow()
-
     win.show()
-
     sys.exit(app.exec())
 
-window()
+if __name__ == "__main__":
+    main()
