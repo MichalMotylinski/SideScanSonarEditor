@@ -1,0 +1,295 @@
+{
+    "info": {
+        "description": "SSS Dataset",
+        "url": "",
+        "version": "1.0",
+        "year": 2025,
+        "date_created": "2025-07-27"
+    },
+    "categories": [
+        {
+            "supercategory": "obstacle",
+            "id": 1,
+            "name": "Boulder"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 2,
+            "name": "Debris"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 3,
+            "name": "Possible UXO"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 4,
+            "name": "Shadow"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 5,
+            "name": "Boulder+Shadow"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 6,
+            "name": "Debris+Shadow"
+        },
+        {
+            "supercategory": "obstacle",
+            "id": 7,
+            "name": "Possible UXO+Shadow"
+        }
+    ],
+    "images": [
+        {
+            "id": 0,
+            "width": 128.0,
+            "height": 128.0,
+            "file_name": "00000.png",
+            "rectangle": [
+                2500,
+                453,
+                128,
+                128
+            ],
+            "side": "stbd"
+        }
+    ],
+    "annotations": [
+        {
+            "id": 0,
+            "image_id": 0,
+            "category_id": 1,
+            "segmentation": [
+                17,
+                40,
+                14,
+                40,
+                19,
+                40,
+                19,
+                41,
+                24,
+                41,
+                24,
+                39,
+                26,
+                39,
+                26,
+                38,
+                20,
+                38,
+                20,
+                39,
+                17,
+                39,
+                17,
+                40
+            ],
+            "bbox": [
+                14,
+                38,
+                12,
+                3
+            ],
+            "area": 36,
+            "iscrowd": 0
+        },
+        {
+            "id": 1,
+            "image_id": 0,
+            "category_id": 4,
+            "segmentation": [
+                25,
+                40,
+                25,
+                41,
+                49,
+                41,
+                49,
+                40,
+                52,
+                40,
+                52,
+                39,
+                57,
+                39,
+                57,
+                38,
+                27,
+                38,
+                27,
+                40,
+                25,
+                40
+            ],
+            "bbox": [
+                25,
+                38,
+                32,
+                3
+            ],
+            "area": 96,
+            "iscrowd": 0
+        },
+        {
+            "id": 2,
+            "image_id": 0,
+            "category_id": 5,
+            "segmentation": [
+                49,
+                41,
+                49,
+                40,
+                52,
+                40,
+                52,
+                39,
+                57,
+                39,
+                57,
+                38,
+                20,
+                38,
+                20,
+                39,
+                17,
+                39,
+                17,
+                40,
+                14,
+                40,
+                18,
+                40,
+                19,
+                41,
+                49,
+                41
+            ],
+            "bbox": [
+                14,
+                38,
+                43,
+                3
+            ],
+            "area": 129,
+            "iscrowd": 0
+        },
+        {
+            "id": 3,
+            "image_id": 0,
+            "category_id": 1,
+            "segmentation": [
+                82,
+                38,
+                83,
+                38,
+                68,
+                38,
+                68,
+                39,
+                69,
+                39,
+                69,
+                40,
+                70,
+                40,
+                70,
+                41,
+                82,
+                41,
+                82,
+                38
+            ],
+            "bbox": [
+                68,
+                38,
+                15,
+                3
+            ],
+            "area": 45,
+            "iscrowd": 0
+        },
+        {
+            "id": 4,
+            "image_id": 0,
+            "category_id": 4,
+            "segmentation": [
+                84,
+                41,
+                95,
+                41,
+                95,
+                40,
+                108,
+                40,
+                108,
+                39,
+                103,
+                39,
+                103,
+                38,
+                85,
+                38,
+                85,
+                39,
+                84,
+                39,
+                84,
+                41
+            ],
+            "bbox": [
+                84,
+                38,
+                24,
+                3
+            ],
+            "area": 72,
+            "iscrowd": 0
+        },
+        {
+            "id": 5,
+            "image_id": 0,
+            "category_id": 5,
+            "segmentation": [
+                70,
+                41,
+                95,
+                41,
+                95,
+                40,
+                108,
+                40,
+                108,
+                39,
+                103,
+                39,
+                103,
+                38,
+                68,
+                38,
+                68,
+                39,
+                69,
+                39,
+                69,
+                40,
+                70,
+                40,
+                70,
+                41
+            ],
+            "bbox": [
+                68,
+                38,
+                40,
+                3
+            ],
+            "area": 120,
+            "iscrowd": 0
+        }
+    ]
+}
