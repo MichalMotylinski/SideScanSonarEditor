@@ -33,7 +33,7 @@ Side-scan sonars are widely used instruments for high-resolution mapping of the 
 
 Annotation of the targets is typically done using specialised software which does not produce results allowing for quick conversion to formats commonly used to train machine learning models.
 Our software `SideScanSonarEditor` is a free and open-source Python package which allows the user to read sonar data from XTF files, display it as images and allow further processing (XTF FILE FORMAT, n.d.).
-The key features include the ability for: full analysis of the sonar imagery; simple manipulation of the sonar imagery; and annotation of the objects of interest.
+The key features include the ability to fully analyze sonar imagery, easily manipulate it, and annotate objects of interest.
 The tool additionally allows for drawing of polygon shapes as well as rectangular shapes which coordinates are used to crop smaller image tiles. Together they can be used in the process of dataset creation for further sonar analysis or computer vision tasks such as object detection or segmentation.
 (\autoref{fig:overview}).
 
