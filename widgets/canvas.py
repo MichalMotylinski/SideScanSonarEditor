@@ -527,13 +527,13 @@ class Canvas(QGraphicsView):
             # If in range draw polygon and its corners
             label_idx = self.get_label_idx(polygons[key]["label"])
 
-            polygon = Polygon(QPolygonF([QPointF(math.floor(x[0]) / decimation, ((image_height - math.floor(x[1])) * stretch)) for x in polygons[key]["points"]]), idx, polygons[key]["label"], [*POLY_COLORS[label_idx], 120])
+            polygon = Polygon(QPolygonF([QPointF(x[0] / decimation + 0.5, ((image_height - x[1]) * stretch) + 0.5 * stretch) for x in polygons[key]["points"]]), idx, polygons[key]["label"], [*POLY_COLORS[label_idx], 120])
             self.scene().addItem(polygon)
 
             self._polygons.append({"polygon": self.scene().items()[0], "corners": []})
             
             for i, item in enumerate(polygons[key]["points"]):
-                rect = Ellipse(QRectF(QPointF(math.floor(item[0]) / decimation, ((image_height - math.floor(item[1])) * stretch)), self.ellipse_size), self.ellipse_shift, idx, i, POLY_COLORS[label_idx])
+                rect = Ellipse(QRectF(QPointF(item[0] / decimation + 0.5, ((image_height - item[1]) * stretch) + 0.5 * stretch), self.ellipse_size), self.ellipse_shift, idx, i, POLY_COLORS[label_idx])
                 self.scene().addItem(rect)
                 self._polygons[-1]["corners"].append(self.scene().items()[0])
             
@@ -563,7 +563,7 @@ class Canvas(QGraphicsView):
             x = math.floor(x)
             y = math.floor(y)
             
-            rectangle = Rectangle(QRectF(math.floor(x / decimation), ((image_height - math.floor(y)) * stretch), width / decimation, height * stretch), len(self._tiles), width, [], [255, 128, 64, 120])
+            rectangle = Rectangle(QRectF(x / decimation + 0.5, (image_height - y) * stretch + 0.5 * stretch, width / decimation, height * stretch), len(self._tiles), width, [], [255, 128, 64, 120])
             self.scene().addItem(rectangle)
             self.parent().parent().tiles_list_widget.addItem(ListWidgetItem("Tile", 99, [255, 128, 64], polygon_idx=rectangle.rect_idx, checked=True, parent=self.parent().parent().tiles_list_widget))
 
@@ -661,8 +661,8 @@ class Canvas(QGraphicsView):
             # Drawing polygons if in drawing mode
             if self._draw_mode:
                 # Calculate position of the point on image.
-                x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom))
-                y_point = math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)))
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
 
                 # Starting just add a single point, then draw point and a line connecting it with a previous point
                 if len(self.active_draw["points"]) == 0:
@@ -895,8 +895,8 @@ class Canvas(QGraphicsView):
                 return
             
             if self.was_moving_corner:
-                x_point = math.floor((event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom))
-                y_point = (math.floor(math.floor((event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"])
+                x_point = (event.position().x() + X_POS - self.x_padding / 2) * (ZOOM_FACTOR ** self._zoom)
+                y_point = (event.position().y() + Y_POS - self.y_padding / 2) * (ZOOM_FACTOR ** self._zoom)
 
                 # Get index of the polygon to which point belongs and its own index in that polygon
                 ellipse_idx = self.selected_corner.ellipse_idx
@@ -953,7 +953,7 @@ class Canvas(QGraphicsView):
                     # Get new coords for each point of the polygon
                     polygon_copy = polygon.polygon()
                     for i, item in enumerate(polygon_copy):
-                        polygon_copy[i] = QPointF(math.floor(item.x()), math.floor(math.floor(item.y() / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"]))
+                        polygon_copy[i] = QPointF(item.x(), item.y())
                     
                     # Create new polygon
                     label_idx = self.get_label_idx(polygon.polygon_class)
@@ -967,7 +967,7 @@ class Canvas(QGraphicsView):
                     # Create new points
                     for i, item in enumerate(self._polygons[polygon._polygon_idx]["corners"]):
                         self.scene().removeItem(item)
-                        rect = Ellipse(QRectF(QPointF(math.floor(polygon._polygon_corners[i][0]), math.floor(math.floor(polygon._polygon_corners[i][1] / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"])), self.ellipse_size), self.ellipse_shift, polygon._polygon_idx, i, POLY_COLORS[label_idx])
+                        rect = Ellipse(QRectF(QPointF(polygon._polygon_corners[i][0], polygon._polygon_corners[i][1]), self.ellipse_size), self.ellipse_shift, polygon._polygon_idx, i, POLY_COLORS[label_idx])
                         rect.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                         self.scene().addItem(rect)
                         self._polygons[polygon._polygon_idx]["corners"][i] = self.scene().items()[0]
@@ -980,7 +980,7 @@ class Canvas(QGraphicsView):
             if self.was_moving_tiles:
                 new_selected_tiles = []
                 for tile in self.selected_tiles:
-                    new_tile = Rectangle(QRectF(math.floor(tile.rect().x()), (math.floor(math.floor(tile.rect().y()) / self.parent().parent().load_params["stretch"]) * self.parent().parent().load_params["stretch"]), tile.tile_size / self.parent().parent().load_params["decimation"], tile.tile_size * self.parent().parent().load_params["stretch"]), tile.rect_idx, tile.tile_size, [], [255, 128, 64, 120])
+                    new_tile = Rectangle(QRectF(tile.rect().x(), tile.rect().y(), tile.tile_size / self.parent().parent().load_params["decimation"], tile.tile_size * self.parent().parent().load_params["stretch"]), tile.rect_idx, tile.tile_size, [], [255, 128, 64, 120])
                     new_tile.setPen(QPen(QColor(255, 255, 255)))
                     self.scene().addItem(new_tile)
                     self._tiles[tile._rect_idx]["tiles"] = self.scene().items()[0]
