@@ -33,16 +33,22 @@ Side-scan sonars are widely used instruments for high-resolution mapping of the 
 
 Annotation of the targets is typically done using specialised software which does not produce results allowing for quick conversion to formats commonly used to train machine learning models.
 Our software `SideScanSonarEditor` is a free and open-source Python package which allows the user to read sonar data from XTF files, display it as images and allow further processing (XTF FILE FORMAT, n.d.).
-The key feature include the ability for: full analysis of the sonar imagery, simple manipulation of the sonar imagery and annotation of the objects of interest.
+The key features include the ability to fully analyze sonar imagery, easily manipulate it, and annotate objects of interest.
 The tool additionally allows for drawing of polygon shapes as well as rectangular shapes which coordinates are used to crop smaller image tiles. Together they can be used in the process of dataset creation for further sonar analysis or computer vision tasks such as object detection or segmentation.
 (\autoref{fig:overview}).
 
 `SideScanSonarEditor` provides the following sonar image manipulation methods:
+
  - Decimation – across-track down sampling which might be useful when importing very large files that might exceed memory limits on some systems. The decimation factor directly determines the fraction of the data that is to be retained meaning with a factor of 1, 100% of the samples are loaded, with a factor of 2, 50%, factor of 3, 33% and so on. The setting range goes from 1-10 but in reality, values greater than 4 will produce errors or severely reduce the number of samples leading to the loss of a significant portion of data. For the purpose of this research, decimation is set to 1 at all times to ensure the highest number of horizontal features per target.
+
  - Stretch – Along-track stretch factor which defines how many times each ping should be repeated. This method is applied to improve the visual representation of the features. Typically, when the data is displayed, the objects will appear stretched horizontally and compressed vertically. To compensate without losing across-track features the image is expanded vertically allowing for easier analysis and labelling of the targets. The stretching method, however, is not utilised when generating training data or during inference. The technique is used purely as a visual correction during the annotation process.
+
  - Invert – Inversion of the colour palette which in some cases might help in visual recognition of targets.
+
  - Colour mapping – Setting colour palette to highlight different features. Applying different mapping scales can help distinguish various targets on the image. Currently available options include two greyscale patterns a linear (grey) and logarithmic (greylog).
+
  - Map range – Minimum and maximum mapping ranges are by default automatically calculated based on the intensity input data. Both can be manually modified to change the representation of the features for easier interpretation.
+
  - Slant range correction - apply slant rage correction to compensate for the geometric distortion of the return signal. The corrected image represents true seafloor distances allowing for better alignment with the navigation data (Chang et al., 2010).
 
 ![SideScanSonarEditor app \label{fig:overview}](overview.png)
