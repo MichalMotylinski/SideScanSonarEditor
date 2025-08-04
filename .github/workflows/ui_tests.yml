@@ -30,7 +30,10 @@ jobs:
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
-
+      
+    - name: Run tests with X virtual framebuffer
+      run: xvfb-run -a pytest tests/
+  
     - name: Run tests
       run: |
         pytest tests/
