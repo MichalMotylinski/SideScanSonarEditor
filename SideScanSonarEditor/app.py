@@ -781,106 +781,66 @@ class MyWindow(QMainWindow):
         if self.merged_image is None:
             return
 
-        try:
-            with open(os.path.join(self.input_filepath, self.tiles_filename), "r") as f:
-                old_tiles = json.load(f)
-        except:
-            old_tiles = {}
-        
         with open(os.path.join(self.input_filepath, self.tiles_filename), "w") as f:
             data = {}
             data["full_height"] = self.load_params["full_image_height"]
             data["full_width"] = self.load_params["full_image_width"]
             tiles = {}
-            i = 0
-
             for tile_data in self.canvas._tiles:
-                if tile_data == None:
-                    if str(i) in old_tiles.keys():
-                        tiles[i] = old_tiles[str(i)]
-                        i += 1
-                elif tile_data == "del":
-                    tiles[i] = "del"
-                    i += 1
-                else:
-                    tiles[i] = {"rectangle": [math.floor(tile_data["tiles"].rect().x()) * self.load_params["decimation"], math.floor((self.port_image.size[1] - math.floor(tile_data["tiles"].rect().y())) / self.load_params["stretch"]), tile_data["tiles"].rect().width() * self.load_params["decimation"], math.floor(math.floor(tile_data["tiles"].rect().height()) / self.load_params["stretch"])]}
-                    i += 1
+                if tile_data == "del":
+                    continue
 
-            # Remove polygons from dict 
-            for key in list(tiles.keys()):
-                if tiles[key] == "del":
-                    del tiles[key]
-
+                rect = tile_data["tiles"].rect()
+                tile_entry = {
+                    "rectangle": [
+                        math.floor(rect.x()) * self.load_params["decimation"],
+                        math.floor((self.port_image.size[1] - math.floor(rect.y())) / self.load_params["stretch"]),
+                        rect.width() * self.load_params["decimation"],
+                        math.floor(math.floor(rect.height()) / self.load_params["stretch"]),
+                    ]
+                }
+                tiles[len(tiles)] = tile_entry
             data["shapes"] = tiles
             json.dump(data, f, indent=4)
 
-        try:
-            with open(os.path.join(self.input_filepath, self.labels_filename), "r") as f:
-                old_polygons = json.load(f)
-        except:
-            old_polygons = {}
         
         with open(os.path.join(self.input_filepath, self.labels_filename), "w") as f:
             data = {}
             data["full_height"] = self.load_params["full_image_height"]
             data["full_width"] = self.load_params["full_image_width"]
-            new_polygons = self.canvas._polygons
+
+            new_polygons_raw = self.canvas._polygons
             polygons = {}
-            i = 0
-            
-            old_classes = {}
 
-            for polygon_data in new_polygons:
-                # If polygon not on the slice load it from file
-                # If the polygon was deleted then add "del" string for later removal from dict
-                # Any new or updated polygons add/update to the dict
-                if polygon_data == None:
-                    if str(i) in old_polygons["shapes"].keys():
-                        polygons[i] = old_polygons["shapes"][str(i)]
+            # Step 1: Build cleaned polygon dict (skip "del")
+            for i, polygon_data in enumerate(p for p in new_polygons_raw if p != "del"):
+                corners = []
+                for corner in polygon_data["polygon"]._polygon_corners:
+                    x = math.floor(corner[0]) * self.load_params["decimation"]
+                    y = math.floor(self.port_image.size[1] / self.load_params["stretch"] -
+                                math.floor(corner[1] / self.load_params["stretch"]))
+                    corners.append([x, y])
 
-                        if polygons[i]["label"] not in old_classes.values():
-                            old_classes[len(old_classes)] = polygons[i]["label"]
-                        i += 1
-                elif polygon_data == "del":
-                    polygons[i] = "del"
-                    i += 1
-                else:
-                    corners = []
-                    
-                    for idx, polygon in enumerate(polygon_data["polygon"]._polygon_corners):
-                        x = math.floor(polygon[0]) * self.load_params["decimation"]
-                        y = math.floor(self.port_image.size[1] / self.load_params["stretch"] - math.floor(polygon[1] / self.load_params["stretch"]))
-                        corners.append([x, y])
+                polygons[i] = {
+                    "label": polygon_data["polygon"].polygon_class,
+                    "points": corners
+                }
 
-                    polygons[i] = {"label": polygon_data["polygon"].polygon_class,
-                                   "points": corners}
-                    i += 1
-                
-            # Remove polygons from dict 
-            for key in list(polygons.keys()):
-                if polygons[key] == "del":
-                    del polygons[key]
-
-            # Update list of labels used
+            # Step 2: Update labels using old_classes if present
             new_classes = {}
-            if len(self.old_classes) != 0:
-                for key in list(polygons.keys()):
-                    old_class = polygons[key]["label"]
-                    if old_class not in self.old_classes.keys():
-                        continue
-                    if old_class not in new_classes.keys():
-                        lab = self.canvas.classes[self.old_classes[polygons[key]["label"]]]
-                        polygons[key]["label"] = lab
-                        new_classes[polygons[key]["label"]] = self.old_classes[old_class]
-                
+            if self.old_classes:
+                for key, value in polygons.items():
+                    old_class = value["label"]
+                    if old_class in self.old_classes:
+                        label_idx = self.old_classes[old_class]
+                        new_label = self.canvas.classes[label_idx]
+                        polygons[key]["label"] = new_label
+                        new_classes[new_label] = label_idx
+
             self.old_classes = new_classes
 
-            # Reorder dict
-            new_polygons = {}
-            i = 0
-            for key in sorted(polygons.keys()):
-                new_polygons[i] = polygons[key]
-                i += 1
+            # Step 3: Reindex polygons to ensure 0...N-1 keys
+            new_polygons = {i: polygons[k] for i, k in enumerate(sorted(polygons.keys()))}
 
             data["shapes"] = new_polygons
             json.dump(data, f, indent=4)
@@ -976,17 +936,23 @@ class MyWindow(QMainWindow):
             }
             
             anns["images"].append(image)
-
+            print(self.canvas._polygons, self.canvas._tiles)
+            for x in tile_data["tiles"].polygons_inside:
+                print(x)
+                if isinstance(self.canvas._polygons[x]["polygon"], Polygon):
+                    print("YES")
+                else:
+                    print("No")
             for polygon in [self.canvas._polygons[x]["polygon"] for x in tile_data["tiles"].polygons_inside if isinstance(self.canvas._polygons[x]["polygon"], Polygon)]:
-                
+                print("AAAAA")
                 xmin, ymin = np.min(np.array(polygon.polygon_corners).T[0]), np.min(np.array(polygon.polygon_corners).T[1])
                 xmax, ymax = np.max(np.array(polygon.polygon_corners).T[0]), np.max(np.array(polygon.polygon_corners).T[1])
                 
                 x_list = np.array(polygon.polygon_corners).T[0] * self.load_params["decimation"]
                 y_list = np.array(polygon.polygon_corners).T[1] / self.load_params["stretch"]
 
-                intersection = calc_intersection_ratio([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
-                
+                intersection = self.calc_intersection_ratio([min(x_list),min(y_list),max(x_list)-min(x_list),max(y_list)-min(y_list)], [tiler_xmin,tiler_ymin,tiler_xmax-tiler_xmin,tiler_ymax-tiler_ymin])
+
                 if intersection < 0.5:
                     continue        
 
@@ -1103,7 +1069,7 @@ class MyWindow(QMainWindow):
             self.port_min_slider.setValue(val)
             self.port_min_slider_current.setText(str(current_val_text))
         else: # If no match then find the find_closest_val value in dict and update the slider
-            closest = find_closest_val(list(self.port_params["channel_min_dict"].values()), current_val_text)
+            closest = self.find_closest_val(list(self.port_params["channel_min_dict"].values()), current_val_text)
             val = next((key for key, val in self.port_params["channel_min_dict"].items() if val == closest), None)
             self.port_min_slider.setValue(val)
             self.port_min_slider_current.setText(str(closest))
@@ -1160,7 +1126,7 @@ class MyWindow(QMainWindow):
             self.port_max_slider.setValue(val)
             self.port_max_slider_current.setText(str(current_val_text))
         else: # If no match then find the find_closest_val value in dict and update the slider
-            closest = find_closest_val(list(self.port_params["channel_max_dict"].values()), current_val_text)
+            closest = self.find_closest_val(list(self.port_params["channel_max_dict"].values()), current_val_text)
             val = next((key for key, val in self.port_params["channel_max_dict"].items() if val == closest), None)
             self.port_max_slider.setValue(val)
             self.port_max_slider_current.setText(str(closest))
@@ -1273,7 +1239,7 @@ class MyWindow(QMainWindow):
             self.starboard_min_slider.setValue(val)
             self.starboard_min_slider_current.setText(str(current_val_text))
         else:
-            closest = find_closest_val(list(self.starboard_params["channel_min_dict"].values()), current_val_text)
+            closest = self.find_closest_val(list(self.starboard_params["channel_min_dict"].values()), current_val_text)
             val = next((key for key, val in self.starboard_params["channel_min_dict"].items() if val == closest), None)
             self.starboard_min_slider.setValue(val)
             self.starboard_min_slider_current.setText(str(closest))
@@ -1330,7 +1296,7 @@ class MyWindow(QMainWindow):
             self.starboard_max_slider.setValue(val)
             self.starboard_max_slider_current.setText(str(current_val_text))
         else: # If no match then find the find_closest_val value in dict and update the slider
-            closest = find_closest_val(list(self.starboard_params["channel_max_dict"].values()), current_val_text)
+            closest = self.find_closest_val(list(self.starboard_params["channel_max_dict"].values()), current_val_text)
             val = next((key for key, val in self.starboard_params["channel_max_dict"].items() if val == closest), None)
             self.starboard_max_slider.setValue(val)
             self.starboard_max_slider_current.setText(str(closest))
@@ -1770,47 +1736,49 @@ class MyWindow(QMainWindow):
         
         self.setCentralWidget(main_widget)
 
-################################################
-# Other functions
-################################################
-def find_closest_val(arr, val):
-    """
-    Find closest value in an array.
+    def find_closest_val(self, arr, val):
+        """
+        Find closest value in an array.
 
-    :param arr: List of the values to search.
-    :type arr: list
-    :param val: Target value.
-    :type val: float
-    :return: Value from array closest to the target.
-    :rtype: float
-    """
-    return arr[min(range(len(arr)), key = lambda i: abs(arr[i] - val))]
+        :param arr: List of the values to search.
+        :type arr: list
+        :param val: Target value.
+        :type val: float
+        :return: Value from array closest to the target.
+        :rtype: float
+        """
+        return arr[min(range(len(arr)), key = lambda i: abs(arr[i] - val))]
 
-def calc_intersection_ratio(rect1, rect2):
-    """
-    Calculate intersection ratio between two rectes.
+    ################################################
+    # Other functions
+    ################################################
+    def calc_intersection_ratio(self, rect1, rect2):
+        """
+        Calculate intersection ratio between two rectes.
 
-    :param rect1: List of the first rectangle coordinates in [x, y, width, length] format.
-    :type rect1: list
-    :param rect2: List of the second rectangle coordinates in [x, y, width, length] format.
-    :type rect2: list
-    :return: Percentage of a smaller rectangle area within larger rectangle
-    :rtype: float
-    """
-    x1, y1, w1, h1 = rect1
-    x2, y2, w2, h2 = rect2
+        :param rect1: List of the first rectangle coordinates in [x, y, width, length] format.
+        :type rect1: list
+        :param rect2: List of the second rectangle coordinates in [x, y, width, length] format.
+        :type rect2: list
+        :return: Percentage of a smaller rectangle area within larger rectangle
+        :rtype: float
+        """
+        x1, y1, w1, h1 = rect1
+        x2, y2, w2, h2 = rect2
 
-    x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
-    y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
+        x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
+        y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
 
-    # Calculate intersection area
-    intersection_area = x_overlap * y_overlap
+        # Calculate intersection area
+        intersection_area = x_overlap * y_overlap
 
-    # Calculate area of smaller rectangle
-    smaller_rect_area = min(w1 * h1, w2 * h2)
+        # Calculate area of smaller rectangle
+        smaller_rect_area = min(w1 * h1, w2 * h2)
 
-    # Return percentage of smaller rectangle inside the larger rectangle
-    return intersection_area / smaller_rect_area if smaller_rect_area != 0 else 0
+        # Return percentage of smaller rectangle inside the larger rectangle
+        return intersection_area / smaller_rect_area if smaller_rect_area != 0 else 0
+
+
 
 def main():
     app = QApplication(sys.argv)
