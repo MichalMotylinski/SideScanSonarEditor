@@ -33,7 +33,3 @@ jobs:
       
     - name: Run tests with X virtual framebuffer
       run: xvfb-run -a pytest tests/
-  
-    - name: Run tests
-      run: |
-        pytest tests/
