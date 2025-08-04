@@ -85,6 +85,12 @@ Finally user can save currently drawn shapes by clicking "Save labels". This cre
 The "Crop tiles" button allows user to create a annotations file in a COCO format. Each image entry has additional key "side" which indicates from which channel the image was cropped. This might be helpful if user would like to perform further processing with the original XTF file using cropped coordinates. The remaining outlook of the file is unchanged and can be used directly for computer vision tasks.
 ![Excerpt from the annotations file \label{fig:annotations}](figures/annotations.png)
 
+## Author Contributions
+
+- **Michal Motylinski**: Software development, Design, Writing – Original Draft.
+- **Prof. Andrew J. Plater**: Supervision, Conceptualization, Writing – Review & Editing.
+- **Dr. Jonathan E. Higham**: Supervision, Conceptualization, Writing – Review & Editing.
+
 License
 -------
 This project is licensed under the [GNU License](./LICENSE).
