@@ -24,6 +24,14 @@ dependencies = [
     "scipy"
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-qt",
+    "mock",
+    "certifi"
+]
+
 [project.urls]
 Repository = "https://github.com/MichalMotylinski/SideScanSonarEditor"
 
