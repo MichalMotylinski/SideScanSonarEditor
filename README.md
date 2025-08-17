@@ -38,6 +38,17 @@ Or to install from source:
 
 ## Usage
 -------------
+After installation he app can be launched with:
+1. Console command:
+    ```bash
+    SideScanSonarEditor
+    ```
+2. Import and run it from a Python script:
+   ```python
+    from SideScanSonarEditor import app
+    app.main()
+    ```
+
 The `SideScanSonarEditor` was designed to read side-scan sonar data from XTF files and does not support any other input format or other sonar data.
 
 ![Overview of the app \label{fig:overview}](figures/overview.png)
