@@ -32,7 +32,7 @@ bibliography: bibliography.bib
 Side-scan sonars are widely used instruments for high-resolution mapping of the seafloor, utilizing acoustic signals to generate detailed imagery. These systems play a crucial role in marine research, habitat assessment, underwater archaeology, and infrastructure inspections, providing valuable insights into seabed features and composition.
 
 Annotation of the targets is typically done using specialised software which does not produce results allowing for quick conversion to formats commonly used to train machine learning models.
-Our software `SideScanSonarEditor` is a free and open-source Python package which allows the user to read sonar data from XTF files, display it as images and allow further processing (XTF FILE FORMAT, n.d.).
+Our software `SideScanSonarEditor` is a free and open-source Python package which allows the user to read sonar data from XTF files, display it as images and allow further processing [@xtf].
 The key features include the ability to fully analyze sonar imagery, easily manipulate it, and annotate objects of interest.
 The tool additionally allows for drawing of polygon shapes as well as rectangular shapes which coordinates are used to crop smaller image tiles. Together they can be used in the process of dataset creation for further sonar analysis or computer vision tasks such as object detection or segmentation.
 (\autoref{fig:overview}).
@@ -49,19 +49,19 @@ The tool additionally allows for drawing of polygon shapes as well as rectangula
 
  - Map range – Minimum and maximum mapping ranges are by default automatically calculated based on the intensity input data. Both can be manually modified to change the representation of the features for easier interpretation.
 
- - Slant range correction - apply slant rage correction to compensate for the geometric distortion of the return signal. The corrected image represents true seafloor distances allowing for better alignment with the navigation data (Chang et al., 2010).
+ - Slant range correction - apply slant rage correction to compensate for the geometric distortion of the return signal. The corrected image represents true seafloor distances allowing for better alignment with the navigation data [@chang:2010].
 
 ![SideScanSonarEditor app \label{fig:overview}](overview.png)
 
 # Statement of Need
 
-Side-scan sonar is a commonly used instrument for mapping of the seabed. These devices operate by being towed behind a vessel, emitting sonar pulses that reflect off the seabed to create detailed images. The raw data collected by the sonar consists of overlapping representations of the seabed that must be processed before they can be used for machine learning applications, such as target recognition and labeling.
+Side-scan sonar is a commonly used instrument for mapping of the seabed. These devices operate by being towed behind a vessel, emitting sonar pulses that reflect off the seabed to create detailed images. The raw data collected by the sonar consists of overlapping representations of the seabed that must be processed before they can be used for machine learning applications, such as target recognition and labeling [@Motylinski:2025].
 
-Interpreting side-scan sonar data from sonar typically requires expensive proprietary software designed for in-depth analysis and post-processing. However, these software packages do not facilitate the extraction of imagery and annotations in a format suitable for training computer vision models or further processing. To train an automatic target recognition model, users must manually crop imagery in SonarWiz (or similar closed-source software) before annotating it using LabelMe or other standard tools (Wada, 2024). This process is highly time-consuming, requiring manual visual analysis of sonar swaths in SonarWiz or EdgeTech Discover to identify and crop relevant areas (Chesapeake Technology - Makers of SonarWiz, n.d.; EdgeTech, n.d.). After cropping, the images must then be manually re-analyzed and labeled in another software such as `LabelMe', adding further to the labor-intensive workflow.
+Interpreting side-scan sonar data from sonar typically requires expensive proprietary software designed for in-depth analysis and post-processing. However, these software packages do not facilitate the extraction of imagery and annotations in a format suitable for training computer vision models or further processing [@lin:2014]. To train an automatic target recognition model, users must manually crop imagery in SonarWiz (or similar closed-source software) before annotating it using LabelMe or other standard tools [@wada:2024]. This process is highly time-consuming, requiring manual visual analysis of sonar swaths in SonarWiz or EdgeTech Discover to identify and crop relevant areas [@chesapeake, @edgetech]. After cropping, the images must then be manually re-analyzed and labeled in another software such as `LabelMe', adding further to the labor-intensive workflow.
 
-To the best of our knowledge, there is currently no open-source software available for viewing, manipulating, and annotating side-scan sonar files. Even commercial software does not provide a streamlined workflow optimized for time efficiency. Our open-source and free-to-use software, SideScanSonarEditor, significantly simplifies and accelerates the annotation process for sonar data. The output format is designed for easy analysis, further processing, and seamless integration with object detection or segmentation models.
+To the best of our knowledge, there is currently no open-source software available for viewing, manipulating, and annotating side-scan sonar files. Even commercial software does not provide a streamlined workflow optimized for time efficiency. Our open-source and free-to-use software, SideScanSonarEditor, significantly simplifies and accelerates the annotation process for sonar data. The output format is designed for easy analysis, further processing, and seamless integration with object detection or segmentation models [@lin:2014].
 
-`SideScanSonarEditor' utilizes the pyxtf library to read complete XTF files and generates waterfall views of surveyed areas (Sture, 2016/2025). The data is displayed as a collection of pings, with the scan direction oriented from bottom to top. The image view consists of two sections corresponding to the two sides of the tow-fish: the port side and the starboard side, with port-side data being horizontally flipped for accurate real-world representation of the seafloor. The software’s primary function is to generate waterfall images and enable efficient annotation of targets, as well as cropping tiles to create datasets ready for model training.
+`SideScanSonarEditor' utilizes the pyxtf library to read complete XTF files and generates waterfall views of surveyed areas [@oysstupyxtf:2025]. The data is displayed as a collection of pings, with the scan direction oriented from bottom to top. The image view consists of two sections corresponding to the two sides of the tow-fish: the port side and the starboard side, with port-side data being horizontally flipped for accurate real-world representation of the seafloor. The software’s primary function is to generate waterfall images and enable efficient annotation of targets, as well as cropping tiles to create datasets ready for model training.
 
 # Future Work
 
@@ -74,13 +74,7 @@ In current form the tool is very simple but future version might see an improved
 This work was supported by the Port City Innovation Hub (European Regional Development Fund).
 
 # References
-Chang, Y.-C., Hsu, S.-K., & Tsai, C.-H. (2010). SIDESCAN SONAR IMAGE PROCESSING:CORRECTING BRIGHTNESS VARIATION AND PATCHING GAPS. Journal of Marine Science and Technology, 18(6). https://doi.org/10.51400/2709-6998.1935
-Chesapeake Technology - Makers of SonarWiz. (n.d.). Retrieved December 6, 2024, from https://chesapeaketech.com/
-EdgeTech. (n.d.). Retrieved December 6, 2024, from https://www.edgetech.com/
-Lin, T.-Y., Maire, M., Belongie, S., Hays, J., Perona, P., Ramanan, D., Dollár, P., & Zitnick, C. L. (2014). Microsoft COCO: Common Objects in Context. In D. Fleet, T. Pajdla, B. Schiele, & T. Tuytelaars (Eds.), Computer Vision – ECCV 2014 (pp. 740–755). Springer International Publishing. https://doi.org/10.1007/978-3-319-10602-1_48
-Sture, Ø. (2025). oysstu/pyxtf. https://github.com/oysstu/pyxtf (Original work published 2016)
-Wada, K. (2024). Labelme: Image Polygonal Annotation with Python. https://doi.org/10.5281/zenodo.5711226
-XTF FILE FORMAT. (n.d.). Retrieved May 2, 2023, from https://www.ecagroup.com/en/xtf-file-format
+
 
 \pagebreak
 \appendix
