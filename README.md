@@ -2,6 +2,7 @@
 
 # SideScanSonarEditor
 SideScanSonarEditor is an open-source application designed for annotation of side-scan sonar data.
+The interpretation of side-scan sonar data is typically conducted using expensive proprietary software and annotation for the purpoeses training ML solutions requires use of multiple software applications and conversion between various formats. No open-source solutions currently exist that streamline this process, leaving researchers with time-consuming and fragmented tools. SideScanSonarEditor addresses this need by providing a free, open-source platform that simplifies visualization, annotation, and dataset preparation, enabling efficient integration with computer vision models.
 
 ## Install and Requirements
 The SideScanSonarEditor tool has been built and tested using Python 3.9 and requires following dependencies:
@@ -38,6 +39,17 @@ Or to install from source:
 
 ## Usage
 -------------
+After installation he app can be launched with:
+1. Console command:
+    ```bash
+    SideScanSonarEditor
+    ```
+2. Import and run it from a Python script:
+   ```python
+    from SideScanSonarEditor import app
+    app.main()
+    ```
+
 The `SideScanSonarEditor` was designed to read side-scan sonar data from XTF files and does not support any other input format or other sonar data.
 
 ![Overview of the app \label{fig:overview}](figures/overview.png)

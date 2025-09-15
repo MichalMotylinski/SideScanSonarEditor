@@ -9,6 +9,11 @@ Thanks for considering contributing to SideScanSonarEditor! This document outlin
 3. Make your changes.
 4. Push and open a Pull Request with a clear description.
 
+## CI/CD testing pipeline
+The automated tests are set to run for each commit. Additionally the tests can be manually triggered with a workflow in the actions panel:
+- Automated UI Tests
+- Test package Installation
+
 ## Reporting Issues and Seeking Support
 
 - Search for existing issues first.
