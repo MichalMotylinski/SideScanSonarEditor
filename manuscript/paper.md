@@ -74,7 +74,3 @@ In current form the tool is very simple but future version might see an improved
 This work was supported by the Port City Innovation Hub (European Regional Development Fund).
 
 # References
-
-
-\pagebreak
-\appendix
