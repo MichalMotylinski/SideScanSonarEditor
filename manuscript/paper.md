@@ -1,5 +1,5 @@
 ---
-title: '`SideScanSonarEditor`: A Python package for annotation of side-scan sonar data'
+title: 'SideScanSonarEditor: A Python package for annotation of side-scan sonar data'
 tags:
   - Python package
   - annotation
